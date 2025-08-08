@@ -2,8 +2,10 @@ package com.lhamacorp.games.tlob;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 
-public class KeyManager implements KeyListener {
+public class KeyManager implements KeyListener, MouseListener {
 
     public volatile boolean up;
     public volatile boolean down;
@@ -13,6 +15,13 @@ public class KeyManager implements KeyListener {
     public volatile boolean enter;
     public volatile boolean escape;
     public volatile boolean shift;
+
+    private volatile boolean attackKey;
+    private volatile boolean attackMouse;
+
+    private void updateAttack() {
+        attack = attackKey || attackMouse;
+    }
 
     @Override
     public void keyTyped(KeyEvent e) { }
@@ -34,7 +43,7 @@ public class KeyManager implements KeyListener {
             case KeyEvent.VK_RIGHT:
                 right = true; break;
             case KeyEvent.VK_SPACE:
-                attack = true; break;
+                attackKey = true; updateAttack(); break;
             case KeyEvent.VK_ENTER:
                 enter = true; break;
             case KeyEvent.VK_ESCAPE:
@@ -62,7 +71,7 @@ public class KeyManager implements KeyListener {
             case KeyEvent.VK_RIGHT:
                 right = false; break;
             case KeyEvent.VK_SPACE:
-                attack = false; break;
+                attackKey = false; updateAttack(); break;
             case KeyEvent.VK_ENTER:
                 enter = false; break;
             case KeyEvent.VK_ESCAPE:
@@ -72,4 +81,24 @@ public class KeyManager implements KeyListener {
             default:
         }
     }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON1) {
+            attackMouse = true;
+            updateAttack();
+        }
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        if (e.getButton() == MouseEvent.BUTTON1) {
+            attackMouse = false;
+            updateAttack();
+        }
+    }
+
+    @Override public void mouseClicked(MouseEvent e) { }
+    @Override public void mouseEntered(MouseEvent e) { }
+    @Override public void mouseExited(MouseEvent e) { }
 }

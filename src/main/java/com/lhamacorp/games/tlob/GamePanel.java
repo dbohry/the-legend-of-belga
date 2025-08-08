@@ -22,7 +22,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     private int cameraOffsetX;
     private int cameraOffsetY;
-    
+
     private boolean gameOver = false;
     private boolean victory = false;
     private boolean paused = false;
@@ -42,9 +42,9 @@ public class GamePanel extends JPanel implements Runnable {
 
         keyManager = new KeyManager();
         addKeyListener(keyManager);
+        addMouseListener(keyManager);
         setFocusable(true);
-        
-        // Add mouse listener for buttons
+
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -105,7 +105,8 @@ public class GamePanel extends JPanel implements Runnable {
             if (sleepNs > 0) {
                 try {
                     Thread.sleep(sleepNs / 1_000_000L, (int) (sleepNs % 1_000_000L));
-                } catch (InterruptedException ignored) { }
+                } catch (InterruptedException ignored) {
+                }
             } else {
                 Thread.yield();
             }
@@ -122,7 +123,7 @@ public class GamePanel extends JPanel implements Runnable {
             }
             return;
         }
-        
+
         // Check for enter key restart
         if ((gameOver || victory) && keyManager.enter) {
             if (gameOver) {
@@ -132,7 +133,7 @@ public class GamePanel extends JPanel implements Runnable {
             }
             return;
         }
-        
+
         // Check for game over
         if (!player.isAlive() && !gameOver) {
             gameOver = true;
@@ -143,7 +144,7 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonY = SCREEN_HEIGHT / 2 + 50;
             tryAgainButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
         }
-        
+
         // Check for victory
         if (enemies.isEmpty() && !victory && !gameOver) {
             victory = true;
@@ -154,7 +155,7 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonY = SCREEN_HEIGHT / 2 + 50;
             nextLevelButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
         }
-        
+
         if (!gameOver && !victory && !paused) {
             player.update(keyManager, tileMap, enemies);
             for (int i = enemies.size() - 1; i >= 0; i--) {
@@ -203,17 +204,17 @@ public class GamePanel extends JPanel implements Runnable {
 
         // HUD
         drawHud(g2);
-        
+
         // Game over screen
         if (gameOver) {
             drawGameOverScreen(g2);
         }
-        
+
         // Victory screen
         if (victory) {
             drawVictoryScreen(g2);
         }
-        
+
         // Pause menu
         if (paused) {
             drawPauseMenu(g2);
@@ -313,7 +314,7 @@ public class GamePanel extends JPanel implements Runnable {
         // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        
+
         // Game Over text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.RED);
@@ -322,14 +323,14 @@ public class GamePanel extends JPanel implements Runnable {
         int textX = (SCREEN_WIDTH - textWidth) / 2;
         int textY = SCREEN_HEIGHT / 2 - 20;
         g2.drawString(gameOverText, textX, textY);
-        
+
         // Try Again button
         if (tryAgainButton != null) {
             g2.setColor(new Color(60, 60, 60));
             g2.fillRect(tryAgainButton.x, tryAgainButton.y, tryAgainButton.width, tryAgainButton.height);
             g2.setColor(Color.WHITE);
             g2.drawRect(tryAgainButton.x, tryAgainButton.y, tryAgainButton.width, tryAgainButton.height);
-            
+
             g2.setFont(new Font("Arial", Font.BOLD, 20));
             String buttonText = "Try Again";
             int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
@@ -337,12 +338,12 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonTextY = tryAgainButton.y + (tryAgainButton.height + 15) / 2;
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
-        
+
         // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
     }
-    
+
     private void drawVictoryScreen(Graphics2D g2) {
         if (!victorySoundPlayed) {
             AudioManager.playSound("map-complete.wav");
@@ -352,7 +353,7 @@ public class GamePanel extends JPanel implements Runnable {
         // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        
+
         // Victory text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.GREEN);
@@ -361,7 +362,7 @@ public class GamePanel extends JPanel implements Runnable {
         int textX = (SCREEN_WIDTH - textWidth) / 2;
         int textY = SCREEN_HEIGHT / 2 - 40;
         g2.drawString(victoryText, textX, textY);
-        
+
         // Level info
         g2.setFont(new Font("Arial", Font.PLAIN, 24));
         g2.setColor(Color.WHITE);
@@ -370,14 +371,14 @@ public class GamePanel extends JPanel implements Runnable {
         int levelTextX = (SCREEN_WIDTH - levelTextWidth) / 2;
         int levelTextY = SCREEN_HEIGHT / 2;
         g2.drawString(levelText, levelTextX, levelTextY);
-        
+
         // Next Level button
         if (nextLevelButton != null) {
             g2.setColor(new Color(60, 120, 60));
             g2.fillRect(nextLevelButton.x, nextLevelButton.y, nextLevelButton.width, nextLevelButton.height);
             g2.setColor(Color.WHITE);
             g2.drawRect(nextLevelButton.x, nextLevelButton.y, nextLevelButton.width, nextLevelButton.height);
-            
+
             g2.setFont(new Font("Arial", Font.BOLD, 20));
             String buttonText = "Next Level";
             int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
@@ -385,12 +386,12 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonTextY = nextLevelButton.y + (nextLevelButton.height + 15) / 2;
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
-        
+
         // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
     }
-    
+
     private void restartGame() {
         gameOver = false;
         paused = false;
@@ -400,52 +401,52 @@ public class GamePanel extends JPanel implements Runnable {
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
         player.heal();
-        
+
         // Reset completed maps counter
         completedMaps = 0;
-        
+
         // Spawn enemies
         spawnEnemies();
-        
+
         // Reset camera
         updateCamera();
-        
+
         // Regain focus for keyboard input
         requestFocusInWindow();
     }
-    
+
     private void startNextLevel() {
         completedMaps++;
         victory = false;
         paused = false;
         victorySoundPlayed = false;
-        
+
         // Generate new map
         MapGenerator generator = new MapGenerator(80, 60, 0.45, 2500);
         tileMap = new TileMap(generator.generate());
-        
+
         // Reset player
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
         player.restoreAll();
-        
+
         // Spawn new enemies
         spawnEnemies();
-        
+
         // Reset camera
         updateCamera();
-        
+
         // Regain focus for keyboard input
         requestFocusInWindow();
     }
-    
+
     private void spawnEnemies() {
         enemies.clear();
         // Calculate enemy count based on completed maps
-        int baseEnemies = 3 + (int)(Math.random() * 6); // 5-10 enemies
-        double multiplier = Math.pow(1.4, completedMaps); // 1.4x multiplier per level
-        int enemiesToSpawn = Math.max(1, (int)(baseEnemies * multiplier));
-        
+        int baseEnemies = 3 + (int) (Math.random() * 6);
+        double multiplier = Math.pow(1.4, completedMaps);
+        int enemiesToSpawn = Math.max(1, (int) (baseEnemies * multiplier));
+
         for (int i = 0; i < enemiesToSpawn; i++) {
             int[] pos = tileMap.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * TILE_SIZE);
             if (pos != null) {
@@ -462,12 +463,12 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
     }
-    
+
     private void drawPauseMenu(Graphics2D g2) {
         // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        
+
         // Pause text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.WHITE);
@@ -476,14 +477,14 @@ public class GamePanel extends JPanel implements Runnable {
         int textX = (SCREEN_WIDTH - textWidth) / 2;
         int textY = SCREEN_HEIGHT / 2 - 120;
         g2.drawString(pauseText, textX, textY);
-        
+
         // Resume button
         if (resumeButton != null) {
             g2.setColor(new Color(60, 120, 60));
             g2.fillRect(resumeButton.x, resumeButton.y, resumeButton.width, resumeButton.height);
             g2.setColor(Color.WHITE);
             g2.drawRect(resumeButton.x, resumeButton.y, resumeButton.width, resumeButton.height);
-            
+
             g2.setFont(new Font("Arial", Font.BOLD, 20));
             String buttonText = "Resume";
             int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
@@ -491,14 +492,14 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonTextY = resumeButton.y + (resumeButton.height + 15) / 2;
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
-        
+
         // Restart button
         if (restartButton != null) {
             g2.setColor(new Color(120, 120, 60));
             g2.fillRect(restartButton.x, restartButton.y, restartButton.width, restartButton.height);
             g2.setColor(Color.WHITE);
             g2.drawRect(restartButton.x, restartButton.y, restartButton.width, restartButton.height);
-            
+
             g2.setFont(new Font("Arial", Font.BOLD, 20));
             String buttonText = "Restart";
             int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
@@ -506,14 +507,14 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonTextY = restartButton.y + (restartButton.height + 15) / 2;
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
-        
+
         // Exit button
         if (exitButton != null) {
             g2.setColor(new Color(120, 60, 60));
             g2.fillRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height);
             g2.setColor(Color.WHITE);
             g2.drawRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height);
-            
+
             g2.setFont(new Font("Arial", Font.BOLD, 20));
             String buttonText = "Exit";
             int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
@@ -521,7 +522,7 @@ public class GamePanel extends JPanel implements Runnable {
             int buttonTextY = exitButton.y + (exitButton.height + 15) / 2;
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
-        
+
         // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
@@ -531,21 +532,21 @@ public class GamePanel extends JPanel implements Runnable {
         int instructionY = SCREEN_HEIGHT / 2 + 120;
         g2.drawString(instructionText, instructionX, instructionY);
     }
-    
+
     private void pauseGame() {
         paused = true;
-        
+
         // Create pause menu buttons
         int buttonWidth = 150;
         int buttonHeight = 40;
         int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
         int buttonY = SCREEN_HEIGHT / 2;
-        
+
         resumeButton = new Rectangle(buttonX, buttonY - 60, buttonWidth, buttonHeight);
         restartButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
         exitButton = new Rectangle(buttonX, buttonY + 60, buttonWidth, buttonHeight);
     }
-    
+
     private void resumeGame() {
         paused = false;
         resumeButton = null;
