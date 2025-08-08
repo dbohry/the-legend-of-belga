@@ -394,7 +394,8 @@ public class GamePanel extends JPanel implements Runnable {
     private void restartGame() {
         gameOver = false;
         paused = false;
-        
+        victorySoundPlayed = false;
+
         // Reset player
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
@@ -417,6 +418,7 @@ public class GamePanel extends JPanel implements Runnable {
         completedMaps++;
         victory = false;
         paused = false;
+        victorySoundPlayed = false;
         
         // Generate new map
         MapGenerator generator = new MapGenerator(80, 60, 0.45, 2500);
