@@ -10,10 +10,11 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -21,35 +22,60 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Grant execute permission for gradlew
+      - name: Gradle wrapper perms
         run: chmod +x gradlew
 
-      - name: Get version from build.gradle
-        id: get_version
+      - name: Resolve version from Gradle
+        id: version
         run: |
-          VERSION=$(grep '^version' build.gradle | awk -F "'" '{print $2}')
+          set -euo pipefail
+          VERSION="$(./gradlew -q properties | awk -F': ' '/^version: /{print $2}')"
+          if [ -z "$VERSION" ]; then
+            echo "Version not found from Gradle properties"; exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION"   # for logs
 
-      - name: Build fat JAR
+      - name: Build JAR
         run: ./gradlew clean jar
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Determine JAR path
+        id: jarpath
+        run: |
+          set -euo pipefail
+          # Prefer exact match with version; fall back to single jar
+          CANDIDATE="build/libs/*-${VERSION}.jar"
+          FILES=( $CANDIDATE )
+          if [ ! -e "${FILES[0]}" ]; then
+            FILES=( build/libs/*.jar )
+          fi
+          if [ ! -e "${FILES[0]}" ]; then
+            echo "No JAR found in build/libs"; exit 1
+          fi
+          echo "JAR_PATH=${FILES[0]}" >> $GITHUB_ENV
+          echo "Jar: ${FILES[0]}"
+
+      - name: Create & push tag if missing
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists"
+          else
+            git tag -a "v${VERSION}" -m "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
+
+      - name: Create release and upload asset
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          release_name: Release v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          files: ${{ env.JAR_PATH }}
           draft: false
           prerelease: false
-
-      - name: Upload JAR artifact
-        uses: actions/upload-release-asset@v1
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: build/libs/TheLegendOfBelga.jar
-          asset_name: TheLegendOfBelga.jar
-          asset_content_type: application/java-archive
