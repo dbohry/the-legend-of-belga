@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.lhamacorp.games'
-version = ''
+version = '1.0'
 
 repositories {
     mavenCentral()
@@ -24,10 +24,11 @@ application {
 }
 
 jar {
+    archiveBaseName.set('TheLegendOfBelga')
+    archiveVersion.set('')
+
     manifest {
-        attributes(
-                'Main-Class': application.mainClass
-        )
+        attributes 'Main-Class': application.mainClass
     }
 
     from {
