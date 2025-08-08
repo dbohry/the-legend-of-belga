@@ -19,7 +19,7 @@ public class Player extends Entity {
 
     private static final int FPS = 60;
     private static final int STAMINA_DRAIN_INTERVAL = FPS;
-    private static final int STAMINA_REGEN_INTERVAL = FPS * 3;
+    private static final int STAMINA_REGEN_INTERVAL = FPS * 2;
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
@@ -116,7 +116,7 @@ public class Player extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        if (keys.attack && attackCooldown == 0 && attackTimer == 0 && this.getStamina() > 0) {
+        if (keys.attack && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
             attackTimer = ATTACK_DURATION_FRAMES;
             attackCooldown = ATTACK_COOLDOWN_FRAMES;
