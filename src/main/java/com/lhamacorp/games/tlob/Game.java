@@ -13,6 +13,6 @@ public class Game {
         window.setLocationRelativeTo(null);
         window.setVisible(true);
         panel.startGameThread();
-        AudioManager.playRandomMusic(-8.0f);
+        AudioManager.playRandomMusic(-10.0f);
     }
 }

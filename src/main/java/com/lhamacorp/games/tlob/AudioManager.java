@@ -53,7 +53,7 @@ public class AudioManager {
     }
 
     public static void playSound(String filename) {
-        playSound(filename, 0.0f);
+        playSound(filename, -10.0f);
     }
 
     public static void playSound(String filename, float volumeDb) {

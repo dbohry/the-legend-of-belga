@@ -146,7 +146,7 @@ public class Player extends Entity {
 
             // Play sound based on result
             if (hitSomething) {
-                AudioManager.playSound("slash-hit.wav", -10.0f);
+                AudioManager.playSound("slash-hit.wav", -15.0f);
             } else {
                 AudioManager.playSound("slash-clean.wav");
             }
@@ -274,7 +274,7 @@ public class Player extends Entity {
         super.damage(amount);
 
         if (isAlive()) {
-            AudioManager.playSound("hero-hurt.wav", -5);
+            AudioManager.playSound("hero-hurt.wav", -10);
         } else {
             AudioManager.playSound("hero-death.wav");
         }
