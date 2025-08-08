@@ -5,7 +5,7 @@ import java.util.Random;
 public class MapGenerator {
     private final int width;
     private final int height;
-    private final double wallBias; // not used in drunkard directly; reserved
+    private final double wallBias;
     private final int steps;
 
     public MapGenerator(int width, int height, double wallBias, int steps) {

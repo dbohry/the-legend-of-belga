@@ -8,7 +8,7 @@ public class Player extends Entity {
     private static final int PLAYER_SIZE = 22;
     private static final double PLAYER_SPEED = 1.8;
     private static final double PLAYER_MAX_HP = 6.0;
-    private static final double PLAYER_MAX_STAMINA = 2.0;
+    private static final double PLAYER_MAX_STAMINA = 6.0;
     private static final double PLAYER_MAX_MANA = 1;
 
     private static final int SWORD_REACH = 28;
@@ -44,7 +44,7 @@ public class Player extends Entity {
 
     @Override
     public void update(Object... args) {
-        KeyHandler keys = (KeyHandler) args[0];
+        KeyManager keys = (KeyManager) args[0];
         TileMap map = (TileMap) args[1];
         @SuppressWarnings("unchecked")
         List<Enemy> enemies = (List<Enemy>) args[2];
@@ -116,7 +116,8 @@ public class Player extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        if (keys.attack && attackCooldown == 0 && attackTimer == 0) {
+        if (keys.attack && attackCooldown == 0 && attackTimer == 0 && this.getStamina() > 0) {
+            stamina -= 0.5;
             attackTimer = ATTACK_DURATION_FRAMES;
             attackCooldown = ATTACK_COOLDOWN_FRAMES;
 

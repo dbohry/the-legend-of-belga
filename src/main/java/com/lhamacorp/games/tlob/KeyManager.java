@@ -3,7 +3,8 @@ package com.lhamacorp.games.tlob;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 
-public class KeyHandler implements KeyListener {
+public class KeyManager implements KeyListener {
+
     public volatile boolean up;
     public volatile boolean down;
     public volatile boolean left;

@@ -11,7 +11,7 @@ public class Enemy extends Entity {
     private static final double ENEMY_MAX_MANA = 0;
 
     private static final int ATTACK_RANGE = 30;
-    private static final int ATTACK_COOLDOWN_FRAMES = 120; // 2 seconds at 60 FPS
+    private static final int ATTACK_COOLDOWN_FRAMES = 120;
     private static final int ATTACK_DURATION_FRAMES = 8;
     private static final double ATTACK_DAMAGE = 1.0;
 

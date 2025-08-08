@@ -15,7 +15,7 @@ public class GamePanel extends JPanel implements Runnable {
     private Thread gameThread;
     private volatile boolean running = false;
 
-    private final KeyHandler keyHandler;
+    private final KeyManager keyManager;
     private TileMap tileMap;
     private final Player player;
     private final List<Enemy> enemies;
@@ -40,8 +40,8 @@ public class GamePanel extends JPanel implements Runnable {
         this.setBackground(Color.BLACK);
         this.setDoubleBuffered(true);
 
-        keyHandler = new KeyHandler();
-        addKeyListener(keyHandler);
+        keyManager = new KeyManager();
+        addKeyListener(keyManager);
         setFocusable(true);
         
         // Add mouse listener for buttons
@@ -114,7 +114,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void update() {
         // Check for pause toggle
-        if (keyHandler.escape && !gameOver && !victory) {
+        if (keyManager.escape && !gameOver && !victory) {
             if (!paused) {
                 pauseGame();
             } else {
@@ -124,7 +124,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
         
         // Check for enter key restart
-        if ((gameOver || victory) && keyHandler.enter) {
+        if ((gameOver || victory) && keyManager.enter) {
             if (gameOver) {
                 restartGame();
             } else if (victory) {
@@ -156,7 +156,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
         
         if (!gameOver && !victory && !paused) {
-            player.update(keyHandler, tileMap, enemies);
+            player.update(keyManager, tileMap, enemies);
             for (int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy e = enemies.get(i);
                 e.update(player, tileMap);
