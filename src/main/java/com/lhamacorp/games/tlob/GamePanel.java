@@ -425,7 +425,7 @@ public class GamePanel extends JPanel implements Runnable {
         // Reset player
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
-        player.heal();
+        player.restoreAll();
         
         // Spawn new enemies
         spawnEnemies();

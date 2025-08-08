@@ -42,6 +42,12 @@ public class Player extends Entity {
         this.alive = true;
     }
 
+    public void restoreAll() {
+        this.health = this.maxHealth;
+        this.mana = this.maxMana;
+        this.stamina = this.maxStamina;
+    }
+
     @Override
     public void update(Object... args) {
         KeyManager keys = (KeyManager) args[0];
