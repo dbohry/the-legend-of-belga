@@ -5,7 +5,10 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class GamePanel extends JPanel implements Runnable {
     public static final int TILE_SIZE = 32;
@@ -33,6 +36,11 @@ public class GamePanel extends JPanel implements Runnable {
     private Rectangle exitButton;
     private int completedMaps = 0;
 
+    // Perk selection
+    private boolean choosingPerk = false;
+    private final List<Perk> perkChoices = new ArrayList<>(3);
+    private final Rectangle[] perkRects = new Rectangle[3];
+
     private boolean victorySoundPlayed = false;
 
     public GamePanel() {
@@ -48,9 +56,22 @@ public class GamePanel extends JPanel implements Runnable {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                // Perk selection takes priority on victory screen
+                if (victory && choosingPerk) {
+                    Point p = e.getPoint();
+                    for (int i = 0; i < perkRects.length; i++) {
+                        Rectangle r = perkRects[i];
+                        if (r != null && r.contains(p)) {
+                            applyPerkAndContinue(i);
+                            return;
+                        }
+                    }
+                    return;
+                }
+
                 if (gameOver && tryAgainButton != null && tryAgainButton.contains(e.getPoint())) {
                     restartGame();
-                } else if (victory && nextLevelButton != null && nextLevelButton.contains(e.getPoint())) {
+                } else if (victory && !choosingPerk && nextLevelButton != null && nextLevelButton.contains(e.getPoint())) {
                     startNextLevel();
                 } else if (paused) {
                     if (resumeButton != null && resumeButton.contains(e.getPoint())) {
@@ -114,30 +135,29 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void update() {
-        // Check for pause toggle
+        // Pause toggle
         if (keyManager.escape && !gameOver && !victory) {
-            if (!paused) {
-                pauseGame();
-            } else {
-                resumeGame();
-            }
+            if (!paused) pauseGame();
+            else resumeGame();
             return;
         }
 
-        // Check for enter key restart
+        // Enter key on end screens:
+        // - If gameOver -> restart
+        // - If victory and NOT choosingPerk -> next level
+        // - If victory and choosingPerk -> ignore (must pick a perk)
         if ((gameOver || victory) && keyManager.enter) {
             if (gameOver) {
                 restartGame();
-            } else if (victory) {
+            } else if (victory && !choosingPerk) {
                 startNextLevel();
             }
             return;
         }
 
-        // Check for game over
+        // Game over detection
         if (!player.isAlive() && !gameOver) {
             gameOver = true;
-            // Create try again button
             int buttonWidth = 150;
             int buttonHeight = 40;
             int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
@@ -145,15 +165,15 @@ public class GamePanel extends JPanel implements Runnable {
             tryAgainButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
         }
 
-        // Check for victory
+        // Victory detection -> go into perk selection FIRST
         if (enemies.isEmpty() && !victory && !gameOver) {
             victory = true;
-            // Create next level button
-            int buttonWidth = 150;
-            int buttonHeight = 40;
-            int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
-            int buttonY = SCREEN_HEIGHT / 2 + 50;
-            nextLevelButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
+            choosingPerk = true;
+            generatePerkChoices();
+            layoutPerkRects();
+
+            // No "Next Level" button until a perk is chosen
+            nextLevelButton = null;
         }
 
         if (!gameOver && !victory && !paused) {
@@ -161,12 +181,84 @@ public class GamePanel extends JPanel implements Runnable {
             for (int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy e = enemies.get(i);
                 e.update(player, tileMap);
-                if (!e.isAlive()) {
-                    enemies.remove(i);
-                }
+                if (!e.isAlive()) enemies.remove(i);
             }
             updateCamera();
         }
+    }
+
+    private void generatePerkChoices() {
+        perkChoices.clear();
+        for (int i = 0; i < 3; i++) {
+            int roll = (int) (Math.random() * 5); // 0..4
+            switch (roll) {
+                case 0 -> { // Max Life +10..20%
+                    double p = 0.10 + Math.random() * 0.10;
+                    String label = String.format("Max Life +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increases maximum life permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxHealthByPercent(p)));
+                }
+                case 1 -> { // Max Stamina +10..20%
+                    double p = 0.10 + Math.random() * 0.10;
+                    String label = String.format("Max Stamina +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increases maximum stamina permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxStaminaByPercent(p)));
+                }
+                case 2 -> { // Max Mana +10..20%
+                    double p = 0.10 + Math.random() * 0.10;
+                    String label = String.format("Max Mana +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increases maximum mana permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p)));
+                }
+                case 3 -> { // Move Speed +5..10%
+                    double p = 0.05 + Math.random() * 0.05;
+                    String label = String.format("Move Speed +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increases movement speed permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p)));
+                }
+                default -> { // Attack Damage +10..20%
+                    double p = 0.10 + Math.random() * 0.10;
+                    String label = String.format("Damage +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increases melee damage permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p)));
+                }
+            }
+        }
+
+        Collections.shuffle(perkChoices);
+    }
+
+    private void layoutPerkRects() {
+        int cardW = 180, cardH = 100;
+        int gap = 20;
+        int totalW = cardW * 3 + gap * 2;
+        int startX = (SCREEN_WIDTH - totalW) / 2;
+        int y = SCREEN_HEIGHT / 2 - cardH / 2 + 30;
+
+        for (int i = 0; i < 3; i++) {
+            int x = startX + i * (cardW + gap);
+            perkRects[i] = new Rectangle(x, y, cardW, cardH);
+        }
+    }
+
+    private void applyPerkAndContinue(int index) {
+        if (index < 0 || index >= perkChoices.size()) return;
+        Perk chosen = perkChoices.get(index);
+        chosen.apply(player);
+
+        // Clear perk UI state
+        choosingPerk = false;
+        perkChoices.clear();
+        Arrays.fill(perkRects, null);
+
+        // Now show the Next Level button (or auto-advance)
+        int buttonWidth = 150;
+        int buttonHeight = 40;
+        int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
+        int buttonY = SCREEN_HEIGHT / 2 + 50;
+        nextLevelButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
+
+        startNextLevel();
     }
 
     private void updateCamera() {
@@ -197,28 +289,16 @@ public class GamePanel extends JPanel implements Runnable {
         tileMap.draw(g2, cameraOffsetX, cameraOffsetY, getWidth(), getHeight());
 
         // Draw entities
-        for (Enemy e : enemies) {
-            e.draw(g2, cameraOffsetX, cameraOffsetY);
-        }
+        for (Enemy e : enemies) e.draw(g2, cameraOffsetX, cameraOffsetY);
         player.draw(g2, cameraOffsetX, cameraOffsetY);
 
         // HUD
         drawHud(g2);
 
-        // Game over screen
-        if (gameOver) {
-            drawGameOverScreen(g2);
-        }
-
-        // Victory screen
-        if (victory) {
-            drawVictoryScreen(g2);
-        }
-
-        // Pause menu
-        if (paused) {
-            drawPauseMenu(g2);
-        }
+        // Overlays
+        if (gameOver) drawGameOverScreen(g2);
+        if (victory) drawVictoryScreen(g2);
+        if (paused) drawPauseMenu(g2);
 
         g2.dispose();
     }
@@ -239,12 +319,9 @@ public class GamePanel extends JPanel implements Runnable {
 
         for (int i = 0; i < (int) maxHp; i++) {
             int blockX = x + i * (blockWidth + spacing);
-
-            // Background
             g2.setColor(new Color(50, 10, 10));
             g2.fillRect(blockX, y, blockWidth, blockHeight);
 
-            // Fill
             if (i < fullHp) {
                 g2.setColor(new Color(200, 40, 40));
                 g2.fillRect(blockX, y, blockWidth, blockHeight);
@@ -264,12 +341,9 @@ public class GamePanel extends JPanel implements Runnable {
 
         for (int i = 0; i < (int) maxMana; i++) {
             int blockX = x + i * (blockWidth + spacing);
-
-            // Background
             g2.setColor(new Color(10, 10, 40));
             g2.fillRect(blockX, y2, blockWidth, blockHeight);
 
-            // Fill
             if (i < fullMana) {
                 g2.setColor(new Color(100, 150, 255));
                 g2.fillRect(blockX, y2, blockWidth, blockHeight);
@@ -289,12 +363,9 @@ public class GamePanel extends JPanel implements Runnable {
 
         for (int i = 0; i < (int) maxStamina; i++) {
             int blockX = x + i * (blockWidth + spacing);
-
-            // Background
             g2.setColor(new Color(60, 60, 20));
             g2.fillRect(blockX, y3, blockWidth, blockHeight);
 
-            // Fill
             if (i < fullStamina) {
                 g2.setColor(new Color(255, 255, 128));
                 g2.fillRect(blockX, y3, blockWidth, blockHeight);
@@ -309,13 +380,10 @@ public class GamePanel extends JPanel implements Runnable {
         g2.drawString("Enemies: " + enemies.size(), x, y3 + blockHeight + 16);
     }
 
-
     private void drawGameOverScreen(Graphics2D g2) {
-        // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Game Over text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.RED);
         String gameOverText = "GAME OVER";
@@ -324,7 +392,6 @@ public class GamePanel extends JPanel implements Runnable {
         int textY = SCREEN_HEIGHT / 2 - 20;
         g2.drawString(gameOverText, textX, textY);
 
-        // Try Again button
         if (tryAgainButton != null) {
             g2.setColor(new Color(60, 60, 60));
             g2.fillRect(tryAgainButton.x, tryAgainButton.y, tryAgainButton.width, tryAgainButton.height);
@@ -339,7 +406,6 @@ public class GamePanel extends JPanel implements Runnable {
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
 
-        // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
     }
@@ -350,11 +416,9 @@ public class GamePanel extends JPanel implements Runnable {
             victorySoundPlayed = true;
         }
 
-        // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Victory text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.GREEN);
         String victoryText = "VICTORY!";
@@ -363,7 +427,6 @@ public class GamePanel extends JPanel implements Runnable {
         int textY = SCREEN_HEIGHT / 2 - 40;
         g2.drawString(victoryText, textX, textY);
 
-        // Level info
         g2.setFont(new Font("Arial", Font.PLAIN, 24));
         g2.setColor(Color.WHITE);
         String levelText = "Level " + (completedMaps + 1) + " Complete!";
@@ -372,8 +435,32 @@ public class GamePanel extends JPanel implements Runnable {
         int levelTextY = SCREEN_HEIGHT / 2;
         g2.drawString(levelText, levelTextX, levelTextY);
 
-        // Next Level button
-        if (nextLevelButton != null) {
+        // Perk selection UI
+        if (choosingPerk) {
+            g2.setFont(new Font("Arial", Font.PLAIN, 18));
+            String choose = "Choose ONE perk";
+            int w = g2.getFontMetrics().stringWidth(choose);
+            g2.drawString(choose, (SCREEN_WIDTH - w) / 2, levelTextY + 30);
+
+            for (int i = 0; i < perkChoices.size(); i++) {
+                Rectangle r = perkRects[i];
+                Perk po = perkChoices.get(i);
+
+                g2.setColor(new Color(30, 30, 30, 230));
+                g2.fillRect(r.x, r.y, r.width, r.height);
+                g2.setColor(Color.WHITE);
+                g2.drawRect(r.x, r.y, r.width, r.height);
+
+                // title
+                g2.setFont(new Font("Arial", Font.BOLD, 16));
+                g2.drawString(po.name, r.x + 10, r.y + 24);
+
+                // description
+                g2.setFont(new Font("Arial", Font.PLAIN, 14));
+                drawWrapped(g2, po.description, r.x + 10, r.y + 46, r.width - 20, 18);
+            }
+        } else if (nextLevelButton != null) {
+            // Next Level button (only after a perk has been chosen)
             g2.setColor(new Color(60, 120, 60));
             g2.fillRect(nextLevelButton.x, nextLevelButton.y, nextLevelButton.width, nextLevelButton.height);
             g2.setColor(Color.WHITE);
@@ -387,17 +474,42 @@ public class GamePanel extends JPanel implements Runnable {
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
 
-        // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
+    }
+
+    private void drawWrapped(Graphics2D g2, String text, int x, int y, int maxWidth, int lineHeight) {
+        FontMetrics fm = g2.getFontMetrics();
+        String[] words = text.split(" ");
+        String line = "";
+        int yy = y;
+        for (String w : words) {
+            String test = line.isEmpty() ? w : line + " " + w;
+            if (fm.stringWidth(test) > maxWidth) {
+                g2.drawString(line, x, yy);
+                yy += lineHeight;
+                line = w;
+            } else {
+                line = test;
+            }
+        }
+        if (!line.isEmpty()) g2.drawString(line, x, yy);
     }
 
     private void restartGame() {
         gameOver = false;
         paused = false;
+        victory = false;
+        choosingPerk = false;
         victorySoundPlayed = false;
 
-        // Reset player
+        // clear end-screen UI
+        tryAgainButton = null;
+        nextLevelButton = null;
+        perkChoices.clear();
+        Arrays.fill(perkRects, null);
+
+        // Reset player to spawn & heal
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
         player.heal();
@@ -411,7 +523,6 @@ public class GamePanel extends JPanel implements Runnable {
         // Reset camera
         updateCamera();
 
-        // Regain focus for keyboard input
         requestFocusInWindow();
     }
 
@@ -419,13 +530,19 @@ public class GamePanel extends JPanel implements Runnable {
         completedMaps++;
         victory = false;
         paused = false;
+        choosingPerk = false;
         victorySoundPlayed = false;
+
+        // clear victory UI
+        nextLevelButton = null;
+        perkChoices.clear();
+        Arrays.fill(perkRects, null);
 
         // Generate new map
         MapGenerator generator = new MapGenerator(80, 60, 0.45, 2500);
         tileMap = new TileMap(generator.generate());
 
-        // Reset player
+        // Reset player to new spawn and fill to new maxes
         int[] spawn = tileMap.findSpawnTile();
         player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
         player.restoreAll();
@@ -436,13 +553,12 @@ public class GamePanel extends JPanel implements Runnable {
         // Reset camera
         updateCamera();
 
-        // Regain focus for keyboard input
         requestFocusInWindow();
     }
 
     private void spawnEnemies() {
         enemies.clear();
-        // Calculate enemy count based on completed maps
+        // Count scales by completed maps
         int baseEnemies = 3 + (int) (Math.random() * 6);
         double multiplier = Math.pow(1.4, completedMaps);
         int enemiesToSpawn = Math.max(1, (int) (baseEnemies * multiplier));
@@ -450,12 +566,10 @@ public class GamePanel extends JPanel implements Runnable {
         for (int i = 0; i < enemiesToSpawn; i++) {
             int[] pos = tileMap.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * TILE_SIZE);
             if (pos != null) {
-                // Double-check that the position is actually a floor tile
                 if (!tileMap.isWall(pos[0], pos[1])) {
                     enemies.add(new Enemy(pos[0] * TILE_SIZE + TILE_SIZE / 2.0, pos[1] * TILE_SIZE + TILE_SIZE / 2.0));
                 }
             } else {
-                // Fallback: spawn at any available floor tile
                 int[] fallbackPos = tileMap.getRandomFloorTile();
                 if (fallbackPos != null && !tileMap.isWall(fallbackPos[0], fallbackPos[1])) {
                     enemies.add(new Enemy(fallbackPos[0] * TILE_SIZE + TILE_SIZE / 2.0, fallbackPos[1] * TILE_SIZE + TILE_SIZE / 2.0));
@@ -465,11 +579,9 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawPauseMenu(Graphics2D g2) {
-        // Semi-transparent overlay
         g2.setColor(new Color(0, 0, 0, 180));
         g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Pause text
         g2.setFont(new Font("Arial", Font.BOLD, 48));
         g2.setColor(Color.WHITE);
         String pauseText = "PAUSED";
@@ -478,7 +590,6 @@ public class GamePanel extends JPanel implements Runnable {
         int textY = SCREEN_HEIGHT / 2 - 120;
         g2.drawString(pauseText, textX, textY);
 
-        // Resume button
         if (resumeButton != null) {
             g2.setColor(new Color(60, 120, 60));
             g2.fillRect(resumeButton.x, resumeButton.y, resumeButton.width, resumeButton.height);
@@ -493,7 +604,6 @@ public class GamePanel extends JPanel implements Runnable {
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
 
-        // Restart button
         if (restartButton != null) {
             g2.setColor(new Color(120, 120, 60));
             g2.fillRect(restartButton.x, restartButton.y, restartButton.width, restartButton.height);
@@ -508,7 +618,6 @@ public class GamePanel extends JPanel implements Runnable {
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
 
-        // Exit button
         if (exitButton != null) {
             g2.setColor(new Color(120, 60, 60));
             g2.fillRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height);
@@ -523,7 +632,6 @@ public class GamePanel extends JPanel implements Runnable {
             g2.drawString(buttonText, buttonTextX, buttonTextY);
         }
 
-        // Instructions
         g2.setFont(new Font("Arial", Font.PLAIN, 16));
         g2.setColor(Color.LIGHT_GRAY);
         String instructionText = "Press ESC to resume";
@@ -536,7 +644,6 @@ public class GamePanel extends JPanel implements Runnable {
     private void pauseGame() {
         paused = true;
 
-        // Create pause menu buttons
         int buttonWidth = 150;
         int buttonHeight = 40;
         int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
@@ -553,5 +660,22 @@ public class GamePanel extends JPanel implements Runnable {
         restartButton = null;
         exitButton = null;
         requestFocusInWindow();
+    }
+
+    // --- Nested Perk type ---
+    private static final class Perk {
+        final String name;
+        final String description;
+        final Consumer<Player> applier;
+
+        Perk(String name, String description, Consumer<Player> applier) {
+            this.name = name;
+            this.description = description;
+            this.applier = applier;
+        }
+
+        void apply(Player p) {
+            applier.accept(p);
+        }
     }
 }

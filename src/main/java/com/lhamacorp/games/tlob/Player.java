@@ -27,6 +27,8 @@ public class Player extends Entity {
 
     private int attackTimer = 0;
     private int attackCooldown = 0;
+    private double speedMultiplier = 1.0;
+    private double damageMultiplier = 1.0;
 
     public Player(double x, double y) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA);
@@ -46,6 +48,38 @@ public class Player extends Entity {
         this.health = this.maxHealth;
         this.mana = this.maxMana;
         this.stamina = this.maxStamina;
+    }
+
+    public void increaseMaxHealthByPercent(double pct) {
+        double oldMax = getMaxHealth();
+        this.maxHealth = Math.ceil(oldMax * (1.0 + pct));
+    }
+
+    public void increaseMaxStaminaByPercent(double pct) {
+        double oldMax = getMaxStamina();
+        this.maxStamina = Math.ceil(oldMax * (1.0 + pct));
+    }
+
+    public void increaseMaxManaByPercent(double pct) {
+        double oldMax = getMaxMana();
+        double newMax = Math.ceil(oldMax * (1.0 + pct));
+        this.maxMana = newMax;
+    }
+
+    private double effectiveBaseSpeed() {
+        return PLAYER_SPEED * speedMultiplier;
+    }
+
+    private double effectiveAttackDamage() {
+        return ATTACK_DAMAGE * damageMultiplier;
+    }
+
+    public void increaseMoveSpeedByPercent(double pct) {
+        speedMultiplier *= (1.0 + pct);
+    }
+
+    public void increaseAttackDamageByPercent(double pct) {
+        damageMultiplier *= (1.0 + pct);
     }
 
     @Override
@@ -74,9 +108,9 @@ public class Player extends Entity {
         }
 
         boolean sprinting = keys.shift && stamina >= 1.0;
-
+        double speedBase = effectiveBaseSpeed();
         if (sprinting) {
-            speed = PLAYER_SPEED * 2;
+            speed = speedBase * 2.0;
             staminaDrainCounter++;
 
             if (staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
@@ -87,7 +121,7 @@ public class Player extends Entity {
 
             staminaRegenCounter = 0;
         } else {
-            speed = PLAYER_SPEED;
+            speed = speedBase;
             if (!wasSprinting) {
                 staminaRegenCounter++;
                 if (staminaRegenCounter >= STAMINA_REGEN_INTERVAL && stamina < maxStamina) {
@@ -130,16 +164,17 @@ public class Player extends Entity {
             Rectangle hit = getSwordHitbox();
             boolean hitSomething = false;
 
+            double dmg = effectiveAttackDamage();
             for (Enemy e : enemies) {
                 if (e.isAlive() && hit.intersects(e.getBounds())) {
-                    e.damage(ATTACK_DAMAGE);
+                    e.damage(dmg);
                     e.applyKnockback(x, y);
                     hitSomething = true;
                 }
             }
 
             // Damage walls in sword hitbox
-            boolean hitWall = damageWallsInHitbox(hit, map);
+            boolean hitWall = damageWallsInHitbox(hit, map, dmg);
             if (hitWall) {
                 hitSomething = true;
             }
@@ -247,7 +282,7 @@ public class Player extends Entity {
         }
     }
 
-    private boolean damageWallsInHitbox(Rectangle hitbox, TileMap map) {
+    private boolean damageWallsInHitbox(Rectangle hitbox, TileMap map, double damage) {
         int tileSize = GamePanel.TILE_SIZE;
         boolean damaged = false;
 
@@ -259,13 +294,12 @@ public class Player extends Entity {
         for (int tileY = startTileY; tileY <= endTileY; tileY++) {
             for (int tileX = startTileX; tileX <= endTileX; tileX++) {
                 if (map.isWall(tileX, tileY)) {
-                    if (map.damageWall(tileX, tileY, ATTACK_DAMAGE)) {
+                    if (map.damageWall(tileX, tileY, damage)) {
                         damaged = true;
                     }
                 }
             }
         }
-
         return damaged;
     }
 
