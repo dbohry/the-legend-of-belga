@@ -1,5 +1,7 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.entities;
 
+import com.lhamacorp.games.tlob.managers.GameManager;
+import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
 import java.awt.*;
@@ -175,16 +177,16 @@ public abstract class Entity {
 
         // Check if player is trying to go outside map boundaries
         if (bounds.x < 0 || bounds.y < 0 ||
-            bounds.x + bounds.width > map.getWidth() * GamePanel.TILE_SIZE ||
-            bounds.y + bounds.height > map.getHeight() * GamePanel.TILE_SIZE) {
+            bounds.x + bounds.width > map.getWidth() * GameManager.TILE_SIZE ||
+            bounds.y + bounds.height > map.getHeight() * GameManager.TILE_SIZE) {
             return true; // Collision with map boundaries
         }
 
         // Check tile-based collisions
-        int left = bounds.x / GamePanel.TILE_SIZE;
-        int right = (bounds.x + bounds.width - 1) / GamePanel.TILE_SIZE;
-        int top = bounds.y / GamePanel.TILE_SIZE;
-        int bottom = (bounds.y + bounds.height - 1) / GamePanel.TILE_SIZE;
+        int left = bounds.x / GameManager.TILE_SIZE;
+        int right = (bounds.x + bounds.width - 1) / GameManager.TILE_SIZE;
+        int top = bounds.y / GameManager.TILE_SIZE;
+        int bottom = (bounds.y + bounds.height - 1) / GameManager.TILE_SIZE;
 
         for (int ty = top; ty <= bottom; ty++) {
             for (int tx = left; tx <= right; tx++) {

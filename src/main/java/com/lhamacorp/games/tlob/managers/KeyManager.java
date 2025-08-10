@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.managers;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -20,12 +20,33 @@ public class KeyManager implements KeyListener, MouseListener {
     private volatile boolean attackKey;
     private volatile boolean attackMouse;
 
+    private volatile boolean escapePressedOnce;
+    private volatile boolean enterPressedOnce;
+    private volatile boolean mDown;
+
     private void updateAttack() {
         attack = attackKey || attackMouse;
     }
 
+    public boolean consumeEscapePressed() {
+        if (escapePressedOnce) {
+            escapePressedOnce = false;
+            return true;
+        }
+        return false;
+    }
+
+    public boolean consumeEnterPressed() {
+        if (enterPressedOnce) {
+            enterPressedOnce = false;
+            return true;
+        }
+        return false;
+    }
+
     @Override
-    public void keyTyped(KeyEvent e) { }
+    public void keyTyped(KeyEvent e) {
+    }
 
     @Override
     public void keyPressed(KeyEvent e) {
@@ -33,26 +54,44 @@ public class KeyManager implements KeyListener, MouseListener {
         switch (code) {
             case KeyEvent.VK_W:
             case KeyEvent.VK_UP:
-                up = true; break;
+                up = true;
+                break;
             case KeyEvent.VK_S:
             case KeyEvent.VK_DOWN:
-                down = true; break;
+                down = true;
+                break;
             case KeyEvent.VK_A:
             case KeyEvent.VK_LEFT:
-                left = true; break;
+                left = true;
+                break;
             case KeyEvent.VK_D:
             case KeyEvent.VK_RIGHT:
-                right = true; break;
+                right = true;
+                break;
+
             case KeyEvent.VK_SPACE:
-                attackKey = true; updateAttack(); break;
+                attackKey = true;
+                updateAttack();
+                break;
+
             case KeyEvent.VK_ENTER:
-                enter = true; break;
+                if (!enter) enterPressedOnce = true; // edge
+                enter = true;
+                break;
+
             case KeyEvent.VK_ESCAPE:
-                escape = true; break;
+                if (!escape) escapePressedOnce = true; // edge
+                escape = true;
+                break;
             case KeyEvent.VK_SHIFT:
-                shift = true; break;
+                shift = true;
+                break;
             case KeyEvent.VK_M:
-                mute = !mute; break;
+                if (!mDown) {
+                    mute = !mute;
+                    mDown = true;
+                }
+                break;
             default:
         }
     }
@@ -63,25 +102,35 @@ public class KeyManager implements KeyListener, MouseListener {
         switch (code) {
             case KeyEvent.VK_W:
             case KeyEvent.VK_UP:
-                up = false; break;
+                up = false;
+                break;
             case KeyEvent.VK_S:
             case KeyEvent.VK_DOWN:
-                down = false; break;
+                down = false;
+                break;
             case KeyEvent.VK_A:
             case KeyEvent.VK_LEFT:
-                left = false; break;
+                left = false;
+                break;
             case KeyEvent.VK_D:
             case KeyEvent.VK_RIGHT:
-                right = false; break;
+                right = false;
+                break;
             case KeyEvent.VK_SPACE:
-                attackKey = false; updateAttack(); break;
+                attackKey = false;
+                updateAttack();
+                break;
             case KeyEvent.VK_ENTER:
-                enter = false; break;
+                enter = false;
+                break;
             case KeyEvent.VK_ESCAPE:
-                escape = false; break;
+                escape = false;
+                break;
             case KeyEvent.VK_SHIFT:
-                shift = false; break;
+                shift = false;
+                break;
             case KeyEvent.VK_M:
+                mDown = false;
                 break;
             default:
         }
@@ -103,7 +152,15 @@ public class KeyManager implements KeyListener, MouseListener {
         }
     }
 
-    @Override public void mouseClicked(MouseEvent e) { }
-    @Override public void mouseEntered(MouseEvent e) { }
-    @Override public void mouseExited(MouseEvent e) { }
+    @Override
+    public void mouseClicked(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+    }
 }

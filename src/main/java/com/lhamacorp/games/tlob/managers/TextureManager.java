@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.managers;
 
 import javax.imageio.ImageIO;
 import java.awt.*;

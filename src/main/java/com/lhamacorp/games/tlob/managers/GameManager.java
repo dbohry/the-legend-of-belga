@@ -1,5 +1,11 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.managers;
 
+import com.lhamacorp.games.tlob.entities.Enemy;
+import com.lhamacorp.games.tlob.entities.Player;
+import com.lhamacorp.games.tlob.maps.MapGenerator;
+import com.lhamacorp.games.tlob.maps.TileMap;
+import com.lhamacorp.games.tlob.perks.Perk;
+import com.lhamacorp.games.tlob.perks.PerkManager;
 import com.lhamacorp.games.tlob.weapons.Sword;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
@@ -11,7 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class GamePanel extends JPanel implements Runnable {
+public class GameManager extends JPanel implements Runnable {
     public static final int TILE_SIZE = 32;
     public static final int SCREEN_WIDTH = 640;
     public static final int SCREEN_HEIGHT = 480;
@@ -46,7 +52,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     private boolean victorySoundPlayed = false;
 
-    public GamePanel() {
+    public GameManager() {
         this.setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
         this.setBackground(Color.BLACK);
         this.setDoubleBuffered(true);
@@ -149,7 +155,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         // Pause toggle
-        if (keyManager.escape && !gameOver && !victory) {
+        if (keyManager.consumeEscapePressed() && !gameOver && !victory) {
             if (!paused) pauseGame();
             else resumeGame();
             return;
@@ -159,12 +165,9 @@ public class GamePanel extends JPanel implements Runnable {
         // - If gameOver -> restart
         // - If victory and NOT choosingPerk -> next level
         // - If victory and choosingPerk -> ignore (must pick a perk)
-        if ((gameOver || victory) && keyManager.enter) {
-            if (gameOver) {
-                restartGame();
-            } else if (victory && !choosingPerk) {
-                startNextLevel();
-            }
+        if ((gameOver || victory) && keyManager.consumeEnterPressed()) {
+            if (gameOver) restartGame();
+            else if (victory && !choosingPerk) startNextLevel();
             return;
         }
 
@@ -388,7 +391,6 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.WHITE);
         g2.drawString("Enemies: " + enemies.size(), x, y3 + blockHeight + 16);
     }
-
 
     private void drawGameOverScreen(Graphics2D g2) {
         g2.setColor(new Color(0, 0, 0, 180));

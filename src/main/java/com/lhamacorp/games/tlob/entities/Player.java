@@ -1,5 +1,10 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.entities;
 
+import com.lhamacorp.games.tlob.managers.AudioManager;
+import com.lhamacorp.games.tlob.managers.GameManager;
+import com.lhamacorp.games.tlob.managers.KeyManager;
+import com.lhamacorp.games.tlob.managers.TextureManager;
+import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
 import java.awt.*;
@@ -298,7 +303,7 @@ public class Player extends Entity {
     }
 
     private boolean damageWallsInHitbox(Rectangle hitbox, TileMap map, double damage) {
-        int tileSize = GamePanel.TILE_SIZE;
+        int tileSize = GameManager.TILE_SIZE;
         boolean damaged = false;
 
         int startTileX = Math.max(0, hitbox.x / tileSize);

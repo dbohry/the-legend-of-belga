@@ -1,11 +1,14 @@
 package com.lhamacorp.games.tlob;
 
+import com.lhamacorp.games.tlob.managers.AudioManager;
+import com.lhamacorp.games.tlob.managers.GameManager;
+
 import javax.swing.*;
 
 public class Game {
     public static void main(String[] args) {
         JFrame window = new JFrame("The Legend of Belga");
-        GamePanel panel = new GamePanel();
+        GameManager panel = new GameManager();
         window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         window.setResizable(false);
         window.add(panel);

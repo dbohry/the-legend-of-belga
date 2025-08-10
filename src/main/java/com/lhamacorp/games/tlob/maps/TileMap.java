@@ -1,4 +1,7 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.maps;
+
+import com.lhamacorp.games.tlob.managers.GameManager;
+import com.lhamacorp.games.tlob.managers.TextureManager;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -67,7 +70,7 @@ public class TileMap {
     }
 
     public void draw(Graphics2D g2, int camX, int camY, int screenW, int screenH) {
-        int tileSize = GamePanel.TILE_SIZE;
+        int tileSize = GameManager.TILE_SIZE;
 
         int startX = Math.max(0, camX / tileSize);
         int startY = Math.max(0, camY / tileSize);
@@ -138,8 +141,8 @@ public class TileMap {
             int x = rnd.nextInt(width);
             int y = rnd.nextInt(height);
             if (!isWall(x, y)) {
-                double cx = x * GamePanel.TILE_SIZE + GamePanel.TILE_SIZE / 2.0;
-                double cy = y * GamePanel.TILE_SIZE + GamePanel.TILE_SIZE / 2.0;
+                double cx = x * GameManager.TILE_SIZE + GameManager.TILE_SIZE / 2.0;
+                double cy = y * GameManager.TILE_SIZE + GameManager.TILE_SIZE / 2.0;
                 if (Math.hypot(cx - px, cy - py) >= minDistance) {
                     return new int[]{x, y};
                 }

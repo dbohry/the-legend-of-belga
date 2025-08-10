@@ -1,6 +1,7 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.entities;
 
-import com.lhamacorp.games.tlob.weapons.Sword;
+import com.lhamacorp.games.tlob.managers.TextureManager;
+import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
 import java.awt.*;

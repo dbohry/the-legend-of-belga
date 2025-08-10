@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.maps;
 
 import java.util.Random;
 

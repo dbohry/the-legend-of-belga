@@ -1,4 +1,6 @@
-package com.lhamacorp.games.tlob;
+package com.lhamacorp.games.tlob.perks;
+
+import com.lhamacorp.games.tlob.entities.Player;
 
 import java.util.function.Consumer;
 
