@@ -36,7 +36,7 @@ public abstract class Entity {
     protected static final int KNOCKBACK_DURATION = 8;
     protected static final double KNOCKBACK_FORCE = 4.0;
 
-    public enum Direction {UP, DOWN, LEFT, RIGHT}
+    public enum Direction {UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT}
 
     public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon) {
         this.x = x;

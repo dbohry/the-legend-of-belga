@@ -8,6 +8,8 @@ import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
 import java.awt.*;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
@@ -65,10 +67,7 @@ public class Player extends Entity {
     }
 
     public void increaseMaxManaByPercent(double pct) {
-        if (getMaxMana() == 0) {
-            this.maxMana = 1.0;
-        }
-
+        if (getMaxMana() == 0) this.maxMana = 1.0;
         double oldMax = getMaxMana();
         this.maxMana = Math.ceil(oldMax * (1.0 + pct));
     }
@@ -106,22 +105,33 @@ public class Player extends Entity {
         @SuppressWarnings("unchecked")
         List<Enemy> enemies = (List<Enemy>) args[2];
 
-        double dx = 0, dy = 0;
-        if (keys.up) {
-            dy -= 1;
-            facing = Direction.UP;
+        // Input + 8-way facing
+        int dxRaw = 0, dyRaw = 0;
+        if (keys.left) dxRaw -= 1;
+        if (keys.right) dxRaw += 1;
+        if (keys.up) dyRaw -= 1;
+        if (keys.down) dyRaw += 1;
+
+        if (dxRaw != 0 || dyRaw != 0) {
+            if (dyRaw < 0) {
+                if (dxRaw < 0) facing = Direction.UP_LEFT;
+                else if (dxRaw > 0) facing = Direction.UP_RIGHT;
+                else facing = Direction.UP;
+            } else if (dyRaw > 0) {
+                if (dxRaw < 0) facing = Direction.DOWN_LEFT;
+                else if (dxRaw > 0) facing = Direction.DOWN_RIGHT;
+                else facing = Direction.DOWN;
+            } else {
+                facing = (dxRaw < 0) ? Direction.LEFT : Direction.RIGHT;
+            }
         }
-        if (keys.down) {
-            dy += 1;
-            facing = Direction.DOWN;
-        }
-        if (keys.left) {
-            dx -= 1;
-            facing = Direction.LEFT;
-        }
-        if (keys.right) {
-            dx += 1;
-            facing = Direction.RIGHT;
+
+        // Movement (normalize diagonals)
+        double dx = dxRaw, dy = dyRaw;
+        if (dx != 0 && dy != 0) {
+            double inv = Math.sqrt(0.5);
+            dx *= inv;
+            dy *= inv;
         }
 
         boolean sprinting = keys.shift && stamina >= 1.0;
@@ -129,13 +139,10 @@ public class Player extends Entity {
         if (sprinting) {
             speed = speedBase * 2.0;
             staminaDrainCounter++;
-
             if (staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
-                stamina -= 1.0;
-                if (stamina < 0) stamina = 0;
+                stamina = Math.max(0, stamina - 1.0);
                 staminaDrainCounter = 0;
             }
-
             staminaRegenCounter = 0;
         } else {
             speed = speedBase;
@@ -143,7 +150,6 @@ public class Player extends Entity {
                 staminaRegenCounter++;
                 if (staminaRegenCounter >= STAMINA_REGEN_INTERVAL) {
                     boolean didRegen = false;
-
                     if (stamina < maxStamina) {
                         stamina = Math.min(maxStamina, stamina + 1.0);
                         didRegen = true;
@@ -152,7 +158,6 @@ public class Player extends Entity {
                         shield = Math.min(maxShield, shield + 1.0);
                         didRegen = true;
                     }
-
                     if (didRegen) staminaRegenCounter = 0;
                 }
             } else {
@@ -160,24 +165,13 @@ public class Player extends Entity {
             }
             staminaDrainCounter = 0;
         }
-
         wasSprinting = sprinting;
 
-        // Normalize diagonal
-        if (dx != 0 && dy != 0) {
-            dx *= Math.sqrt(0.5);
-            dy *= Math.sqrt(0.5);
-        }
-
-        // Update knockback first
+        // Knockback & movement
         updateKnockbackWithMap(map);
+        if (knockbackTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
 
-        // Only allow movement if not being knocked back
-        if (knockbackTimer == 0) {
-            moveWithCollision(dx * speed, dy * speed, map, enemies);
-        }
-
-        // Handle attack
+        // Attack
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
@@ -186,30 +180,22 @@ public class Player extends Entity {
             attackTimer = weapon.getDuration();
             attackCooldown = weapon.getCooldown();
 
-            Rectangle hit = getSwordHitbox();
+            Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
 
             double dmg = effectiveAttackDamage();
             for (Enemy e : enemies) {
-                if (e.isAlive() && hit.intersects(e.getBounds())) {
+                if (e.isAlive() && swing.intersects(e.getBounds())) {
                     e.damage(dmg);
                     e.applyKnockback(x, y);
                     hitSomething = true;
                 }
             }
 
-            // Damage walls in sword hitbox
-            boolean hitWall = damageWallsInHitbox(hit, map, dmg);
-            if (hitWall) {
-                hitSomething = true;
-            }
+            if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
 
-            // Play sound based on result
-            if (hitSomething) {
-                AudioManager.playSound("slash-hit.wav", -15.0f);
-            } else {
-                AudioManager.playSound("slash-clean.wav");
-            }
+            if (hitSomething) AudioManager.playSound("slash-hit.wav", -15.0f);
+            else AudioManager.playSound("slash-clean.wav");
         }
     }
 
@@ -217,18 +203,15 @@ public class Player extends Entity {
         double newX = x + dx;
         double newY = y + dy;
 
-        // Horizontal collision
         if (!collidesWithMap(newX, y, map) && !collidesWithEnemies(newX, y, enemies)) {
             x = newX;
         } else {
-            // Try to slide along wall horizontally in small steps
             int step = (int) Math.signum(dx);
             while (step != 0 && !collidesWithMap(x + step, y, map) && !collidesWithEnemies(x + step, y, enemies)) {
                 x += step;
             }
         }
 
-        // Vertical collision
         if (!collidesWithMap(x, newY, map) && !collidesWithEnemies(x, newY, enemies)) {
             y = newY;
         } else {
@@ -249,20 +232,80 @@ public class Player extends Entity {
         return false;
     }
 
-    private Rectangle getSwordHitbox() {
+    // Rotated blade shape honoring reach & width for all 8 directions
+    private Shape getSwordSwingShape() {
         int cx = (int) Math.round(x);
         int cy = (int) Math.round(y);
-        return switch (facing) {
-            case UP -> new Rectangle(cx - weapon.getWidth() / 2, cy - height / 2 - weapon.getReach(), weapon.getWidth(), weapon.getReach());
-            case DOWN -> new Rectangle(cx - weapon.getWidth() / 2, cy + height / 2, weapon.getWidth(), weapon.getReach());
-            case LEFT -> new Rectangle(cx - width / 2 - weapon.getReach(), cy - weapon.getWidth() / 2, weapon.getReach(), weapon.getWidth());
-            default -> new Rectangle(cx + width / 2, cy - weapon.getWidth() / 2, weapon.getReach(), weapon.getWidth());
-        };
+        int r = weapon.getReach();
+        int w = weapon.getWidth();
+
+        int left = (int) Math.round(x - width / 2.0);
+        int right = (int) Math.round(x + width / 2.0);
+        int top = (int) Math.round(y - height / 2.0);
+        int bottom = (int) Math.round(y + height / 2.0);
+
+        double theta, ax, ay;
+        switch (facing) {
+            case UP:
+                theta = -Math.PI / 2;
+                ax = cx;
+                ay = top;
+                break;
+            case DOWN:
+                theta = Math.PI / 2;
+                ax = cx;
+                ay = bottom;
+                break;
+            case LEFT:
+                theta = Math.PI;
+                ax = left;
+                ay = cy;
+                break;
+            case RIGHT:
+                theta = 0.0;
+                ax = right;
+                ay = cy;
+                break;
+            case UP_RIGHT:
+                theta = -Math.PI / 4;
+                ax = right;
+                ay = top;
+                break;
+            case UP_LEFT:
+                theta = -3 * Math.PI / 4;
+                ax = left;
+                ay = top;
+                break;
+            case DOWN_RIGHT:
+                theta = Math.PI / 4;
+                ax = right;
+                ay = bottom;
+                break;
+            case DOWN_LEFT:
+                theta = 3 * Math.PI / 4;
+                ax = left;
+                ay = bottom;
+                break;
+            default:
+                theta = 0.0;
+                ax = right;
+                ay = cy;
+                break;
+        }
+
+        double cxBlade = ax + Math.cos(theta) * (r / 2.0);
+        double cyBlade = ay + Math.sin(theta) * (r / 2.0);
+
+        Rectangle2D.Double blade = new Rectangle2D.Double(-r / 2.0, -w / 2.0, r, w);
+
+        AffineTransform at = new AffineTransform();
+        at.translate(cxBlade, cyBlade);
+        at.rotate(theta);
+        return at.createTransformedShape(blade);
     }
 
     @Override
     public void draw(Graphics2D g2, int camX, int camY) {
-        // Player body
         BufferedImage tex = TextureManager.getPlayerTexture();
         if (tex != null) {
             int px = (int) Math.round(x - width / 2.0) - camX;
@@ -272,17 +315,18 @@ public class Player extends Entity {
             drawCenteredRect(g2, camX, camY, width, height, new Color(40, 160, 70));
         }
 
-        // Draw sword swing indicator
         if (attackTimer > 0) {
-            Rectangle hit = getSwordHitbox();
+            Shape swingWorld = getSwordSwingShape();
+            Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
+
             g2.setColor(new Color(255, 255, 180, 180));
-            g2.fillRect(hit.x - camX, hit.y - camY, hit.width, hit.height);
+            g2.fill(swing);
             g2.setColor(new Color(255, 255, 255, 220));
             g2.setStroke(new BasicStroke(2f));
-            g2.drawRect(hit.x - camX, hit.y - camY, hit.width, hit.height);
+            g2.draw(swing);
         }
 
-        // Optional: small facing indicator
+        // Facing indicator (includes diagonals)
         g2.setColor(new Color(10, 40, 15));
         int px = (int) Math.round(x) - camX;
         int py = (int) Math.round(y) - camY;
@@ -299,24 +343,37 @@ public class Player extends Entity {
             case RIGHT:
                 g2.fillRect(px + width / 2, py - 2, 4, 4);
                 break;
+            case UP_RIGHT:
+                g2.fillRect(px + width / 2, py - height / 2 - 4, 4, 4);
+                break;
+            case DOWN_RIGHT:
+                g2.fillRect(px + width / 2, py + height / 2, 4, 4);
+                break;
+            case UP_LEFT:
+                g2.fillRect(px - width / 2 - 4, py - height / 2 - 4, 4, 4);
+                break;
+            case DOWN_LEFT:
+                g2.fillRect(px - width / 2 - 4, py + height / 2, 4, 4);
+                break;
         }
     }
 
-    private boolean damageWallsInHitbox(Rectangle hitbox, TileMap map, double damage) {
+    private boolean damageWallsInShape(Shape swing, TileMap map, double damage) {
         int tileSize = GameManager.TILE_SIZE;
         boolean damaged = false;
 
-        int startTileX = Math.max(0, hitbox.x / tileSize);
-        int endTileX = Math.min(map.getWidth() - 1, (hitbox.x + hitbox.width - 1) / tileSize);
-        int startTileY = Math.max(0, hitbox.y / tileSize);
-        int endTileY = Math.min(map.getHeight() - 1, (hitbox.y + hitbox.height - 1) / tileSize);
+        Rectangle2D b = swing.getBounds2D();
+        int startTileX = Math.max(0, (int) Math.floor(b.getX() / tileSize));
+        int endTileX = Math.min(map.getWidth() - 1, (int) Math.floor((b.getX() + b.getWidth() - 1) / tileSize));
+        int startTileY = Math.max(0, (int) Math.floor(b.getY() / tileSize));
+        int endTileY = Math.min(map.getHeight() - 1, (int) Math.floor((b.getY() + b.getHeight() - 1) / tileSize));
 
-        for (int tileY = startTileY; tileY <= endTileY; tileY++) {
-            for (int tileX = startTileX; tileX <= endTileX; tileX++) {
-                if (map.isWall(tileX, tileY)) {
-                    if (map.damageWall(tileX, tileY, damage)) {
-                        damaged = true;
-                    }
+        for (int ty = startTileY; ty <= endTileY; ty++) {
+            for (int tx = startTileX; tx <= endTileX; tx++) {
+                if (!map.isWall(tx, ty)) continue;
+                Rectangle2D tileRect = new Rectangle2D.Double(tx * tileSize, ty * tileSize, tileSize, tileSize);
+                if (swing.intersects(tileRect)) {
+                    if (map.damageWall(tx, ty, damage)) damaged = true;
                 }
             }
         }
@@ -326,29 +383,21 @@ public class Player extends Entity {
     @Override
     public void damage(double amount) {
         super.damage(amount);
-
-        if (isAlive()) {
-            AudioManager.playSound("hero-hurt.wav", -10);
-        } else {
-            AudioManager.playSound("hero-death.wav");
-        }
+        if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
+        else AudioManager.playSound("hero-death.wav");
     }
 
     @Override
     protected void applyKnockbackMovement() {
         double newX = x + knockbackX;
         double newY = y + knockbackY;
-
-        // Check map collision for knockback movement
         if (!collidesWithMap(newX, newY, null)) {
             x = newX;
             y = newY;
         } else {
-            // Stop knockback if we hit a wall
             knockbackTimer = 0;
             knockbackX = 0;
             knockbackY = 0;
         }
     }
-
 }
