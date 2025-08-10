@@ -21,6 +21,5 @@ public class Game {
         window.setVisible(true);
 
         panel.startGameThread();
-        AudioManager.playRandomMusic(-10.0f);
     }
 }

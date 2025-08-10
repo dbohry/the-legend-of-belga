@@ -10,7 +10,7 @@ public class AudioManager {
     private static Clip musicClip = null;
     private static final String SOUND_ASSETS_DIR = "/assets/sfx/";
     private static final String[] PLAYLIST = {
-        "background-music-1.wav",
+        "background-music-1.wav"
     };
 
     public static void playRandomMusic(float volumeDb) {
@@ -77,6 +77,28 @@ public class AudioManager {
         } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) {
             System.err.println("Error playing sound: " + filename);
         }
+    }
+
+    public static void setMusicVolume(float volumeDb) {
+        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gain = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
+            float clamped = Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), volumeDb));
+            gain.setValue(clamped);
+        }
+    }
+
+    public static float getMusicVolumeRangeMin() {
+        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            return ((FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN)).getMinimum();
+        }
+        return -80.0f; // sensible default
+    }
+
+    public static float getMusicVolumeRangeMax() {
+        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            return ((FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN)).getMaximum();
+        }
+        return 0.0f;
     }
 
 }

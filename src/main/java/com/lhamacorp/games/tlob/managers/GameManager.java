@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class GameManager extends JPanel implements Runnable {
+
     public static final int TILE_SIZE = 32;
     public static final int SCREEN_WIDTH = 640;
     public static final int SCREEN_HEIGHT = 480;
@@ -37,7 +38,10 @@ public class GameManager extends JPanel implements Runnable {
     private boolean victory = false;
     private boolean paused = false;
     private boolean musicMuted = false;
-    private static final float MUSIC_VOL_DB = -12.0f;
+    private static final float VOLUME_DB_MIN = -40.0f;
+    private static final float VOLUME_DB_MAX = 0.0f;
+    private float musicVolumeDb = -12.0f;
+    private Rectangle volumeBarRect;
     private Rectangle tryAgainButton;
     private Rectangle nextLevelButton;
     private Rectangle resumeButton;
@@ -62,7 +66,31 @@ public class GameManager extends JPanel implements Runnable {
         addMouseListener(keyManager);
         setFocusable(true);
 
-        AudioManager.playRandomMusic(MUSIC_VOL_DB);
+        AudioManager.playRandomMusic(musicVolumeDb);
+
+        addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (paused && volumeBarRect != null && volumeBarRect.contains(e.getPoint())) {
+                    applyVolumeFromPoint(e.getPoint());
+                }
+            }
+        });
+
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                // Perk logic unchanged...
+
+                if (paused) {
+                    if (volumeBarRect != null && volumeBarRect.contains(e.getPoint())) {
+                        applyVolumeFromPoint(e.getPoint());
+                        return;
+                    }
+                    // existing resume/restart/exit handling...
+                }
+            }
+        });
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -150,7 +178,7 @@ public class GameManager extends JPanel implements Runnable {
             if (musicMuted) {
                 AudioManager.stopMusic();
             } else {
-                AudioManager.playRandomMusic(MUSIC_VOL_DB);
+                AudioManager.playRandomMusic(musicVolumeDb);
             }
         }
 
@@ -197,6 +225,17 @@ public class GameManager extends JPanel implements Runnable {
                 if (!e.isAlive()) enemies.remove(i);
             }
             updateCamera();
+        }
+    }
+
+    private void applyVolumeFromPoint(Point p) {
+        if (volumeBarRect == null) return;
+        float t = (float)(p.x - volumeBarRect.x) / (float)volumeBarRect.width;
+        t = Math.max(0f, Math.min(1f, t));
+        musicVolumeDb = VOLUME_DB_MIN + t * (VOLUME_DB_MAX - VOLUME_DB_MIN);
+
+        if (!musicMuted) {
+            AudioManager.setMusicVolume(musicVolumeDb);
         }
     }
 
@@ -651,6 +690,50 @@ public class GameManager extends JPanel implements Runnable {
         int instructionX = (SCREEN_WIDTH - instructionWidth) / 2;
         int instructionY = SCREEN_HEIGHT / 2 + 120;
         g2.drawString(instructionText, instructionX, instructionY);
+
+        // --- Music Volume Slider ---
+        // Place the slider ABOVE the Resume button with a safe vertical gap.
+        int barWidth  = 220;
+        int barHeight = 10;
+        int barX = (SCREEN_WIDTH - barWidth) / 2;
+
+        int gapToResume = 12; // padding between slider clickable area and Resume button top
+        int resumeTop = (resumeButton != null) ? resumeButton.y : (SCREEN_HEIGHT / 2 - 60);
+
+        // Compute barY so that the slider (including its +/-6px clickable padding)
+        // stays at least `gapToResume` ABOVE the Resume button.
+        int barY = (resumeTop - gapToResume) - barHeight - 6; // minus clickable padding
+
+        // Define clickable area slightly taller to ease clicking
+        volumeBarRect = new Rectangle(barX, barY - 6, barWidth, barHeight + 12);
+
+        // Track
+        g2.setColor(new Color(40, 40, 40));
+        g2.fillRect(barX, barY, barWidth, barHeight);
+        g2.setColor(Color.WHITE);
+        g2.drawRect(barX, barY, barWidth, barHeight);
+
+        // Filled portion
+        float range = (VOLUME_DB_MAX - VOLUME_DB_MIN);
+        float t = range == 0 ? 0f : (musicVolumeDb - VOLUME_DB_MIN) / range;
+        t = Math.max(0f, Math.min(1f, t));
+        int fillW = Math.round(t * barWidth);
+        g2.setColor(new Color(100, 150, 255));
+        g2.fillRect(barX, barY, fillW, barHeight);
+
+        // Knob
+        int knobX = barX + fillW - 4;
+        int knobY = barY - 4;
+        g2.setColor(Color.WHITE);
+        g2.fillRect(knobX, knobY, 8, barHeight + 8);
+
+        // Label above the slider
+        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+        String volLabel = String.format("Music Volume: %.0f dB", musicVolumeDb);
+        int labelW = g2.getFontMetrics().stringWidth(volLabel);
+        g2.setColor(Color.LIGHT_GRAY);
+        g2.drawString(volLabel, barX + (barWidth - labelW) / 2, barY - 10);
+
     }
 
     private void pauseGame() {
