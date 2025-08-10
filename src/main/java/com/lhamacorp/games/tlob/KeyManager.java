@@ -82,7 +82,7 @@ public class KeyManager implements KeyListener, MouseListener {
             case KeyEvent.VK_SHIFT:
                 shift = false; break;
             case KeyEvent.VK_M:
-                mute = !mute; break;
+                break;
             default:
         }
     }

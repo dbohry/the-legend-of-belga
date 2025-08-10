@@ -32,6 +32,8 @@ public class GamePanel extends JPanel implements Runnable {
     private boolean gameOver = false;
     private boolean victory = false;
     private boolean paused = false;
+    private boolean musicMuted = false;
+    private static final float MUSIC_VOL_DB = -12.0f;
     private Rectangle tryAgainButton;
     private Rectangle nextLevelButton;
     private Rectangle resumeButton;
@@ -55,6 +57,8 @@ public class GamePanel extends JPanel implements Runnable {
         addKeyListener(keyManager);
         addMouseListener(keyManager);
         setFocusable(true);
+
+        AudioManager.playRandomMusic(MUSIC_VOL_DB);
 
         addMouseListener(new MouseAdapter() {
             @Override
@@ -139,6 +143,15 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void update() {
+        if (keyManager.mute != musicMuted) {
+            musicMuted = keyManager.mute;
+            if (musicMuted) {
+                AudioManager.stopMusic();
+            } else {
+                AudioManager.playRandomMusic(MUSIC_VOL_DB);
+            }
+        }
+
         // Pause toggle
         if (keyManager.escape && !gameOver && !victory) {
             if (!paused) pauseGame();
