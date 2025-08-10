@@ -1,5 +1,8 @@
 package com.lhamacorp.games.tlob;
 
+import com.lhamacorp.games.tlob.weapons.Sword;
+import com.lhamacorp.games.tlob.weapons.Weapon;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 
@@ -19,8 +22,8 @@ public class Enemy extends Entity {
     private int attackCooldown = 0;
     private int attackTimer = 0;
 
-    public Enemy(double x, double y) {
-        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA);
+    public Enemy(double x, double y, Weapon weapon) {
+        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, weapon);
     }
 
     @Override

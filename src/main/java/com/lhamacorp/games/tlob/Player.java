@@ -1,21 +1,18 @@
 package com.lhamacorp.games.tlob;
 
+import com.lhamacorp.games.tlob.weapons.Weapon;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
 public class Player extends Entity {
+
     private static final int PLAYER_SIZE = 22;
     private static final double PLAYER_SPEED = 1.8;
     private static final double PLAYER_MAX_HP = 6.0;
     private static final double PLAYER_MAX_STAMINA = 6.0;
     private static final double PLAYER_MAX_MANA = 1;
-
-    private static final int SWORD_REACH = 28;
-    private static final int SWORD_WIDTH = 12;
-    private static final int ATTACK_DURATION_FRAMES = 10;
-    private static final int ATTACK_COOLDOWN_FRAMES = 16;
-    private static final double ATTACK_DAMAGE = 2.0;
 
     private static final int FPS = 60;
     private static final int STAMINA_DRAIN_INTERVAL = FPS;
@@ -30,8 +27,8 @@ public class Player extends Entity {
     private double speedMultiplier = 1.0;
     private double damageMultiplier = 1.0;
 
-    public Player(double x, double y) {
-        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA);
+    public Player(double x, double y, Weapon weapon) {
+        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, weapon);
     }
 
     public void setPosition(double x, double y) {
@@ -71,7 +68,7 @@ public class Player extends Entity {
     }
 
     private double effectiveAttackDamage() {
-        return ATTACK_DAMAGE * damageMultiplier;
+        return weapon.getDamage() * damageMultiplier;
     }
 
     public void increaseMoveSpeedByPercent(double pct) {
@@ -80,6 +77,12 @@ public class Player extends Entity {
 
     public void increaseAttackDamageByPercent(double pct) {
         damageMultiplier *= (1.0 + pct);
+    }
+
+    public void increaseWeaponRangeByPercent(double pct) {
+        int currentReach = weapon.getReach();
+        int newReach = (int) Math.ceil(currentReach * (1.0 + pct));
+        weapon.setReach(newReach);
     }
 
     @Override
@@ -158,8 +161,8 @@ public class Player extends Entity {
 
         if (keys.attack && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
-            attackTimer = ATTACK_DURATION_FRAMES;
-            attackCooldown = ATTACK_COOLDOWN_FRAMES;
+            attackTimer = weapon.getDuration();
+            attackCooldown = weapon.getCooldown();
 
             Rectangle hit = getSwordHitbox();
             boolean hitSomething = false;
@@ -227,17 +230,12 @@ public class Player extends Entity {
     private Rectangle getSwordHitbox() {
         int cx = (int) Math.round(x);
         int cy = (int) Math.round(y);
-        switch (facing) {
-            case UP:
-                return new Rectangle(cx - SWORD_WIDTH / 2, cy - height / 2 - SWORD_REACH, SWORD_WIDTH, SWORD_REACH);
-            case DOWN:
-                return new Rectangle(cx - SWORD_WIDTH / 2, cy + height / 2, SWORD_WIDTH, SWORD_REACH);
-            case LEFT:
-                return new Rectangle(cx - width / 2 - SWORD_REACH, cy - SWORD_WIDTH / 2, SWORD_REACH, SWORD_WIDTH);
-            case RIGHT:
-            default:
-                return new Rectangle(cx + width / 2, cy - SWORD_WIDTH / 2, SWORD_REACH, SWORD_WIDTH);
-        }
+        return switch (facing) {
+            case UP -> new Rectangle(cx - weapon.getWidth() / 2, cy - height / 2 - weapon.getReach(), weapon.getWidth(), weapon.getReach());
+            case DOWN -> new Rectangle(cx - weapon.getWidth() / 2, cy + height / 2, weapon.getWidth(), weapon.getReach());
+            case LEFT -> new Rectangle(cx - width / 2 - weapon.getReach(), cy - weapon.getWidth() / 2, weapon.getReach(), weapon.getWidth());
+            default -> new Rectangle(cx + width / 2, cy - weapon.getWidth() / 2, weapon.getReach(), weapon.getWidth());
+        };
     }
 
     @Override

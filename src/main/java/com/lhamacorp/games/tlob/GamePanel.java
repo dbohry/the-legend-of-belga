@@ -1,5 +1,8 @@
 package com.lhamacorp.games.tlob;
 
+import com.lhamacorp.games.tlob.weapons.Sword;
+import com.lhamacorp.games.tlob.weapons.Weapon;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -89,7 +92,8 @@ public class GamePanel extends JPanel implements Runnable {
         this.tileMap = new TileMap(generator.generate());
 
         int[] spawn = tileMap.findSpawnTile();
-        player = new Player(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
+        Weapon sword = new Sword(2, 28, 12, 10, 16);
+        player = new Player(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0, sword);
 
         enemies = new ArrayList<>();
         spawnEnemies();
@@ -189,8 +193,12 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void generatePerkChoices() {
         perkChoices.clear();
+
+        List<Integer> types = new ArrayList<>(List.of(0, 1, 2, 3, 4, 5));
+        Collections.shuffle(types);
+
         for (int i = 0; i < 3; i++) {
-            int roll = (int) (Math.random() * 5); // 0..4
+            int roll = types.get(i);
             switch (roll) {
                 case 0 -> { // Max Life +10..20%
                     double p = 0.10 + Math.random() * 0.10;
@@ -216,17 +224,25 @@ public class GamePanel extends JPanel implements Runnable {
                     String desc = "Increases movement speed permanently.";
                     perkChoices.add(new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p)));
                 }
-                default -> { // Attack Damage +10..20%
+                case 4 -> { // Attack Damage +10..20%
                     double p = 0.10 + Math.random() * 0.10;
                     String label = String.format("Damage +%d%%", (int) Math.round(p * 100));
                     String desc = "Increases melee damage permanently.";
                     perkChoices.add(new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p)));
                 }
+                case 5 -> { // Weapon range +5..10%
+                    double p = 0.05 + Math.random() * 0.05;
+                    String label = String.format("Weapon range +%d%%", (int) Math.round(p * 100));
+                    String desc = "Increased weapon range permanently.";
+                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseWeaponRangeByPercent(p)));
+                }
+                default -> throw new IllegalStateException("Unexpected perk type: " + roll);
             }
         }
 
         Collections.shuffle(perkChoices);
     }
+
 
     private void layoutPerkRects() {
         int cardW = 180, cardH = 100;
@@ -562,17 +578,18 @@ public class GamePanel extends JPanel implements Runnable {
         int baseEnemies = 3 + (int) (Math.random() * 6);
         double multiplier = Math.pow(1.4, completedMaps);
         int enemiesToSpawn = Math.max(1, (int) (baseEnemies * multiplier));
+        Weapon enemySword = new Sword(2, 28, 12, 10, 16);
 
         for (int i = 0; i < enemiesToSpawn; i++) {
             int[] pos = tileMap.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * TILE_SIZE);
             if (pos != null) {
                 if (!tileMap.isWall(pos[0], pos[1])) {
-                    enemies.add(new Enemy(pos[0] * TILE_SIZE + TILE_SIZE / 2.0, pos[1] * TILE_SIZE + TILE_SIZE / 2.0));
+                    enemies.add(new Enemy(pos[0] * TILE_SIZE + TILE_SIZE / 2.0, pos[1] * TILE_SIZE + TILE_SIZE / 2.0, enemySword));
                 }
             } else {
                 int[] fallbackPos = tileMap.getRandomFloorTile();
                 if (fallbackPos != null && !tileMap.isWall(fallbackPos[0], fallbackPos[1])) {
-                    enemies.add(new Enemy(fallbackPos[0] * TILE_SIZE + TILE_SIZE / 2.0, fallbackPos[1] * TILE_SIZE + TILE_SIZE / 2.0));
+                    enemies.add(new Enemy(fallbackPos[0] * TILE_SIZE + TILE_SIZE / 2.0, fallbackPos[1] * TILE_SIZE + TILE_SIZE / 2.0, enemySword));
                 }
             }
         }
@@ -662,20 +679,4 @@ public class GamePanel extends JPanel implements Runnable {
         requestFocusInWindow();
     }
 
-    // --- Nested Perk type ---
-    private static final class Perk {
-        final String name;
-        final String description;
-        final Consumer<Player> applier;
-
-        Perk(String name, String description, Consumer<Player> applier) {
-            this.name = name;
-            this.description = description;
-            this.applier = applier;
-        }
-
-        void apply(Player p) {
-            applier.accept(p);
-        }
-    }
 }

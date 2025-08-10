@@ -15,6 +15,7 @@ public class KeyManager implements KeyListener, MouseListener {
     public volatile boolean enter;
     public volatile boolean escape;
     public volatile boolean shift;
+    public volatile boolean mute = false;
 
     private volatile boolean attackKey;
     private volatile boolean attackMouse;
@@ -50,6 +51,8 @@ public class KeyManager implements KeyListener, MouseListener {
                 escape = true; break;
             case KeyEvent.VK_SHIFT:
                 shift = true; break;
+            case KeyEvent.VK_M:
+                mute = !mute; break;
             default:
         }
     }
@@ -78,6 +81,8 @@ public class KeyManager implements KeyListener, MouseListener {
                 escape = false; break;
             case KeyEvent.VK_SHIFT:
                 shift = false; break;
+            case KeyEvent.VK_M:
+                mute = !mute; break;
             default:
         }
     }

@@ -1,5 +1,7 @@
 package com.lhamacorp.games.tlob;
 
+import com.lhamacorp.games.tlob.weapons.Weapon;
+
 import java.awt.*;
 
 public abstract class Entity {
@@ -18,6 +20,7 @@ public abstract class Entity {
     protected double maxHealth;
     protected double health;
     protected boolean alive = true;
+    protected Weapon weapon;
 
     protected Direction facing = Direction.DOWN;
 
@@ -30,7 +33,7 @@ public abstract class Entity {
 
     public enum Direction {UP, DOWN, LEFT, RIGHT}
 
-    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana) {
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, Weapon weapon) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -42,6 +45,7 @@ public abstract class Entity {
         this.stamina = maxStamina;
         this.maxMana = maxMana;
         this.mana = maxMana;
+        this.weapon = weapon;
     }
 
     public boolean isAlive() {
