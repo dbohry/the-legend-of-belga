@@ -10,12 +10,4 @@ public class Sword extends Weapon {
         super.cooldown = cooldown;
     }
 
-    public void increaseDamage(int increasedDamage) {
-        damage += damage + increasedDamage;
-    }
-
-    public void increaseRange(int increasedRange) {
-        reach += reach + increasedRange;
-    }
-
 }

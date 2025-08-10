@@ -85,7 +85,9 @@ public class Player extends Entity {
     }
 
     public void increaseAttackDamageByPercent(double pct) {
-        damageMultiplier *= (1.0 + pct);
+        int currentDamage = weapon.getDamage();
+        int newDamage = (int) Math.ceil(currentDamage * (1.0 + pct));
+        weapon.setDamage(newDamage);
     }
 
     public void increaseWeaponRangeByPercent(double pct) {

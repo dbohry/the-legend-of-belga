@@ -40,8 +40,13 @@ public class TileMap {
         }
     }
 
-    public int getWidth() { return width; }
-    public int getHeight() { return height; }
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
 
     public boolean isWall(int x, int y) {
         if (x < 0 || y < 0 || x >= width || y >= height) return true;
@@ -61,12 +66,6 @@ public class TileMap {
             return true;
         }
         return false;
-    }
-
-    public double getWallHealth(int x, int y) {
-        if (x < 0 || y < 0 || x >= width || y >= height) return 0;
-        if (tiles[x][y] != WALL) return 0;
-        return wallHealth[x][y];
     }
 
     public void draw(Graphics2D g2, int camX, int camY, int screenW, int screenH) {
@@ -92,7 +91,7 @@ public class TileMap {
                     // Wall damage overlay (only for destructible walls)
                     if (tile == WALL && wallHealth[x][y] > 0 && wallHealth[x][y] < WALL_MAX_HP) {
                         double damagePercent = 1.0 - (wallHealth[x][y] / WALL_MAX_HP);
-                        int overlayAlpha = (int)(damagePercent * 100);
+                        int overlayAlpha = (int) (damagePercent * 100);
                         g2.setColor(new Color(255, 0, 0, overlayAlpha));
                         g2.fillRect(px, py, tileSize, tileSize);
                     }
@@ -106,7 +105,7 @@ public class TileMap {
 
                         if (tile == WALL && wallHealth[x][y] > 0 && wallHealth[x][y] < WALL_MAX_HP) {
                             double damagePercent = 1.0 - (wallHealth[x][y] / WALL_MAX_HP);
-                            int overlayAlpha = (int)(damagePercent * 100);
+                            int overlayAlpha = (int) (damagePercent * 100);
                             g2.setColor(new Color(255, 0, 0, overlayAlpha));
                             g2.fillRect(px, py, tileSize, tileSize);
                         }

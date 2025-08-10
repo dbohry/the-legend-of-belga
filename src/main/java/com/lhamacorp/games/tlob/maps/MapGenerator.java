@@ -40,10 +40,18 @@ public class MapGenerator {
             }
             int dir = rnd.nextInt(4);
             switch (dir) {
-                case 0: cx += 1; break;
-                case 1: cx -= 1; break;
-                case 2: cy += 1; break;
-                case 3: cy -= 1; break;
+                case 0:
+                    cx += 1;
+                    break;
+                case 1:
+                    cx -= 1;
+                    break;
+                case 2:
+                    cy += 1;
+                    break;
+                case 3:
+                    cy -= 1;
+                    break;
             }
             cx = clamp(cx, 1, width - 2);
             cy = clamp(cy, 1, height - 2);
@@ -72,7 +80,8 @@ public class MapGenerator {
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
                     int walls = countNeighbors(result, x, y, 1);
-                    if (walls >= 5) next[x][y] = TileMap.WALL; else next[x][y] = TileMap.FLOOR;
+                    if (walls >= 5) next[x][y] = TileMap.WALL;
+                    else next[x][y] = TileMap.FLOOR;
                 }
             }
             result = next;
@@ -97,5 +106,7 @@ public class MapGenerator {
         return count;
     }
 
-    private int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
+    private int clamp(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
 }

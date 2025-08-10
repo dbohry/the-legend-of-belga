@@ -18,6 +18,10 @@ public class Weapon {
         this.reach = reach;
     }
 
+    public void setDamage(int damage) {
+        this.damage = damage;
+    }
+
     public String getName() {
         return name;
     }

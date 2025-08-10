@@ -8,6 +8,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 public class Enemy extends Entity {
+
     private static final int ENEMY_SIZE = 20;
     private static final double ENEMY_SPEED = 2;
     private static final double ENEMY_MAX_HP = 1.0;

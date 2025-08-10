@@ -230,7 +230,7 @@ public class GameManager extends JPanel implements Runnable {
 
     private void applyVolumeFromPoint(Point p) {
         if (volumeBarRect == null) return;
-        float t = (float)(p.x - volumeBarRect.x) / (float)volumeBarRect.width;
+        float t = (float) (p.x - volumeBarRect.x) / (float) volumeBarRect.width;
         t = Math.max(0f, Math.min(1f, t));
         musicVolumeDb = VOLUME_DB_MIN + t * (VOLUME_DB_MAX - VOLUME_DB_MIN);
 
@@ -693,7 +693,7 @@ public class GameManager extends JPanel implements Runnable {
 
         // --- Music Volume Slider ---
         // Place the slider ABOVE the Resume button with a safe vertical gap.
-        int barWidth  = 220;
+        int barWidth = 220;
         int barHeight = 10;
         int barX = (SCREEN_WIDTH - barWidth) / 2;
 

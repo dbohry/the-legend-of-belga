@@ -16,7 +16,7 @@ public class PerkManager {
     /**
      * Roll 3 distinct perk choices and store them.
      */
-    public List<Perk> rollChoices() {
+    public void rollChoices() {
         currentChoices.clear();
 
         List<PerkType> types = new ArrayList<>(Arrays.asList(PerkType.values()));
@@ -26,7 +26,7 @@ public class PerkManager {
             currentChoices.add(generate(types.get(i)));
         }
         Collections.shuffle(currentChoices);
-        return getChoices();
+        getChoices();
     }
 
     /**
@@ -50,7 +50,6 @@ public class PerkManager {
         currentChoices.clear();
     }
 
-    // ----- internal factory -----
     private Perk generate(PerkType type) {
         switch (type) {
             case MAX_HEALTH -> {
