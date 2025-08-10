@@ -6,22 +6,27 @@ import java.util.*;
 import java.util.function.Predicate;
 
 /**
- * Flexible, registry-based perk manager.
- * Add new perks via register("ID", PerkEntry.of(weight, eligibility, rng -> new Perk(...))).
+ * Flexible, registry-based perk manager with rarity and eligibility.
+ * Add new perks via:
+ *   register("ID", Rarity.RARE, rng -> new Perk(...));
+ *   register("ID", Rarity.UNCOMMON, player -> player.hasMana(), rng -> new Perk(...));
  */
 public class PerkManager {
 
-    /**
-     * Factory that builds a Perk; use rng for randomized values.
-     */
+    /** Factory that builds a Perk; use rng for randomized values. */
     @FunctionalInterface
     public interface PerkFactory {
         Perk create(Random rng);
     }
 
-    /**
-     * Registry entry with weight (for rarity) and optional player-based eligibility.
-     */
+    /** Rarity presets mapped to weights (higher weight => more common). */
+    public enum Rarity {
+        COMMON(10), UNCOMMON(6), RARE(3), EPIC(1), LEGENDARY(1);
+        public final int weight;
+        Rarity(int w) { this.weight = w; }
+    }
+
+    /** Registry entry with weight (for rarity) and optional player-based eligibility. */
     public static final class PerkEntry {
         public final int weight;
         public final Predicate<Player> eligibility;
@@ -56,46 +61,48 @@ public class PerkManager {
         this.rng = (rng != null) ? rng : new Random();
     }
 
-    /* -------------------- Public API -------------------- */
+    /* -------------------- Registration API -------------------- */
 
-    /**
-     * Register/replace a perk definition under an id.
-     */
+    /** Register/replace a perk definition under an id (raw weight version). */
     public void register(String id, PerkEntry entry) {
         registry.put(Objects.requireNonNull(id), Objects.requireNonNull(entry));
     }
 
-    /**
-     * Remove a perk by id.
-     */
-    public void unregister(String id) {
-        registry.remove(id);
+    /** Register with rarity (no eligibility). */
+    public void register(String id, Rarity rarity, PerkFactory factory) {
+        register(id, PerkEntry.of(rarity.weight, factory));
     }
 
-    /**
-     * Return an immutable view of rolled choices.
-     */
-    public List<Perk> getChoices() {
-        return Collections.unmodifiableList(currentChoices);
+    /** Register with rarity and eligibility. */
+    public void register(String id, Rarity rarity, Predicate<Player> eligibility, PerkFactory factory) {
+        register(id, PerkEntry.of(rarity.weight, eligibility, factory));
     }
 
-    /**
-     * Clear rolled choices.
-     */
-    public void clearChoices() {
-        currentChoices.clear();
+    /** Remove a perk by id. */
+    public void unregister(String id) { registry.remove(id); }
+
+    /** Change a perk's weight (rarity) at runtime. Returns true if updated. */
+    public boolean setWeight(String id, int newWeight) {
+        PerkEntry e = registry.get(id);
+        if (e == null || newWeight <= 0) return false;
+        registry.put(id, PerkEntry.of(newWeight, e.eligibility, e.factory));
+        return true;
     }
 
-    /**
-     * Backward compatible roll (no eligibility).
-     */
-    public void rollChoices() {
-        rollChoicesFor(null);
-    }
+    /* -------------------- Rolling & Applying -------------------- */
+
+    /** Immutable view of rolled choices. */
+    public List<Perk> getChoices() { return Collections.unmodifiableList(currentChoices); }
+
+    /** Clear rolled choices. */
+    public void clearChoices() { currentChoices.clear(); }
+
+    /** Backward-compatible roll (no eligibility). Prefer rollChoicesFor(player). */
+    public void rollChoices() { rollChoicesFor(null); }
 
     /**
-     * Roll 3 distinct perk choices, honoring eligibility if a player is provided.
-     * Weighted without replacement.
+     * Roll up to 3 distinct perk choices, honoring eligibility if a player is provided.
+     * Weighted sampling without replacement based on entry.weight.
      */
     public void rollChoicesFor(Player player) {
         currentChoices.clear();
@@ -110,7 +117,6 @@ public class PerkManager {
         }
         if (pool.isEmpty()) return;
 
-        // Weighted picks without replacement (up to 3)
         int picks = Math.min(3, pool.size());
         for (int i = 0; i < picks; i++) {
             int totalWeight = 0;
@@ -122,27 +128,19 @@ public class PerkManager {
 
             for (int idx = 0; idx < pool.size(); idx++) {
                 cumulative += pool.get(idx).getValue().weight;
-                if (cumulative >= target) {
-                    chosenIdx = idx;
-                    break;
-                }
+                if (cumulative >= target) { chosenIdx = idx; break; }
             }
             if (chosenIdx < 0) chosenIdx = pool.size() - 1;
 
             PerkEntry chosen = pool.get(chosenIdx).getValue();
             currentChoices.add(chosen.factory.create(rng));
-
-            // remove to avoid duplicates
-            pool.remove(chosenIdx);
+            pool.remove(chosenIdx); // avoid duplicates
         }
 
-        // Optional: shuffle final order for variety
         Collections.shuffle(currentChoices, rng);
     }
 
-    /**
-     * Apply the chosen perk to the player. Returns the perk applied (or null if bad index).
-     */
+    /** Apply the chosen perk to the player. Returns the perk applied (or null if bad index). */
     public Perk applyChoice(int index, Player player) {
         if (index < 0 || index >= currentChoices.size()) return null;
         Perk chosen = currentChoices.get(index);
@@ -150,59 +148,61 @@ public class PerkManager {
         return chosen;
     }
 
+    /* -------------------- Defaults -------------------- */
+
     private void registerDefaults() {
-        // You can tweak weights to reflect rarity (higher = more common)
-        register("MAX_HEALTH", PerkEntry.of(10, r -> {
+        register("MAX_HEALTH", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Max Life +%d%%", (int) Math.round(p * 100));
-            String desc = "Increases maximum life permanently.";
+            String label = String.format("Max Life +%d%%", (int)Math.round(p * 100));
+            String desc  = "Increases maximum life permanently.";
             return new Perk(label, desc, pl -> pl.increaseMaxHealthByPercent(p));
-        }));
+        });
 
-        register("MAX_STAMINA", PerkEntry.of(10, r -> {
+        register("MAX_STAMINA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Max Stamina +%d%%", (int) Math.round(p * 100));
-            String desc = "Increases maximum stamina permanently.";
+            String label = String.format("Max Stamina +%d%%", (int)Math.round(p * 100));
+            String desc  = "Increases maximum stamina permanently.";
             return new Perk(label, desc, pl -> pl.increaseMaxStaminaByPercent(p));
-        }));
+        });
 
-        register("MAX_MANA", PerkEntry.of(8, r -> {
-            double p = pct(r, 0.10, 0.20);
-            String label = String.format("Max Mana +%d%%", (int) Math.round(p * 100));
-            String desc = "Increases maximum mana permanently.";
-            return new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p));
-        }));
+        register("MAX_MANA", Rarity.COMMON,
+            player -> player.getMaxMana() > 0,  // only offer if mana is relevant
+            r -> {
+                double p = pct(r, 0.10, 0.20);
+                String label = String.format("Max Mana +%d%%", (int)Math.round(p * 100));
+                String desc  = "Increases maximum mana permanently.";
+                return new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p));
+            }
+        );
 
-        register("MOVE_SPEED", PerkEntry.of(8, r -> {
+        register("MOVE_SPEED", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.05, 0.10);
-            String label = String.format("Move Speed +%d%%", (int) Math.round(p * 100));
-            String desc = "Increases movement speed permanently.";
+            String label = String.format("Move Speed +%d%%", (int)Math.round(p * 100));
+            String desc  = "Increases movement speed permanently.";
             return new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p));
-        }));
+        });
 
-        register("WEAPON_DAMAGE", PerkEntry.of(9, r -> {
+        register("WEAPON_DAMAGE", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Damage +%d%%", (int) Math.round(p * 100));
-            String desc = "Increases melee damage permanently.";
+            String label = String.format("Damage +%d%%", (int)Math.round(p * 100));
+            String desc  = "Increases melee damage permanently.";
             return new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p));
-        }));
+        });
 
-        register("WEAPON_RANGE", PerkEntry.of(6, r -> {
+        register("WEAPON_RANGE", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10);
-            String label = String.format("Weapon Range +%d%%", (int) Math.round(p * 100));
-            String desc = "Increased weapon range permanently.";
+            String label = String.format("Weapon Range +%d%%", (int)Math.round(p * 100));
+            String desc  = "Increased weapon range permanently.";
             return new Perk(label, desc, pl -> pl.increaseWeaponRangeByPercent(p));
-        }));
+        });
 
-        register("WEAPON_WIDTH", PerkEntry.of(6, r -> {
-            String label = "+1 Weapon Width";
-            String desc = "Enlarge your weapon by 1";
-            return new Perk(label, desc, Player::increaseWeaponWidth);
-        }));
+        register("WEAPON_WIDTH", Rarity.LEGENDARY, r ->
+            new Perk("+1 Weapon Width", "Enlarge your weapon by 1", Player::increaseWeaponWidth)
+        );
 
-        register("SHIELD", PerkEntry.of(7, r ->
+        register("SHIELD", Rarity.RARE, r ->
             new Perk("+1 Shield", "Adds +1 to HP shield", Player::increaseShield)
-        ));
+        );
     }
 
     private static double pct(Random r, double min, double max) {
