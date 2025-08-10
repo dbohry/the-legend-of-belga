@@ -12,11 +12,12 @@ public class Player extends Entity {
     private static final double PLAYER_SPEED = 1.8;
     private static final double PLAYER_MAX_HP = 6.0;
     private static final double PLAYER_MAX_STAMINA = 6.0;
-    private static final double PLAYER_MAX_MANA = 1;
+    private static final double PLAYER_MAX_MANA = 0;
+    private static final double PLAYER_MAX_SHIELD = 0;
 
     private static final int FPS = 60;
     private static final int STAMINA_DRAIN_INTERVAL = FPS;
-    private static final int STAMINA_REGEN_INTERVAL = FPS * 2;
+    private static final int STAMINA_REGEN_INTERVAL = FPS * 3;
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
@@ -28,7 +29,7 @@ public class Player extends Entity {
     private double damageMultiplier = 1.0;
 
     public Player(double x, double y, Weapon weapon) {
-        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, weapon);
+        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon);
     }
 
     public void setPosition(double x, double y) {
@@ -45,6 +46,7 @@ public class Player extends Entity {
         this.health = this.maxHealth;
         this.mana = this.maxMana;
         this.stamina = this.maxStamina;
+        this.shield = this.maxShield;
     }
 
     public void increaseMaxHealthByPercent(double pct) {
@@ -58,9 +60,12 @@ public class Player extends Entity {
     }
 
     public void increaseMaxManaByPercent(double pct) {
+        if (getMaxMana() == 0) {
+            this.maxMana = 1.0;
+        }
+
         double oldMax = getMaxMana();
-        double newMax = Math.ceil(oldMax * (1.0 + pct));
-        this.maxMana = newMax;
+        this.maxMana = Math.ceil(oldMax * (1.0 + pct));
     }
 
     private double effectiveBaseSpeed() {
@@ -83,6 +88,10 @@ public class Player extends Entity {
         int currentReach = weapon.getReach();
         int newReach = (int) Math.ceil(currentReach * (1.0 + pct));
         weapon.setReach(newReach);
+    }
+
+    public void increaseShield() {
+        this.maxShield += 1.0;
     }
 
     @Override
@@ -127,15 +136,23 @@ public class Player extends Entity {
             speed = speedBase;
             if (!wasSprinting) {
                 staminaRegenCounter++;
-                if (staminaRegenCounter >= STAMINA_REGEN_INTERVAL && stamina < maxStamina) {
-                    stamina += 1.0;
-                    if (stamina > maxStamina) stamina = maxStamina;
-                    staminaRegenCounter = 0;
+                if (staminaRegenCounter >= STAMINA_REGEN_INTERVAL) {
+                    boolean didRegen = false;
+
+                    if (stamina < maxStamina) {
+                        stamina = Math.min(maxStamina, stamina + 1.0);
+                        didRegen = true;
+                    }
+                    if (shield < maxShield) {
+                        shield = Math.min(maxShield, shield + 1.0);
+                        didRegen = true;
+                    }
+
+                    if (didRegen) staminaRegenCounter = 0;
                 }
             } else {
                 staminaRegenCounter = 0;
             }
-
             staminaDrainCounter = 0;
         }
 

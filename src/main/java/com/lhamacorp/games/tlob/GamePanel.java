@@ -9,9 +9,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.function.Consumer;
 
 public class GamePanel extends JPanel implements Runnable {
     public static final int TILE_SIZE = 32;
@@ -43,8 +41,8 @@ public class GamePanel extends JPanel implements Runnable {
 
     // Perk selection
     private boolean choosingPerk = false;
-    private final List<Perk> perkChoices = new ArrayList<>(3);
     private final Rectangle[] perkRects = new Rectangle[3];
+    private final PerkManager perkManager = new PerkManager();
 
     private boolean victorySoundPlayed = false;
 
@@ -78,8 +76,6 @@ public class GamePanel extends JPanel implements Runnable {
 
                 if (gameOver && tryAgainButton != null && tryAgainButton.contains(e.getPoint())) {
                     restartGame();
-                } else if (victory && !choosingPerk && nextLevelButton != null && nextLevelButton.contains(e.getPoint())) {
-                    startNextLevel();
                 } else if (paused) {
                     if (resumeButton != null && resumeButton.contains(e.getPoint())) {
                         resumeGame();
@@ -186,11 +182,8 @@ public class GamePanel extends JPanel implements Runnable {
         if (enemies.isEmpty() && !victory && !gameOver) {
             victory = true;
             choosingPerk = true;
-            generatePerkChoices();
+            perkManager.rollChoices();
             layoutPerkRects();
-
-            // No "Next Level" button until a perk is chosen
-            nextLevelButton = null;
         }
 
         if (!gameOver && !victory && !paused) {
@@ -203,59 +196,6 @@ public class GamePanel extends JPanel implements Runnable {
             updateCamera();
         }
     }
-
-    private void generatePerkChoices() {
-        perkChoices.clear();
-
-        List<Integer> types = new ArrayList<>(List.of(0, 1, 2, 3, 4, 5));
-        Collections.shuffle(types);
-
-        for (int i = 0; i < 3; i++) {
-            int roll = types.get(i);
-            switch (roll) {
-                case 0 -> { // Max Life +10..20%
-                    double p = 0.10 + Math.random() * 0.10;
-                    String label = String.format("Max Life +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increases maximum life permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxHealthByPercent(p)));
-                }
-                case 1 -> { // Max Stamina +10..20%
-                    double p = 0.10 + Math.random() * 0.10;
-                    String label = String.format("Max Stamina +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increases maximum stamina permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxStaminaByPercent(p)));
-                }
-                case 2 -> { // Max Mana +10..20%
-                    double p = 0.10 + Math.random() * 0.10;
-                    String label = String.format("Max Mana +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increases maximum mana permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p)));
-                }
-                case 3 -> { // Move Speed +5..10%
-                    double p = 0.05 + Math.random() * 0.05;
-                    String label = String.format("Move Speed +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increases movement speed permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p)));
-                }
-                case 4 -> { // Attack Damage +10..20%
-                    double p = 0.10 + Math.random() * 0.10;
-                    String label = String.format("Damage +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increases melee damage permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p)));
-                }
-                case 5 -> { // Weapon range +5..10%
-                    double p = 0.05 + Math.random() * 0.05;
-                    String label = String.format("Weapon range +%d%%", (int) Math.round(p * 100));
-                    String desc = "Increased weapon range permanently.";
-                    perkChoices.add(new Perk(label, desc, pl -> pl.increaseWeaponRangeByPercent(p)));
-                }
-                default -> throw new IllegalStateException("Unexpected perk type: " + roll);
-            }
-        }
-
-        Collections.shuffle(perkChoices);
-    }
-
 
     private void layoutPerkRects() {
         int cardW = 180, cardH = 100;
@@ -271,13 +211,12 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void applyPerkAndContinue(int index) {
-        if (index < 0 || index >= perkChoices.size()) return;
-        Perk chosen = perkChoices.get(index);
-        chosen.apply(player);
+        var applied = perkManager.applyChoice(index, player);
+        if (applied == null) return;
 
         // Clear perk UI state
         choosingPerk = false;
-        perkChoices.clear();
+        perkManager.clearChoices();
         Arrays.fill(perkRects, null);
 
         // Now show the Next Level button (or auto-advance)
@@ -340,46 +279,87 @@ public class GamePanel extends JPanel implements Runnable {
         int x = pad;
         int y = pad;
 
-        // === HP ===
+        // === HP + Shield (blue adds on top of health) ===
         double hp = player.getHealth();
+        double sh = player.getShield();
         double maxHp = player.getMaxHealth();
+        double maxSh = player.getMaxShield();
+
         int fullHp = (int) hp;
         boolean hasHalfHp = hp - fullHp >= 0.5;
 
-        for (int i = 0; i < (int) maxHp; i++) {
+        int fullSh = (int) sh;
+        boolean hasHalfSh = sh - fullSh >= 0.5;
+
+        int totalSlots = (int) maxHp + (int) maxSh;
+
+        for (int i = 0; i < totalSlots; i++) {
             int blockX = x + i * (blockWidth + spacing);
             g2.setColor(new Color(50, 10, 10));
             g2.fillRect(blockX, y, blockWidth, blockHeight);
+        }
 
-            if (i < fullHp) {
-                g2.setColor(new Color(200, 40, 40));
-                g2.fillRect(blockX, y, blockWidth, blockHeight);
-            } else if (i == fullHp && hasHalfHp) {
-                g2.setColor(new Color(200, 40, 40));
+        for (int i = 0; i < fullHp && i < totalSlots; i++) {
+            int blockX = x + i * (blockWidth + spacing);
+            g2.setColor(new Color(200, 40, 40));
+            g2.fillRect(blockX, y, blockWidth, blockHeight);
+        }
+        if (hasHalfHp) {
+            int i = Math.min(fullHp, totalSlots - 1);
+            int blockX = x + i * (blockWidth + spacing);
+            g2.setColor(new Color(200, 40, 40));
+            g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
+        }
+
+        int shieldStart = Math.min((int) Math.ceil(hp), totalSlots);
+
+        for (int i = 0; i < fullSh; i++) {
+            int idx = shieldStart + i;
+            if (idx >= totalSlots) break;
+            int blockX = x + idx * (blockWidth + spacing);
+            g2.setColor(new Color(100, 150, 255));
+            g2.fillRect(blockX, y, blockWidth, blockHeight);
+        }
+
+        if (hasHalfSh) {
+            int idx = shieldStart + fullSh;
+            if (idx < totalSlots) {
+                int blockX = x + idx * (blockWidth + spacing);
+                g2.setColor(new Color(100, 150, 255));
                 g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
             }
         }
 
-        // === Mana ===
-        double mana = player.getMana();
+        // Prepare next row position under HP/Shield
+        int nextRowY = y + blockHeight + 6;
+
+        // === Mana (only if maxMana > 0) ===
         double maxMana = player.getMaxMana();
-        int fullMana = (int) mana;
-        boolean hasHalfMana = mana - fullMana >= 0.5;
+        int staminaY;
+        if (maxMana > 0) {
+            double mana = player.getMana();
+            int fullMana = (int) mana;
+            boolean hasHalfMana = mana - fullMana >= 0.5;
 
-        int y2 = y + blockHeight + 6;
+            int y2 = nextRowY;
 
-        for (int i = 0; i < (int) maxMana; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(new Color(10, 10, 40));
-            g2.fillRect(blockX, y2, blockWidth, blockHeight);
-
-            if (i < fullMana) {
-                g2.setColor(new Color(100, 150, 255));
+            for (int i = 0; i < (int) maxMana; i++) {
+                int blockX = x + i * (blockWidth + spacing);
+                g2.setColor(new Color(10, 10, 40));
                 g2.fillRect(blockX, y2, blockWidth, blockHeight);
-            } else if (i == fullMana && hasHalfMana) {
-                g2.setColor(new Color(100, 150, 255));
-                g2.fillRect(blockX, y2, blockWidth / 2, blockHeight);
+
+                if (i < fullMana) {
+                    g2.setColor(new Color(100, 150, 255));
+                    g2.fillRect(blockX, y2, blockWidth, blockHeight);
+                } else if (i == fullMana && hasHalfMana) {
+                    g2.setColor(new Color(100, 150, 255));
+                    g2.fillRect(blockX, y2, blockWidth / 2, blockHeight);
+                }
             }
+
+            staminaY = y2 + blockHeight + 6;
+        } else {
+            staminaY = nextRowY;
         }
 
         // === Stamina ===
@@ -388,7 +368,7 @@ public class GamePanel extends JPanel implements Runnable {
         int fullStamina = (int) stamina;
         boolean hasHalfStamina = stamina - fullStamina >= 0.5;
 
-        int y3 = y2 + blockHeight + 6;
+        int y3 = staminaY;
 
         for (int i = 0; i < (int) maxStamina; i++) {
             int blockX = x + i * (blockWidth + spacing);
@@ -408,6 +388,7 @@ public class GamePanel extends JPanel implements Runnable {
         g2.setColor(Color.WHITE);
         g2.drawString("Enemies: " + enemies.size(), x, y3 + blockHeight + 16);
     }
+
 
     private void drawGameOverScreen(Graphics2D g2) {
         g2.setColor(new Color(0, 0, 0, 180));
@@ -471,20 +452,19 @@ public class GamePanel extends JPanel implements Runnable {
             int w = g2.getFontMetrics().stringWidth(choose);
             g2.drawString(choose, (SCREEN_WIDTH - w) / 2, levelTextY + 30);
 
-            for (int i = 0; i < perkChoices.size(); i++) {
+            var choices = perkManager.getChoices();
+            for (int i = 0; i < choices.size(); i++) {
                 Rectangle r = perkRects[i];
-                Perk po = perkChoices.get(i);
+                Perk po = choices.get(i);
 
                 g2.setColor(new Color(30, 30, 30, 230));
                 g2.fillRect(r.x, r.y, r.width, r.height);
                 g2.setColor(Color.WHITE);
                 g2.drawRect(r.x, r.y, r.width, r.height);
 
-                // title
                 g2.setFont(new Font("Arial", Font.BOLD, 16));
                 g2.drawString(po.name, r.x + 10, r.y + 24);
 
-                // description
                 g2.setFont(new Font("Arial", Font.PLAIN, 14));
                 drawWrapped(g2, po.description, r.x + 10, r.y + 46, r.width - 20, 18);
             }
@@ -535,7 +515,7 @@ public class GamePanel extends JPanel implements Runnable {
         // clear end-screen UI
         tryAgainButton = null;
         nextLevelButton = null;
-        perkChoices.clear();
+        perkManager.clearChoices();
         Arrays.fill(perkRects, null);
 
         // Reset player to spawn & heal
@@ -564,7 +544,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         // clear victory UI
         nextLevelButton = null;
-        perkChoices.clear();
+        perkManager.clearChoices();
         Arrays.fill(perkRects, null);
 
         // Generate new map

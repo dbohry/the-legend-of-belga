@@ -11,6 +11,9 @@ public abstract class Entity {
     protected int height;
     protected double speed;
 
+    protected double maxShield;
+    protected double shield;
+
     protected double maxMana;
     protected double mana;
 
@@ -33,7 +36,7 @@ public abstract class Entity {
 
     public enum Direction {UP, DOWN, LEFT, RIGHT}
 
-    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, Weapon weapon) {
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -46,6 +49,8 @@ public abstract class Entity {
         this.maxMana = maxMana;
         this.mana = maxMana;
         this.weapon = weapon;
+        this.maxShield = maxShield;
+        this.shield = maxShield;
     }
 
     public boolean isAlive() {
@@ -58,6 +63,14 @@ public abstract class Entity {
 
     public double getY() {
         return y;
+    }
+
+    public double getShield() {
+        return shield;
+    }
+
+    public double getMaxShield() {
+        return maxShield;
     }
 
     public double getMana() {
@@ -96,7 +109,21 @@ public abstract class Entity {
 
     public void damage(double amount) {
         if (!alive) return;
-        health -= amount;
+
+        double remaining = amount;
+
+        // absorb with shield first
+        if (shield > 0) {
+            double absorbed = Math.min(shield, remaining);
+            shield -= absorbed;
+            remaining -= absorbed;
+        }
+
+        // then health
+        if (remaining > 0) {
+            health -= remaining;
+        }
+
         if (health <= 0) {
             health = 0;
             alive = false;
@@ -121,22 +148,18 @@ public abstract class Entity {
         if (knockbackTimer > 0) {
             knockbackTimer--;
 
-            // Calculate new position
             double newX = x + knockbackX;
             double newY = y + knockbackY;
 
-            // Check map collision for knockback movement
             if (!collidesWithMap(newX, newY, map)) {
                 x = newX;
                 y = newY;
             } else {
-                // Stop knockback if we hit a wall
                 knockbackTimer = 0;
                 knockbackX = 0;
                 knockbackY = 0;
             }
 
-            // Decay knockback force
             knockbackX *= 0.9;
             knockbackY *= 0.9;
 
