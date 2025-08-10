@@ -36,14 +36,6 @@ public class KeyManager implements KeyListener, MouseListener {
         return false;
     }
 
-    public boolean consumeEnterPressed() {
-        if (enterPressedOnce) {
-            enterPressedOnce = false;
-            return true;
-        }
-        return false;
-    }
-
     @Override
     public void keyTyped(KeyEvent e) {
     }
@@ -75,12 +67,12 @@ public class KeyManager implements KeyListener, MouseListener {
                 break;
 
             case KeyEvent.VK_ENTER:
-                if (!enter) enterPressedOnce = true; // edge
+                if (!enter) enterPressedOnce = true;
                 enter = true;
                 break;
 
             case KeyEvent.VK_ESCAPE:
-                if (!escape) escapePressedOnce = true; // edge
+                if (!escape) escapePressedOnce = true;
                 escape = true;
                 break;
             case KeyEvent.VK_SHIFT:

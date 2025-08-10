@@ -22,6 +22,10 @@ public class Weapon {
         this.damage = damage;
     }
 
+    public void setWidth(int width) {
+        this.width = width;
+    }
+
     public String getName() {
         return name;
     }

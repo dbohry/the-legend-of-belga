@@ -25,7 +25,7 @@ public class Enemy extends Entity {
     private int attackTimer = 0;
 
     public Enemy(double x, double y, Weapon weapon) {
-        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0, weapon);
+        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0, weapon, "Zombie");
     }
 
     @Override

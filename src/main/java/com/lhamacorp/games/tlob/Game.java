@@ -11,7 +11,7 @@ public class Game {
         if (version == null) version = "dev";
 
         JFrame window = new JFrame(appName + " v" + version);
-        GameManager panel = new GameManager();
+        GameManager panel = new GameManager(false);
         window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         window.setResizable(false);
         window.add(panel);

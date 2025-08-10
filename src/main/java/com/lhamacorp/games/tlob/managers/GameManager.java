@@ -2,137 +2,132 @@ package com.lhamacorp.games.tlob.managers;
 
 import com.lhamacorp.games.tlob.entities.Enemy;
 import com.lhamacorp.games.tlob.entities.Player;
-import com.lhamacorp.games.tlob.maps.MapGenerator;
+import com.lhamacorp.games.tlob.managers.renderers.*;
 import com.lhamacorp.games.tlob.maps.TileMap;
-import com.lhamacorp.games.tlob.perks.Perk;
 import com.lhamacorp.games.tlob.perks.PerkManager;
 import com.lhamacorp.games.tlob.weapons.Sword;
 import com.lhamacorp.games.tlob.weapons.Weapon;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Orchestrates high-level game flow; delegates UI and logic to extracted classes.
+ * Toggle start screen:
+ * - Code: new GameManager(false)
+ * - JVM flag: -Dtlob.skipStart=true
+ */
 public class GameManager extends JPanel implements Runnable {
 
+    // ===== Dimensions & Constants =====
     public static final int TILE_SIZE = 32;
-    public static final int SCREEN_WIDTH = 640;
-    public static final int SCREEN_HEIGHT = 480;
+    public static final int SCREEN_WIDTH = 1280;
+    public static final int SCREEN_HEIGHT = 720;
 
+    private static final Color BG_DARK = new Color(10, 10, 15);
+    private static final float VOLUME_DB_MIN = -40.0f;
+    private static final float VOLUME_DB_MAX = 0.0f;
+
+    // ===== State Machine =====
+    private enum GameState {START, PLAYING, PAUSED, VICTORY, GAME_OVER}
+
+    private GameState state;
+
+    // ===== Loop =====
     private Thread gameThread;
     private volatile boolean running = false;
 
+    // ===== Core Systems =====
     private final KeyManager keyManager;
-    private TileMap tileMap;
-    private final Player player;
-    private final List<Enemy> enemies;
-
-    private int cameraOffsetX;
-    private int cameraOffsetY;
-
-    private boolean gameOver = false;
-    private boolean victory = false;
-    private boolean paused = false;
-    private boolean musicMuted = false;
-    private static final float VOLUME_DB_MIN = -40.0f;
-    private static final float VOLUME_DB_MAX = 0.0f;
-    private float musicVolumeDb = -12.0f;
-    private Rectangle volumeBarRect;
-    private Rectangle tryAgainButton;
-    private Rectangle nextLevelButton;
-    private Rectangle resumeButton;
-    private Rectangle restartButton;
-    private Rectangle exitButton;
-    private int completedMaps = 0;
-
-    // Perk selection
-    private boolean choosingPerk = false;
-    private final Rectangle[] perkRects = new Rectangle[3];
+    private final Camera camera = new Camera();
     private final PerkManager perkManager = new PerkManager();
+    private final SpawnManager enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16));
+    private final HudRenderer hudRenderer = new HudRenderer(new Font("Arial", Font.PLAIN, 16));
+    private final PauseMenuRenderer pauseMenuRenderer =
+        new PauseMenuRenderer(new Font("Arial", Font.BOLD, 48),
+            new Font("Arial", Font.BOLD, 20),
+            new Font("Arial", Font.PLAIN, 14),
+            VOLUME_DB_MIN, VOLUME_DB_MAX);
+    private final StartScreenRenderer startScreenRenderer =
+        new StartScreenRenderer("The Legend of the Belga",
+            new Font("Arial", Font.BOLD, 48),
+            new Font("Arial", Font.PLAIN, 24));
+    private final VictoryScreenRenderer victoryRenderer = new VictoryScreenRenderer();
+    private final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
 
-    private boolean victorySoundPlayed = false;
+    private final LevelManager levelManager =
+        new LevelManager(/* width */80, /* height */60, /* density */0.45, /* carveSteps */2500);
 
+    // ===== World =====
+    private final Player player;
+    private final List<Enemy> enemies = new ArrayList<>();
+
+    // ===== Audio =====
+    private boolean musicMuted = false;
+    private float musicVolumeDb = -12.0f;
+
+    // ===== Start Screen Toggle =====
+    private final boolean startScreenEnabled;
+
+    // ===== Constructors =====
     public GameManager() {
-        this.setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
-        this.setBackground(Color.BLACK);
-        this.setDoubleBuffered(true);
+        this(!Boolean.getBoolean("tlob.skipStart"));
+    }
+
+    public GameManager(boolean enableStartScreen) {
+        this.startScreenEnabled = enableStartScreen;
+
+        setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
+        setBackground(Color.BLACK);
+        setDoubleBuffered(true);
 
         keyManager = new KeyManager();
         addKeyListener(keyManager);
-        addMouseListener(keyManager);
+        addMouseListener(keyManager);   // gameplay mouse remains handled by your existing KeyManager
         setFocusable(true);
 
+        // UI listeners (state-routed)
+        addMouseMotionListener(new UIMouseMotionHandler());
+        addMouseListener(new UIMouseClickHandler());
+        addKeyListener(new GlobalKeyHandler());       // ESC, etc.
+        if (startScreenEnabled) {
+            addKeyListener(new StartScreenKeyHandler());
+            state = GameState.START;
+        } else {
+            state = GameState.PLAYING;
+        }
+
+        // World init (via LevelManager)
+        TileMap map = levelManager.map();
+        int[] spawn = map.findSpawnTile();
+        Weapon sword = new Sword(2, 28, 10, 10, 16);
+        player = new Player(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0,
+            spawn[1] * TILE_SIZE + TILE_SIZE / 2.0,
+            sword);
+
+        if (!startScreenEnabled) {
+            try {
+                if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
+            } catch (Exception ignored) {
+            }
+        }
+
+        enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
+
+        // Initial layouts for static UIs
+        pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
+        gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        // Music
         AudioManager.playRandomMusic(musicVolumeDb);
-
-        addMouseMotionListener(new MouseAdapter() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                if (paused && volumeBarRect != null && volumeBarRect.contains(e.getPoint())) {
-                    applyVolumeFromPoint(e.getPoint());
-                }
-            }
-        });
-
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                // Perk logic unchanged...
-
-                if (paused) {
-                    if (volumeBarRect != null && volumeBarRect.contains(e.getPoint())) {
-                        applyVolumeFromPoint(e.getPoint());
-                        return;
-                    }
-                    // existing resume/restart/exit handling...
-                }
-            }
-        });
-
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                // Perk selection takes priority on victory screen
-                if (victory && choosingPerk) {
-                    Point p = e.getPoint();
-                    for (int i = 0; i < perkRects.length; i++) {
-                        Rectangle r = perkRects[i];
-                        if (r != null && r.contains(p)) {
-                            applyPerkAndContinue(i);
-                            return;
-                        }
-                    }
-                    return;
-                }
-
-                if (gameOver && tryAgainButton != null && tryAgainButton.contains(e.getPoint())) {
-                    restartGame();
-                } else if (paused) {
-                    if (resumeButton != null && resumeButton.contains(e.getPoint())) {
-                        resumeGame();
-                    } else if (restartButton != null && restartButton.contains(e.getPoint())) {
-                        restartGame();
-                    } else if (exitButton != null && exitButton.contains(e.getPoint())) {
-                        System.exit(0);
-                    }
-                }
-            }
-        });
-
-        MapGenerator generator = new MapGenerator(80, 60, 0.45, 2500);
-        this.tileMap = new TileMap(generator.generate());
-
-        int[] spawn = tileMap.findSpawnTile();
-        Weapon sword = new Sword(2, 28, 12, 10, 16);
-        player = new Player(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0, sword);
-
-        enemies = new ArrayList<>();
-        spawnEnemies();
     }
 
+    // =========================
+    // Game Loop
+    // =========================
     public void startGameThread() {
         if (running) return;
         running = true;
@@ -145,13 +140,13 @@ public class GameManager extends JPanel implements Runnable {
         final double targetFps = 60.0;
         final double optimalTimeNs = 1_000_000_000.0 / targetFps;
 
-        long lastTime = System.nanoTime();
+        long last = System.nanoTime();
         double delta = 0.0;
 
         while (running) {
             long now = System.nanoTime();
-            delta += (now - lastTime) / optimalTimeNs;
-            lastTime = now;
+            delta += (now - last) / optimalTimeNs;
+            last = now;
 
             while (delta >= 1) {
                 update();
@@ -172,589 +167,237 @@ public class GameManager extends JPanel implements Runnable {
         }
     }
 
+    // =========================
+    // Update
+    // =========================
     private void update() {
+        // Global mute toggle (driven by KeyManager)
         if (keyManager.mute != musicMuted) {
             musicMuted = keyManager.mute;
-            if (musicMuted) {
-                AudioManager.stopMusic();
-            } else {
-                AudioManager.playRandomMusic(musicVolumeDb);
-            }
+            if (musicMuted) AudioManager.stopMusic();
+            else AudioManager.playRandomMusic(musicVolumeDb);
         }
 
-        // Pause toggle
-        if (keyManager.consumeEscapePressed() && !gameOver && !victory) {
-            if (!paused) pauseGame();
-            else resumeGame();
-            return;
-        }
+        switch (state) {
+            case START:
+            case GAME_OVER:
+            case VICTORY:
+            case PAUSED:
+                // Overlays; no world simulation
+                return;
 
-        // Enter key on end screens:
-        // - If gameOver -> restart
-        // - If victory and NOT choosingPerk -> next level
-        // - If victory and choosingPerk -> ignore (must pick a perk)
-        if ((gameOver || victory) && keyManager.consumeEnterPressed()) {
-            if (gameOver) restartGame();
-            else if (victory && !choosingPerk) startNextLevel();
-            return;
-        }
+            case PLAYING:
+                // Game over?
+                if (!player.isAlive()) {
+                    enterGameOver();
+                    return;
+                }
+                // Victory?
+                if (enemies.isEmpty()) {
+                    enterVictory();
+                    return;
+                }
 
-        // Game over detection
-        if (!player.isAlive() && !gameOver) {
-            gameOver = true;
-            int buttonWidth = 150;
-            int buttonHeight = 40;
-            int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
-            int buttonY = SCREEN_HEIGHT / 2 + 50;
-            tryAgainButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
-        }
+                // Normal simulation
+                player.update(keyManager, levelManager.map(), enemies);
+                for (int i = enemies.size() - 1; i >= 0; i--) {
+                    Enemy e = enemies.get(i);
+                    e.update(player, levelManager.map());
+                    if (!e.isAlive()) enemies.remove(i);
+                }
 
-        // Victory detection -> go into perk selection FIRST
-        if (enemies.isEmpty() && !victory && !gameOver) {
-            victory = true;
-            choosingPerk = true;
-            perkManager.rollChoices();
-            layoutPerkRects();
-        }
-
-        if (!gameOver && !victory && !paused) {
-            player.update(keyManager, tileMap, enemies);
-            for (int i = enemies.size() - 1; i >= 0; i--) {
-                Enemy e = enemies.get(i);
-                e.update(player, tileMap);
-                if (!e.isAlive()) enemies.remove(i);
-            }
-            updateCamera();
+                // Camera
+                int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+                int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+                camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+                return;
         }
     }
 
-    private void applyVolumeFromPoint(Point p) {
-        if (volumeBarRect == null) return;
-        float t = (float) (p.x - volumeBarRect.x) / (float) volumeBarRect.width;
-        t = Math.max(0f, Math.min(1f, t));
-        musicVolumeDb = VOLUME_DB_MIN + t * (VOLUME_DB_MAX - VOLUME_DB_MIN);
-
-        if (!musicMuted) {
-            AudioManager.setMusicVolume(musicVolumeDb);
-        }
-    }
-
-    private void layoutPerkRects() {
-        int cardW = 180, cardH = 100;
-        int gap = 20;
-        int totalW = cardW * 3 + gap * 2;
-        int startX = (SCREEN_WIDTH - totalW) / 2;
-        int y = SCREEN_HEIGHT / 2 - cardH / 2 + 30;
-
-        for (int i = 0; i < 3; i++) {
-            int x = startX + i * (cardW + gap);
-            perkRects[i] = new Rectangle(x, y, cardW, cardH);
-        }
-    }
-
-    private void applyPerkAndContinue(int index) {
-        var applied = perkManager.applyChoice(index, player);
-        if (applied == null) return;
-
-        // Clear perk UI state
-        choosingPerk = false;
-        perkManager.clearChoices();
-        Arrays.fill(perkRects, null);
-
-        // Now show the Next Level button (or auto-advance)
-        int buttonWidth = 150;
-        int buttonHeight = 40;
-        int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
-        int buttonY = SCREEN_HEIGHT / 2 + 50;
-        nextLevelButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
-
-        startNextLevel();
-    }
-
-    private void updateCamera() {
-        int mapPixelWidth = tileMap.getWidth() * TILE_SIZE;
-        int mapPixelHeight = tileMap.getHeight() * TILE_SIZE;
-
-        int targetX = (int) Math.round(player.getX() - SCREEN_WIDTH / 2.0);
-        int targetY = (int) Math.round(player.getY() - SCREEN_HEIGHT / 2.0);
-
-        cameraOffsetX = clamp(targetX, 0, Math.max(0, mapPixelWidth - SCREEN_WIDTH));
-        cameraOffsetY = clamp(targetY, 0, Math.max(0, mapPixelHeight - SCREEN_HEIGHT));
-    }
-
-    private int clamp(int v, int min, int max) {
-        return Math.max(min, Math.min(max, v));
-    }
-
+    // =========================
+    // Render
+    // =========================
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
 
-        // Clear background
-        g2.setColor(new Color(10, 10, 15));
+        // Clear
+        g2.setColor(BG_DARK);
         g2.fillRect(0, 0, getWidth(), getHeight());
 
-        // Draw map
-        tileMap.draw(g2, cameraOffsetX, cameraOffsetY, getWidth(), getHeight());
-
-        // Draw entities
-        for (Enemy e : enemies) e.draw(g2, cameraOffsetX, cameraOffsetY);
-        player.draw(g2, cameraOffsetX, cameraOffsetY);
-
-        // HUD
-        drawHud(g2);
-
-        // Overlays
-        if (gameOver) drawGameOverScreen(g2);
-        if (victory) drawVictoryScreen(g2);
-        if (paused) drawPauseMenu(g2);
+        switch (state) {
+            case START -> {
+                startScreenRenderer.draw(g2);
+            }
+            case PLAYING -> {
+                drawWorld(g2);
+                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+            }
+            case PAUSED -> {
+                drawWorld(g2);
+                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                pauseMenuRenderer.draw(g2, musicVolumeDb);
+            }
+            case GAME_OVER -> {
+                drawWorld(g2);
+                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                gameOverRenderer.draw(g2);
+            }
+            case VICTORY -> {
+                drawWorld(g2);
+                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                victoryRenderer.draw(g2);
+            }
+        }
 
         g2.dispose();
     }
 
-    private void drawHud(Graphics2D g2) {
-        int pad = 8;
-        int blockWidth = 16;
-        int blockHeight = 12;
-        int spacing = 2;
-        int x = pad;
-        int y = pad;
-
-        // === HP + Shield (blue adds on top of health) ===
-        double hp = player.getHealth();
-        double sh = player.getShield();
-        double maxHp = player.getMaxHealth();
-        double maxSh = player.getMaxShield();
-
-        int fullHp = (int) hp;
-        boolean hasHalfHp = hp - fullHp >= 0.5;
-
-        int fullSh = (int) sh;
-        boolean hasHalfSh = sh - fullSh >= 0.5;
-
-        int totalSlots = (int) maxHp + (int) maxSh;
-
-        for (int i = 0; i < totalSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(new Color(50, 10, 10));
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
-        }
-
-        for (int i = 0; i < fullHp && i < totalSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(new Color(200, 40, 40));
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
-        }
-        if (hasHalfHp) {
-            int i = Math.min(fullHp, totalSlots - 1);
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(new Color(200, 40, 40));
-            g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
-        }
-
-        int shieldStart = Math.min((int) Math.ceil(hp), totalSlots);
-
-        for (int i = 0; i < fullSh; i++) {
-            int idx = shieldStart + i;
-            if (idx >= totalSlots) break;
-            int blockX = x + idx * (blockWidth + spacing);
-            g2.setColor(new Color(100, 150, 255));
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
-        }
-
-        if (hasHalfSh) {
-            int idx = shieldStart + fullSh;
-            if (idx < totalSlots) {
-                int blockX = x + idx * (blockWidth + spacing);
-                g2.setColor(new Color(100, 150, 255));
-                g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
-            }
-        }
-
-        // Prepare next row position under HP/Shield
-        int nextRowY = y + blockHeight + 6;
-
-        // === Mana (only if maxMana > 0) ===
-        double maxMana = player.getMaxMana();
-        int staminaY;
-        if (maxMana > 0) {
-            double mana = player.getMana();
-            int fullMana = (int) mana;
-            boolean hasHalfMana = mana - fullMana >= 0.5;
-
-            int y2 = nextRowY;
-
-            for (int i = 0; i < (int) maxMana; i++) {
-                int blockX = x + i * (blockWidth + spacing);
-                g2.setColor(new Color(10, 10, 40));
-                g2.fillRect(blockX, y2, blockWidth, blockHeight);
-
-                if (i < fullMana) {
-                    g2.setColor(new Color(100, 150, 255));
-                    g2.fillRect(blockX, y2, blockWidth, blockHeight);
-                } else if (i == fullMana && hasHalfMana) {
-                    g2.setColor(new Color(100, 150, 255));
-                    g2.fillRect(blockX, y2, blockWidth / 2, blockHeight);
-                }
-            }
-
-            staminaY = y2 + blockHeight + 6;
-        } else {
-            staminaY = nextRowY;
-        }
-
-        // === Stamina ===
-        double stamina = player.getStamina();
-        double maxStamina = player.getMaxStamina();
-        int fullStamina = (int) stamina;
-        boolean hasHalfStamina = stamina - fullStamina >= 0.5;
-
-        int y3 = staminaY;
-
-        for (int i = 0; i < (int) maxStamina; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(new Color(60, 60, 20));
-            g2.fillRect(blockX, y3, blockWidth, blockHeight);
-
-            if (i < fullStamina) {
-                g2.setColor(new Color(255, 255, 128));
-                g2.fillRect(blockX, y3, blockWidth, blockHeight);
-            } else if (i == fullStamina && hasHalfStamina) {
-                g2.setColor(new Color(255, 255, 128));
-                g2.fillRect(blockX, y3, blockWidth / 2, blockHeight);
-            }
-        }
-
-        // === Enemies Left ===
-        g2.setColor(Color.WHITE);
-        g2.drawString("Enemies: " + enemies.size(), x, y3 + blockHeight + 16);
+    private void drawWorld(Graphics2D g2) {
+        TileMap map = levelManager.map();
+        map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight());
+        for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
+        player.draw(g2, camera.offsetX(), camera.offsetY());
     }
 
-    private void drawGameOverScreen(Graphics2D g2) {
-        g2.setColor(new Color(0, 0, 0, 180));
-        g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-        g2.setFont(new Font("Arial", Font.BOLD, 48));
-        g2.setColor(Color.RED);
-        String gameOverText = "GAME OVER";
-        int textWidth = g2.getFontMetrics().stringWidth(gameOverText);
-        int textX = (SCREEN_WIDTH - textWidth) / 2;
-        int textY = SCREEN_HEIGHT / 2 - 20;
-        g2.drawString(gameOverText, textX, textY);
-
-        if (tryAgainButton != null) {
-            g2.setColor(new Color(60, 60, 60));
-            g2.fillRect(tryAgainButton.x, tryAgainButton.y, tryAgainButton.width, tryAgainButton.height);
-            g2.setColor(Color.WHITE);
-            g2.drawRect(tryAgainButton.x, tryAgainButton.y, tryAgainButton.width, tryAgainButton.height);
-
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            String buttonText = "Try Again";
-            int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
-            int buttonTextX = tryAgainButton.x + (tryAgainButton.width - buttonTextWidth) / 2;
-            int buttonTextY = tryAgainButton.y + (tryAgainButton.height + 15) / 2;
-            g2.drawString(buttonText, buttonTextX, buttonTextY);
-        }
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
-        g2.setColor(Color.LIGHT_GRAY);
+    // =========================
+    // State transitions
+    // =========================
+    private void enterGameOver() {
+        state = GameState.GAME_OVER;
+        gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
     }
 
-    private void drawVictoryScreen(Graphics2D g2) {
-        if (!victorySoundPlayed) {
-            AudioManager.playSound("map-complete.wav");
-            victorySoundPlayed = true;
-        }
-
-        g2.setColor(new Color(0, 0, 0, 180));
-        g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-        g2.setFont(new Font("Arial", Font.BOLD, 48));
-        g2.setColor(Color.GREEN);
-        String victoryText = "VICTORY!";
-        int textWidth = g2.getFontMetrics().stringWidth(victoryText);
-        int textX = (SCREEN_WIDTH - textWidth) / 2;
-        int textY = SCREEN_HEIGHT / 2 - 40;
-        g2.drawString(victoryText, textX, textY);
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 24));
-        g2.setColor(Color.WHITE);
-        String levelText = "Level " + (completedMaps + 1) + " Complete!";
-        int levelTextWidth = g2.getFontMetrics().stringWidth(levelText);
-        int levelTextX = (SCREEN_WIDTH - levelTextWidth) / 2;
-        int levelTextY = SCREEN_HEIGHT / 2;
-        g2.drawString(levelText, levelTextX, levelTextY);
-
-        // Perk selection UI
-        if (choosingPerk) {
-            g2.setFont(new Font("Arial", Font.PLAIN, 18));
-            String choose = "Choose ONE perk";
-            int w = g2.getFontMetrics().stringWidth(choose);
-            g2.drawString(choose, (SCREEN_WIDTH - w) / 2, levelTextY + 30);
-
-            var choices = perkManager.getChoices();
-            for (int i = 0; i < choices.size(); i++) {
-                Rectangle r = perkRects[i];
-                Perk po = choices.get(i);
-
-                g2.setColor(new Color(30, 30, 30, 230));
-                g2.fillRect(r.x, r.y, r.width, r.height);
-                g2.setColor(Color.WHITE);
-                g2.drawRect(r.x, r.y, r.width, r.height);
-
-                g2.setFont(new Font("Arial", Font.BOLD, 16));
-                g2.drawString(po.name, r.x + 10, r.y + 24);
-
-                g2.setFont(new Font("Arial", Font.PLAIN, 14));
-                drawWrapped(g2, po.description, r.x + 10, r.y + 46, r.width - 20, 18);
-            }
-        } else if (nextLevelButton != null) {
-            // Next Level button (only after a perk has been chosen)
-            g2.setColor(new Color(60, 120, 60));
-            g2.fillRect(nextLevelButton.x, nextLevelButton.y, nextLevelButton.width, nextLevelButton.height);
-            g2.setColor(Color.WHITE);
-            g2.drawRect(nextLevelButton.x, nextLevelButton.y, nextLevelButton.width, nextLevelButton.height);
-
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            String buttonText = "Next Level";
-            int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
-            int buttonTextX = nextLevelButton.x + (nextLevelButton.width - buttonTextWidth) / 2;
-            int buttonTextY = nextLevelButton.y + (nextLevelButton.height + 15) / 2;
-            g2.drawString(buttonText, buttonTextX, buttonTextY);
-        }
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
-        g2.setColor(Color.LIGHT_GRAY);
+    private void enterVictory() {
+        state = GameState.VICTORY;
+        perkManager.rollChoices();
+        victoryRenderer.setChoices(perkManager.getChoices());
+        victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+        AudioManager.playSound("map-complete.wav");
     }
 
-    private void drawWrapped(Graphics2D g2, String text, int x, int y, int maxWidth, int lineHeight) {
-        FontMetrics fm = g2.getFontMetrics();
-        String[] words = text.split(" ");
-        String line = "";
-        int yy = y;
-        for (String w : words) {
-            String test = line.isEmpty() ? w : line + " " + w;
-            if (fm.stringWidth(test) > maxWidth) {
-                g2.drawString(line, x, yy);
-                yy += lineHeight;
-                line = w;
-            } else {
-                line = test;
-            }
-        }
-        if (!line.isEmpty()) g2.drawString(line, x, yy);
+    private void pauseGame() {
+        state = GameState.PAUSED;
+        pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
+    }
+
+    private void resumeGame() {
+        state = GameState.PLAYING;
+        requestFocusInWindow();
     }
 
     private void restartGame() {
-        gameOver = false;
-        paused = false;
-        victory = false;
-        choosingPerk = false;
-        victorySoundPlayed = false;
+        state = GameState.PLAYING;
 
-        // clear end-screen UI
-        tryAgainButton = null;
-        nextLevelButton = null;
-        perkManager.clearChoices();
-        Arrays.fill(perkRects, null);
+        levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
 
-        // Reset player to spawn & heal
-        int[] spawn = tileMap.findSpawnTile();
-        player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
-        player.heal();
-
-        // Reset completed maps counter
-        completedMaps = 0;
-
-        // Spawn enemies
-        spawnEnemies();
-
-        // Reset camera
-        updateCamera();
+        // Reset camera immediately
+        int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+        int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+        camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         requestFocusInWindow();
     }
 
     private void startNextLevel() {
-        completedMaps++;
-        victory = false;
-        paused = false;
-        choosingPerk = false;
-        victorySoundPlayed = false;
+        levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
 
-        // clear victory UI
-        nextLevelButton = null;
-        perkManager.clearChoices();
-        Arrays.fill(perkRects, null);
+        // Back to gameplay
+        state = GameState.PLAYING;
 
-        // Generate new map
-        MapGenerator generator = new MapGenerator(80, 60, 0.45, 2500);
-        tileMap = new TileMap(generator.generate());
-
-        // Reset player to new spawn and fill to new maxes
-        int[] spawn = tileMap.findSpawnTile();
-        player.setPosition(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0, spawn[1] * TILE_SIZE + TILE_SIZE / 2.0);
-        player.restoreAll();
-
-        // Spawn new enemies
-        spawnEnemies();
-
-        // Reset camera
-        updateCamera();
+        int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+        int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+        camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         requestFocusInWindow();
     }
 
-    private void spawnEnemies() {
-        enemies.clear();
-        // Count scales by completed maps
-        int baseEnemies = 3 + (int) (Math.random() * 6);
-        double multiplier = Math.pow(1.4, completedMaps);
-        int enemiesToSpawn = Math.max(1, (int) (baseEnemies * multiplier));
-        Weapon enemySword = new Sword(2, 28, 12, 10, 16);
+    private void applyPerkAndContinue(int index) {
+        var applied = perkManager.applyChoice(index, player);
+        if (applied == null) return;
+        startNextLevel();
+    }
 
-        for (int i = 0; i < enemiesToSpawn; i++) {
-            int[] pos = tileMap.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * TILE_SIZE);
-            if (pos != null) {
-                if (!tileMap.isWall(pos[0], pos[1])) {
-                    enemies.add(new Enemy(pos[0] * TILE_SIZE + TILE_SIZE / 2.0, pos[1] * TILE_SIZE + TILE_SIZE / 2.0, enemySword));
+    // =========================
+    // Input routing
+    // =========================
+    private class GlobalKeyHandler extends KeyAdapter {
+        @Override
+        public void keyPressed(KeyEvent e) {
+            if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                if (state == GameState.PLAYING) pauseGame();
+                else if (state == GameState.PAUSED) resumeGame();
+            }
+        }
+    }
+
+    private class StartScreenKeyHandler extends KeyAdapter {
+        @Override
+        public void keyTyped(KeyEvent e) {
+            if (state != GameState.START) return;
+            startScreenRenderer.keyTyped(e.getKeyChar());
+            if (startScreenRenderer.isComplete()) {
+                try {
+                    player.setName(startScreenRenderer.getHeroName());
+                } catch (Exception ignored) {
                 }
-            } else {
-                int[] fallbackPos = tileMap.getRandomFloorTile();
-                if (fallbackPos != null && !tileMap.isWall(fallbackPos[0], fallbackPos[1])) {
-                    enemies.add(new Enemy(fallbackPos[0] * TILE_SIZE + TILE_SIZE / 2.0, fallbackPos[1] * TILE_SIZE + TILE_SIZE / 2.0, enemySword));
+                state = GameState.PLAYING;
+            }
+            repaint();
+        }
+    }
+
+    private class UIMouseMotionHandler extends MouseMotionAdapter {
+        @Override
+        public void mouseDragged(MouseEvent e) {
+            if (state == GameState.PAUSED) {
+                float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
+                if (!Float.isNaN(maybeDb)) {
+                    musicVolumeDb = maybeDb;
+                    if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
                 }
             }
         }
     }
 
-    private void drawPauseMenu(Graphics2D g2) {
-        g2.setColor(new Color(0, 0, 0, 180));
-        g2.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    private class UIMouseClickHandler extends MouseAdapter {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+            switch (state) {
+                case START -> requestFocusInWindow(); // typing only
 
-        g2.setFont(new Font("Arial", Font.BOLD, 48));
-        g2.setColor(Color.WHITE);
-        String pauseText = "PAUSED";
-        int textWidth = g2.getFontMetrics().stringWidth(pauseText);
-        int textX = (SCREEN_WIDTH - textWidth) / 2;
-        int textY = SCREEN_HEIGHT / 2 - 120;
-        g2.drawString(pauseText, textX, textY);
+                case GAME_OVER -> {
+                    if (gameOverRenderer.hitTryAgain(e.getPoint())) {
+                        restartGame();
+                    }
+                }
 
-        if (resumeButton != null) {
-            g2.setColor(new Color(60, 120, 60));
-            g2.fillRect(resumeButton.x, resumeButton.y, resumeButton.width, resumeButton.height);
-            g2.setColor(Color.WHITE);
-            g2.drawRect(resumeButton.x, resumeButton.y, resumeButton.width, resumeButton.height);
+                case PAUSED -> {
+                    float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
+                    if (!Float.isNaN(maybeDb)) {
+                        musicVolumeDb = maybeDb;
+                        if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
+                        return;
+                    }
+                    if (pauseMenuRenderer.hitResume(e.getPoint())) {
+                        resumeGame();
+                    } else if (pauseMenuRenderer.hitRestart(e.getPoint())) {
+                        restartGame();
+                    } else if (pauseMenuRenderer.hitExit(e.getPoint())) {
+                        System.exit(0);
+                    }
+                }
 
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            String buttonText = "Resume";
-            int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
-            int buttonTextX = resumeButton.x + (resumeButton.width - buttonTextWidth) / 2;
-            int buttonTextY = resumeButton.y + (resumeButton.height + 15) / 2;
-            g2.drawString(buttonText, buttonTextX, buttonTextY);
+                case VICTORY -> {
+                    int idx = victoryRenderer.handleClick(e.getPoint());
+                    if (idx >= 0) applyPerkAndContinue(idx);
+                }
+
+                case PLAYING -> {
+                    // gameplay clicks still handled by KeyManager (added as listener above)
+                }
+            }
         }
-
-        if (restartButton != null) {
-            g2.setColor(new Color(120, 120, 60));
-            g2.fillRect(restartButton.x, restartButton.y, restartButton.width, restartButton.height);
-            g2.setColor(Color.WHITE);
-            g2.drawRect(restartButton.x, restartButton.y, restartButton.width, restartButton.height);
-
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            String buttonText = "Restart";
-            int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
-            int buttonTextX = restartButton.x + (restartButton.width - buttonTextWidth) / 2;
-            int buttonTextY = restartButton.y + (restartButton.height + 15) / 2;
-            g2.drawString(buttonText, buttonTextX, buttonTextY);
-        }
-
-        if (exitButton != null) {
-            g2.setColor(new Color(120, 60, 60));
-            g2.fillRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height);
-            g2.setColor(Color.WHITE);
-            g2.drawRect(exitButton.x, exitButton.y, exitButton.width, exitButton.height);
-
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            String buttonText = "Exit";
-            int buttonTextWidth = g2.getFontMetrics().stringWidth(buttonText);
-            int buttonTextX = exitButton.x + (exitButton.width - buttonTextWidth) / 2;
-            int buttonTextY = exitButton.y + (exitButton.height + 15) / 2;
-            g2.drawString(buttonText, buttonTextX, buttonTextY);
-        }
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
-        g2.setColor(Color.LIGHT_GRAY);
-        String instructionText = "Press ESC to resume";
-        int instructionWidth = g2.getFontMetrics().stringWidth(instructionText);
-        int instructionX = (SCREEN_WIDTH - instructionWidth) / 2;
-        int instructionY = SCREEN_HEIGHT / 2 + 120;
-        g2.drawString(instructionText, instructionX, instructionY);
-
-        // --- Music Volume Slider ---
-        // Place the slider ABOVE the Resume button with a safe vertical gap.
-        int barWidth = 220;
-        int barHeight = 10;
-        int barX = (SCREEN_WIDTH - barWidth) / 2;
-
-        int gapToResume = 12; // padding between slider clickable area and Resume button top
-        int resumeTop = (resumeButton != null) ? resumeButton.y : (SCREEN_HEIGHT / 2 - 60);
-
-        // Compute barY so that the slider (including its +/-6px clickable padding)
-        // stays at least `gapToResume` ABOVE the Resume button.
-        int barY = (resumeTop - gapToResume) - barHeight - 6; // minus clickable padding
-
-        // Define clickable area slightly taller to ease clicking
-        volumeBarRect = new Rectangle(barX, barY - 6, barWidth, barHeight + 12);
-
-        // Track
-        g2.setColor(new Color(40, 40, 40));
-        g2.fillRect(barX, barY, barWidth, barHeight);
-        g2.setColor(Color.WHITE);
-        g2.drawRect(barX, barY, barWidth, barHeight);
-
-        // Filled portion
-        float range = (VOLUME_DB_MAX - VOLUME_DB_MIN);
-        float t = range == 0 ? 0f : (musicVolumeDb - VOLUME_DB_MIN) / range;
-        t = Math.max(0f, Math.min(1f, t));
-        int fillW = Math.round(t * barWidth);
-        g2.setColor(new Color(100, 150, 255));
-        g2.fillRect(barX, barY, fillW, barHeight);
-
-        // Knob
-        int knobX = barX + fillW - 4;
-        int knobY = barY - 4;
-        g2.setColor(Color.WHITE);
-        g2.fillRect(knobX, knobY, 8, barHeight + 8);
-
-        // Label above the slider
-        g2.setFont(new Font("Arial", Font.PLAIN, 14));
-        String volLabel = String.format("Music Volume: %.0f dB", musicVolumeDb);
-        int labelW = g2.getFontMetrics().stringWidth(volLabel);
-        g2.setColor(Color.LIGHT_GRAY);
-        g2.drawString(volLabel, barX + (barWidth - labelW) / 2, barY - 10);
-
     }
-
-    private void pauseGame() {
-        paused = true;
-
-        int buttonWidth = 150;
-        int buttonHeight = 40;
-        int buttonX = (SCREEN_WIDTH - buttonWidth) / 2;
-        int buttonY = SCREEN_HEIGHT / 2;
-
-        resumeButton = new Rectangle(buttonX, buttonY - 60, buttonWidth, buttonHeight);
-        restartButton = new Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
-        exitButton = new Rectangle(buttonX, buttonY + 60, buttonWidth, buttonHeight);
-    }
-
-    private void resumeGame() {
-        paused = false;
-        resumeButton = null;
-        restartButton = null;
-        exitButton = null;
-        requestFocusInWindow();
-    }
-
 }

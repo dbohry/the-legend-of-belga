@@ -100,6 +100,11 @@ public class Player extends Entity {
         this.maxShield += 1.0;
     }
 
+    public void increaseWeaponWidth() {
+        int currentWidth = this.weapon.getWidth();
+        this.weapon.setWidth(currentWidth + 1);
+    }
+
     @Override
     public void update(Object... args) {
         KeyManager keys = (KeyManager) args[0];

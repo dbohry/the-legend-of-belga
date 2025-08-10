@@ -7,6 +7,7 @@ import com.lhamacorp.games.tlob.weapons.Weapon;
 import java.awt.*;
 
 public abstract class Entity {
+
     protected double x;
     protected double y;
     protected int width;
@@ -26,6 +27,7 @@ public abstract class Entity {
     protected double health;
     protected boolean alive = true;
     protected Weapon weapon;
+    protected String name;
 
     protected Direction facing = Direction.DOWN;
 
@@ -53,6 +55,32 @@ public abstract class Entity {
         this.weapon = weapon;
         this.maxShield = maxShield;
         this.shield = maxShield;
+    }
+
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon, String name) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.speed = speed;
+        this.maxHealth = maxHealth;
+        this.health = maxHealth;
+        this.maxStamina = maxStamina;
+        this.stamina = maxStamina;
+        this.maxMana = maxMana;
+        this.mana = maxMana;
+        this.weapon = weapon;
+        this.maxShield = maxShield;
+        this.shield = maxShield;
+        this.name = name;
+    }
+
+    public void setName(String n) {
+        this.name = n;
+    }
+
+    public String getName() {
+        return name;
     }
 
     public boolean isAlive() {
