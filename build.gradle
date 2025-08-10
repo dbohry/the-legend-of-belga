@@ -28,7 +28,11 @@ jar {
     archiveVersion.set('')
 
     manifest {
-        attributes 'Main-Class': application.mainClass
+        attributes(
+                'Main-Class': application.mainClass,
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version
+        )
     }
 
     from {
@@ -36,4 +40,10 @@ jar {
     }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+processResources {
+    filesMatching("version.properties") {
+        expand(version: project.version)
+    }
 }

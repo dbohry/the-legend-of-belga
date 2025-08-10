@@ -7,7 +7,11 @@ import javax.swing.*;
 
 public class Game {
     public static void main(String[] args) {
-        JFrame window = new JFrame("The Legend of Belga");
+        String appName = "The Legend of Belga";
+        String version = Game.class.getPackage().getImplementationVersion();
+        if (version == null) version = "dev";
+
+        JFrame window = new JFrame(appName + " v" + version);
         GameManager panel = new GameManager();
         window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         window.setResizable(false);
@@ -15,6 +19,7 @@ public class Game {
         window.pack();
         window.setLocationRelativeTo(null);
         window.setVisible(true);
+
         panel.startGameThread();
         AudioManager.playRandomMusic(-10.0f);
     }
