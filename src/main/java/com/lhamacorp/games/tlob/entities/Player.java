@@ -23,6 +23,8 @@ public class Player extends Entity {
     private static final double PLAYER_MAX_SHIELD = 0;
 
     private static final int FPS = 60;
+    private static final int TICK_MS = 1000 / FPS;
+
     private static final int STAMINA_DRAIN_INTERVAL = FPS;
     private static final int STAMINA_REGEN_INTERVAL = FPS * 3;
 
@@ -34,6 +36,10 @@ public class Player extends Entity {
     private int attackCooldown = 0;
     private double speedMultiplier = 1.0;
     private double damageMultiplier = 1.0;
+
+    // Animation state
+    private long animTimeMs = 0L;
+    private boolean movingThisTick = false;
 
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon);
@@ -141,6 +147,9 @@ public class Player extends Entity {
             dy *= inv;
         }
 
+        // Are we moving under player control this tick (not just knockback)?
+        movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
+
         boolean sprinting = keys.shift && stamina >= 1.0;
         double speedBase = effectiveBaseSpeed();
         if (sprinting) {
@@ -204,6 +213,9 @@ public class Player extends Entity {
             if (hitSomething) AudioManager.playSound("slash-hit.wav", -15.0f);
             else AudioManager.playSound("slash-clean.wav");
         }
+
+        // Advance local animation time each tick
+        animTimeMs += TICK_MS;
     }
 
     private void moveWithCollision(double dx, double dy, TileMap map, List<Enemy> enemies) {
@@ -313,11 +325,17 @@ public class Player extends Entity {
 
     @Override
     public void draw(Graphics2D g2, int camX, int camY) {
-        BufferedImage tex = TextureManager.getPlayerTexture();
+        // Map our 8-way facing to the 4 directional rows of the sprite sheet
+        TextureManager.Direction dir = toCardinal(facing);
+        TextureManager.Motion motion = movingThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
+
+        TextureManager.SpriteAnimation anim = TextureManager.getPlayerAnimation(dir, motion);
+        BufferedImage tex = (anim != null && anim.length() > 0) ? anim.frameAt(animTimeMs) : TextureManager.getPlayerTexture();
+
         if (tex != null) {
-            int px = (int) Math.round(x - width / 2.0) - camX;
-            int py = (int) Math.round(y - height / 2.0) - camY;
-            g2.drawImage(tex, px, py, width, height, null);
+            int pxImg = (int) Math.round(x - width / 2.0) - camX;
+            int pyImg = (int) Math.round(y - height / 2.0) - camY;
+            g2.drawImage(tex, pxImg, pyImg, width, height, null);
         } else {
             drawCenteredRect(g2, camX, camY, width, height, new Color(40, 160, 70));
         }
@@ -333,7 +351,7 @@ public class Player extends Entity {
             g2.draw(swing);
         }
 
-        // Facing indicator (includes diagonals)
+        // Facing indicator (includes diagonals) — unchanged
         g2.setColor(new Color(10, 40, 15));
         int px = (int) Math.round(x) - camX;
         int py = (int) Math.round(y) - camY;
@@ -405,6 +423,25 @@ public class Player extends Entity {
             knockbackTimer = 0;
             knockbackX = 0;
             knockbackY = 0;
+        }
+    }
+
+    // Map 8-way facing to the 4 sprite-sheet rows (DOWN, LEFT, RIGHT, UP)
+    private static TextureManager.Direction toCardinal(Direction f) {
+        switch (f) {
+            case UP:
+            case UP_LEFT:
+            case UP_RIGHT:
+                return TextureManager.Direction.UP;
+            case DOWN:
+            case DOWN_LEFT:
+            case DOWN_RIGHT:
+                return TextureManager.Direction.DOWN;
+            case LEFT:
+                return TextureManager.Direction.LEFT;
+            case RIGHT:
+            default:
+                return TextureManager.Direction.RIGHT;
         }
     }
 }
