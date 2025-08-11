@@ -1,6 +1,7 @@
 // GameManagerMultiplayer.java
 package com.lhamacorp.games.tlob.client.managers;
 
+import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.common.net.Protocol;
 import com.lhamacorp.games.tlob.common.net.Protocol.EnemySnap;
 import com.lhamacorp.games.tlob.common.net.Protocol.PlayerSnap;
@@ -197,27 +198,42 @@ public class MultiplayerGameManager extends BaseGameManager {
 
     @Override
     protected void updatePlaying(Point aimWorld) {
+        // 1) send input each tick
         sendInputToServer(aimWorld);
 
+        // 2) smooth my local player toward last server target, but NEVER through walls
         if (player != null && !Double.isNaN(meTargetX)) {
-            final double gain = 0.18;
-            double nx = player.getX() + (meTargetX - player.getX()) * gain;
-            double ny = player.getY() + (meTargetY - player.getY()) * gain;
-            player.setPosition(nx, ny);
+            final double gain = 0.18; // smoothing factor
+            double cx = player.getX();
+            double cy = player.getY();
+
+            double nx = cx + (meTargetX - cx) * gain;
+            double ny = cy + (meTargetY - cy) * gain;
+
+            if (!collidesPlayerBox(nx, ny)) {
+                player.setPosition(nx, ny);
+            } else {
+                // try sliding on each axis
+                double sx = (!collidesPlayerBox(nx, cy)) ? nx : cx;
+                double sy = (!collidesPlayerBox(cx, ny)) ? ny : cy;
+                player.setPosition(sx, sy);
+            }
         }
 
+        // 3) advance remote anim clocks + smooth remotes toward their targets
         remotePlayers.values().forEach(RemotePlayerView::tick);
         remoteEnemies.values().forEach(RemoteEnemyView::tick);
 
+        // 4) local cosmetic animation for my sprite
         boolean movingKeys = input.left || input.right || input.up || input.down;
         if (player != null) player.tickClientAnimations(movingKeys);
 
+        // net banner timeout
         if (showNetBanner && --netBannerTicks <= 0) {
             showNetBanner = false;
             netBannerTicks = 0;
         }
     }
-
 
     @Override
     protected String[] topRightExtraLines() {
@@ -283,6 +299,29 @@ public class MultiplayerGameManager extends BaseGameManager {
     }
 
     // ---------- Helpers/inner types ----------
+
+    /** Client-side AABB vs tile grid for my player (must match server PLAYER_HALF=11). */
+    private boolean collidesPlayerBox(double cx, double cy) {
+        if (levelManager == null) return false;
+        TileMap m = levelManager.map();
+        if (m == null) return false;
+
+        final int half = 11;
+        final int ts = TILE_SIZE;
+
+        int left = (int) Math.floor((cx - half) / ts);
+        int right = (int) Math.floor((cx + half - 1) / ts);
+        int top = (int) Math.floor((cy - half) / ts);
+        int bot = (int) Math.floor((cy + half - 1) / ts);
+
+        for (int ty = top; ty <= bot; ty++) {
+            for (int tx = left; tx <= right; tx++) {
+                if (m.isWall(tx, ty)) return true;
+            }
+        }
+        return false;
+    }
+
 
     private static int angleToOctant(double ang) {
         int o = (int) Math.round(ang / (Math.PI / 4.0));
@@ -387,19 +426,26 @@ public class MultiplayerGameManager extends BaseGameManager {
         long animMs;
         boolean initialized = false;
 
-        RemoteEnemyView(int id) {
-            this.id = id;
-        }
+        RemoteEnemyView(int id) { this.id = id; }
 
         void apply(EnemySnap es) {
+            boolean wasAlive = this.alive;
+
             this.tx = es.x;
             this.ty = es.y;
             this.hp = es.hp;
             this.alive = es.alive;
-            if (!initialized) {
-                this.x = tx;
-                this.y = ty;
-                initialized = true;
+
+            if (!initialized) { this.x = tx; this.y = ty; initialized = true; }
+
+            // play death sound once on transition alive -> dead
+            if (wasAlive && !this.alive) {
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        // pick the name you actually use in SP; keep a fallback chain
+                        AudioManager.playSound("enemy-death.wav");
+                    } catch (Throwable ignored) { }
+                });
             }
         }
 
@@ -417,10 +463,7 @@ public class MultiplayerGameManager extends BaseGameManager {
             int py = (int) Math.round(y - SIZE / 2.0) - camY;
 
             BufferedImage tex = null;
-            try {
-                tex = TextureManager.getEnemyTexture();
-            } catch (Throwable ignored) {
-            }
+            try { tex = TextureManager.getEnemyTexture(); } catch (Throwable ignored) {}
             if (tex != null) g2.drawImage(tex, px, py, SIZE, SIZE, null);
             else {
                 g2.setColor(new Color(200, 70, 70, 220));

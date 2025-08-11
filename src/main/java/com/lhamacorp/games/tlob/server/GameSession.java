@@ -57,6 +57,8 @@ final class GameSession implements Runnable {
     private final List<EnemyState> enemies = new CopyOnWriteArrayList<>();
     private final BlockingQueue<ClientPacket> inputQ = new LinkedBlockingQueue<>();
     private final List<ClientConn> conns = new CopyOnWriteArrayList<>();
+    private static int lcgNext(int s) { return s * 1664525 + 1013904223; }
+    private static double lcg01(int s) { return ((s >>> 8) & 0xFFFFFF) / (double)(1 << 24); }
 
     private final GridMap grid;
 
@@ -292,26 +294,36 @@ final class GameSession implements Runnable {
         for (EnemyState e : enemies) {
             if (!e.alive) continue;
 
-            // pick closest living player
+            // find closest living player
             PlayerState target = null;
             double best = Double.POSITIVE_INFINITY;
-            for (PlayerState ps : players.values())
-                if (ps.alive) {
-                    double d = Math.hypot(ps.x - e.x, ps.y - e.y);
-                    if (d < best) {
-                        best = d;
-                        target = ps;
-                    }
+            for (PlayerState ps : players.values()) {
+                if (!ps.alive) continue;
+                double d = Math.hypot(ps.x - e.x, ps.y - e.y);
+                if (d < best) {
+                    best = d;
+                    target = ps;
                 }
+            }
             if (target == null) continue;
 
+            if (best > e.aggroRadius) {
+                // --- wander when far (match SP feel) ---
+                if (--e.wanderTimer <= 0) pickNewWanderDir(e);
+                double vx = e.wanderDx * (0.6 * ENEMY_SPEED);
+                double vy = e.wanderDy * (0.6 * ENEMY_SPEED);
+                e.x = moveAxis(e.x, e.y, vx * dt, true, ENEMY_HALF);
+                e.y = moveAxis(e.x, e.y, vy * dt, false, ENEMY_HALF);
+                continue;
+            }
+
+            // --- engaged: melee or chase ---
             if (best <= ENEMY_MELEE_RANGE) {
                 target.hp = Math.max(0.0, target.hp - ENEMY_DMG_PER_SEC * dt);
                 if (target.hp == 0.0) target.alive = false;
                 continue;
             }
 
-            // steer toward target with collision
             double dx = target.x - e.x, dy = target.y - e.y, len = Math.hypot(dx, dy);
             if (len > 1e-6) {
                 dx /= len;
@@ -363,6 +375,17 @@ final class GameSession implements Runnable {
 
     // ----- Helpers -----
 
+    private void pickNewWanderDir(EnemyState e) {
+        e.lcg = lcgNext(e.lcg);
+        int span = 15 + (int) Math.floor(lcg01(e.lcg) * 21.0); // 15..35 ticks (~0.5–1.2s @30Hz feel)
+        e.wanderTimer = span;
+
+        e.lcg = lcgNext(e.lcg);
+        double ang = lcg01(e.lcg) * Math.PI * 2.0;
+        e.wanderDx = Math.cos(ang);
+        e.wanderDy = Math.sin(ang);
+    }
+
     /** Move one axis with tile collision; returns new coordinate for that axis. */
     private double moveAxis(double x, double y, double delta, boolean xAxis, int half) {
         if (delta == 0) return xAxis ? x : y;
@@ -397,11 +420,18 @@ final class GameSession implements Runnable {
             e.id = i + 1;
             e.x = t[0] * Constants.TILE_SIZE + Constants.TILE_SIZE / 2.0;
             e.y = t[1] * Constants.TILE_SIZE + Constants.TILE_SIZE / 2.0;
-            e.hp = 4.0;
+            e.hp = 1.0;           // <<< match Single Player
             e.alive = true;
+            // personalize aggro + wander (used in section C)
+            e.aggroRadius = 220 + 140 * r.nextDouble(); // 220..360 px like SP
+            // per-enemy tiny RNG seed (LCG); deterministic
+            e.lcg = (int) ((Double.doubleToLongBits(e.x) * 31 + Double.doubleToLongBits(e.y)) ^ 0x9E3779B9);
+            if (e.lcg == 0) e.lcg = 1;
+            pickNewWanderDir(e); // initialize wander
             enemies.add(e);
         }
     }
+
 
     private void onClientLine(ClientConn conn, String line) {
         if (line == null) {
@@ -562,6 +592,10 @@ final class GameSession implements Runnable {
         double x, y, hp;
         boolean alive = true;
         long lastSwingTag = 0L;
+        double aggroRadius;
+        int wanderTimer;
+        double wanderDx, wanderDy;
+        int lcg;
     }
 
     // ----- Small utils -----
