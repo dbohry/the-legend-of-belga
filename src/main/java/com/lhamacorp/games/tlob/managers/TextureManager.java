@@ -7,21 +7,20 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 
 public final class TextureManager {
 
     // ===== Existing assets (grass/stone unchanged) =====
-    private static final String ASSETS_DIR   = "assets";
-    private static final String GRASS_FILE   = ASSETS_DIR + "/grass.png";
-    private static final String STONE_FILE   = ASSETS_DIR + "/stone.png";
+    private static final String ASSETS_DIR = "assets";
+    private static final String GRASS_FILE = ASSETS_DIR + "/grass.png";
+    private static final String STONE_FILE = ASSETS_DIR + "/stone.png";
     // Treat these as sprite sheets now (4x4). If only a single frame exists, we degrade gracefully.
 
     // ===== Tile sizes (keep your existing sizes) =====
     private static final int PLAYER_W = 22, PLAYER_H = 22;
-    private static final int ENEMY_W  = 20, ENEMY_H  = 20;
+    private static final int ENEMY_W = 20, ENEMY_H = 20;
 
     // ===== Animation layout =====
     private static final int FRAMES_PER_ROW = 4;  // walk cycle frames
@@ -29,6 +28,9 @@ public final class TextureManager {
     private static final int DEFAULT_FRAME_DURATION_MS = 120;
 
     // ===== Cached textures =====
+    private static final boolean ANIMATE_GRASS = Boolean.getBoolean("tlob.anim.grass");
+    private static final int GRASS_FRAMES = 4;
+    private static BufferedImage[] grassFrames;
     private static BufferedImage grassTexture;
     private static BufferedImage stoneTexture;
 
@@ -42,7 +44,8 @@ public final class TextureManager {
 
     private static boolean loaded;
 
-    private TextureManager() {}
+    private TextureManager() {
+    }
 
     // ===== Public API (unchanged grass/stone) =====
     public static BufferedImage getGrassTexture() {
@@ -67,8 +70,9 @@ public final class TextureManager {
     }
 
     // ===== New animation API =====
-    public enum Direction { DOWN, LEFT, RIGHT, UP }
-    public enum Motion { IDLE, WALK }
+    public enum Direction {DOWN, LEFT, RIGHT, UP}
+
+    public enum Motion {IDLE, WALK}
 
     public static final class SpriteAnimation {
         private final BufferedImage[] frames;
@@ -85,9 +89,17 @@ public final class TextureManager {
             return frames[idx];
         }
 
-        public BufferedImage[] frames() { return frames; }
-        public int getFrameDurationMs() { return frameDurationMs; }
-        public int length() { return frames.length; }
+        public BufferedImage[] frames() {
+            return frames;
+        }
+
+        public int getFrameDurationMs() {
+            return frameDurationMs;
+        }
+
+        public int length() {
+            return frames.length;
+        }
     }
 
     public static SpriteAnimation getPlayerAnimation(Direction dir, Motion motion) {
@@ -98,6 +110,14 @@ public final class TextureManager {
     public static SpriteAnimation getEnemyAnimation(Direction dir, Motion motion) {
         ensureLoaded();
         return enemyAnimations.get(new Key(motion, dir));
+    }
+
+    public static BufferedImage getGrassTextureFrame(int tick30) {
+        ensureLoaded();
+        if (!ANIMATE_GRASS) return grassTexture;
+        if (grassFrames == null || grassFrames.length == 0) return grassTexture;
+        int idx = Math.floorMod(tick30 / 2, GRASS_FRAMES);
+        return grassFrames[idx];
     }
 
     // ===== Internal load =====
@@ -121,7 +141,7 @@ public final class TextureManager {
 
         // Player / Enemy: sprite sheets (4x4). Fallback to procedural generation if missing.
         BufferedImage playerSheet = null;
-        BufferedImage enemySheet  = null;
+        BufferedImage enemySheet = null;
 
         if (playerSheet == null || !looksLikeSheet(playerSheet, PLAYER_W, PLAYER_H)) {
             playerSheet = generatePlayerSheet(PLAYER_W, PLAYER_H, ROWS_PER_SHEET, FRAMES_PER_ROW);
@@ -133,17 +153,62 @@ public final class TextureManager {
         }
 
         playerAnimations = sliceIntoAnimations(playerSheet, PLAYER_W, PLAYER_H);
-        enemyAnimations  = sliceIntoAnimations(enemySheet, ENEMY_W, ENEMY_H);
+        enemyAnimations = sliceIntoAnimations(enemySheet, ENEMY_W, ENEMY_H);
 
         // Legacy first frame = idle/down (row 0, col 0)
         playerFirstFrame = playerAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
-        enemyFirstFrame  = enemyAnimations .get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+        enemyFirstFrame = enemyAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+
+        // Build animated grass frames only if enabled
+        if (ANIMATE_GRASS && grassFrames == null) {
+            grassFrames = new BufferedImage[GRASS_FRAMES];
+            BufferedImage base = (grassTexture != null) ? grassTexture : generateGrassTexture(32, 32);
+            grassFrames[0] = base;
+            for (int i = 1; i < GRASS_FRAMES; i++) {
+                grassFrames[i] = swayAndTintGrass(base, i);
+            }
+        }
 
         loaded = true;
     }
 
+    private static BufferedImage swayAndTintGrass(BufferedImage base, int phase) {
+        int w = base.getWidth(), h = base.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // Sway amounts (-0.06 .. +0.06)
+        double shearX = switch (phase % GRASS_FRAMES) {
+            case 1 -> -0.04;
+            case 2 -> 0.00;
+            case 3 -> 0.04;
+            default -> 0.00;
+        };
+
+        // Shear around vertical center to keep within bounds
+        AffineTransform at = new AffineTransform();
+        at.translate(-shearX * (h / 2.0), 0); // compensate x shift introduced by shear
+        at.shear(shearX, 0);
+        g.drawImage(base, at, null);
+
+        // Tiny lighting change so it doesn’t look like a pure transform
+        // (alternates a gentle highlight/darken overlay)
+        int alpha = 18; // very subtle
+        if (phase % 2 == 1) {
+            g.setColor(new Color(255, 255, 255, alpha));
+        } else {
+            g.setColor(new Color(0, 0, 0, alpha));
+        }
+        g.fillRect(0, 0, w, h);
+
+        g.dispose();
+        return out;
+    }
+
     private static boolean looksLikeSheet(BufferedImage img, int fw, int fh) {
-        return img.getWidth()  >= fw && img.getHeight() >= fh && (img.getWidth() % fw == 0) && (img.getHeight() % fh == 0);
+        return img.getWidth() >= fw && img.getHeight() >= fh && (img.getWidth() % fw == 0) && (img.getHeight() % fh == 0);
     }
 
     private static Map<Key, SpriteAnimation> sliceIntoAnimations(BufferedImage sheet, int fw, int fh) {
@@ -169,13 +234,14 @@ public final class TextureManager {
 
         // Fill missing directions by mirroring/rehusing DOWN if needed
         for (Direction d : Direction.values()) {
-            map.computeIfAbsent(new Key(Motion.IDLE, d),  k -> map.get(new Key(Motion.IDLE, Direction.DOWN)));
-            map.computeIfAbsent(new Key(Motion.WALK, d),  k -> map.get(new Key(Motion.WALK, Direction.DOWN)));
+            map.computeIfAbsent(new Key(Motion.IDLE, d), k -> map.get(new Key(Motion.IDLE, Direction.DOWN)));
+            map.computeIfAbsent(new Key(Motion.WALK, d), k -> map.get(new Key(Motion.WALK, Direction.DOWN)));
         }
         return map;
     }
 
-    private record Key(Motion motion, Direction dir) {}
+    private record Key(Motion motion, Direction dir) {
+    }
 
     // ===== IO helpers =====
     private static BufferedImage tryLoad(InputStream stream) {
@@ -194,7 +260,8 @@ public final class TextureManager {
             File parent = f.getParentFile();
             if (parent != null) parent.mkdirs();
             ImageIO.write(img, "png", f);
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     // ===== Unchanged grass/stone generation =====
@@ -256,11 +323,11 @@ public final class TextureManager {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         Color tunic = new Color(40, 160, 70);
-        Color hat   = new Color(30, 120, 50);
+        Color hat = new Color(30, 120, 50);
         Color boots = new Color(80, 60, 30);
-        Color skin  = new Color(238, 205, 180);
-        Color belt  = new Color(50, 40, 30);
-        Color line  = new Color(0, 0, 0, 120);
+        Color skin = new Color(238, 205, 180);
+        Color belt = new Color(50, 40, 30);
+        Color line = new Color(0, 0, 0, 120);
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
@@ -327,10 +394,10 @@ public final class TextureManager {
         Graphics2D g = sheet.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        Color body  = new Color(200, 60, 60);
+        Color body = new Color(200, 60, 60);
         Color shade = new Color(150, 30, 30);
-        Color eyeW  = new Color(250, 250, 250);
-        Color eyeB  = new Color(20, 20, 20);
+        Color eyeW = new Color(250, 250, 250);
+        Color eyeB = new Color(20, 20, 20);
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
