@@ -7,6 +7,7 @@ import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.perks.PerkManager;
 import com.lhamacorp.games.tlob.weapons.Sword;
 import com.lhamacorp.games.tlob.weapons.Weapon;
+import com.lhamacorp.games.tlob.world.InputState;
 
 import javax.swing.*;
 import java.awt.*;
@@ -30,6 +31,8 @@ public class GameManager extends JPanel implements Runnable {
 
     private Thread gameThread;
     private volatile boolean running = false;
+    private final InputState input = new InputState();
+    private long simFrame = 0;
 
     // 30 Hz animation clock (increment every 2 logic updates @60hz)
     private int logicTicks = 0;
@@ -126,38 +129,30 @@ public class GameManager extends JPanel implements Runnable {
 
     @Override
     public void run() {
-        final double targetFps = 60.0;
-        final double optimalTimeNs = 1_000_000_000.0 / targetFps;
+        final double simHz = 30.0;
+        final double simStepNs = 1_000_000_000.0 / simHz;
 
         long last = System.nanoTime();
-        double delta = 0.0;
+        double acc = 0.0;
 
         while (running) {
             long now = System.nanoTime();
-            delta += (now - last) / optimalTimeNs;
+            acc += (now - last);
             last = now;
 
-            while (delta >= 1) {
-                update();      // 60hz simulation step
-                delta -= 1;
+            // catch up sim in fixed 30 Hz steps
+            while (acc >= simStepNs) {
+                update();
+                acc -= simStepNs;
             }
 
             repaint();
-
-            long sleepNs = (long) (optimalTimeNs - (System.nanoTime() - now));
-            if (sleepNs > 0) {
-                try {
-                    Thread.sleep(sleepNs / 1_000_000L, (int) (sleepNs % 1_000_000L));
-                } catch (InterruptedException ignored) {
-                }
-            } else {
-                Thread.yield();
-            }
+            Thread.yield();
         }
     }
 
     private void update() {
-        // Mute toggle
+        // Mute toggle (unchanged)
         if (keyManager.mute != musicMuted) {
             musicMuted = keyManager.mute;
             if (musicMuted) AudioManager.stopMusic();
@@ -166,10 +161,17 @@ public class GameManager extends JPanel implements Runnable {
 
         switch (state) {
             case START, GAME_OVER, VICTORY, PAUSED -> {
-                // overlays; no world sim
                 return;
             }
             case PLAYING -> {
+                // Fill input snapshot for this sim frame
+                input.up = keyManager.up;
+                input.down = keyManager.down;
+                input.left = keyManager.left;
+                input.right = keyManager.right;
+                input.attack = keyManager.attack;
+                input.shift = keyManager.shift;
+
                 if (!player.isAlive()) {
                     enterGameOver();
                     return;
@@ -179,7 +181,8 @@ public class GameManager extends JPanel implements Runnable {
                     return;
                 }
 
-                player.update(keyManager, levelManager.map(), enemies);
+                // --- Simulation (now 30 Hz) ---
+                player.update(input, levelManager.map(), enemies);
                 for (int i = enemies.size() - 1; i >= 0; i--) {
                     Enemy e = enemies.get(i);
                     e.update(player, levelManager.map());
@@ -191,9 +194,10 @@ public class GameManager extends JPanel implements Runnable {
                 int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
                 camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-                // Advance 30hz tile/ambient tick (every 2 logic ticks)
-                logicTicks++;
-                if ((logicTicks & 1) == 0) animTick30++;
+                // Advance frame counters
+                simFrame++;
+                // keep your old 30Hz tile tick tied to the sim (1:1 now)
+                animTick30++;
             }
         }
     }
@@ -233,7 +237,6 @@ public class GameManager extends JPanel implements Runnable {
 
     private void drawWorld(Graphics2D g2) {
         TileMap map = levelManager.map();
-        // UPDATED: call the animated overload (see TileMap patch below)
         map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
         player.draw(g2, camera.offsetX(), camera.offsetY());
@@ -246,7 +249,7 @@ public class GameManager extends JPanel implements Runnable {
 
     private void enterVictory() {
         state = GameState.VICTORY;
-        perkManager.rollChoicesFor(player);              // eligibility-aware roll
+        perkManager.rollChoicesFor(player);
         victoryRenderer.setChoices(perkManager.getChoices());
         victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
         AudioManager.playSound("map-complete.wav");
@@ -265,6 +268,11 @@ public class GameManager extends JPanel implements Runnable {
     private void restartGame() {
         state = GameState.PLAYING;
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
+
+        logicTicks = 0;
+        animTick30 = 0;
+        simFrame   = 0;
+
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -274,6 +282,11 @@ public class GameManager extends JPanel implements Runnable {
     private void startNextLevel() {
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
+
+        logicTicks = 0;
+        animTick30 = 0;
+        simFrame   = 0;
+
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -348,7 +361,8 @@ public class GameManager extends JPanel implements Runnable {
                     int idx = victoryRenderer.handleClick(e.getPoint());
                     if (idx >= 0) applyPerkAndContinue(idx);
                 }
-                case PLAYING -> { /* gameplay clicks handled by KeyManager */ }
+                case PLAYING -> {
+                }
             }
         }
     }

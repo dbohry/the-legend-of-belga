@@ -10,25 +10,26 @@ import java.awt.image.BufferedImage;
 public class Enemy extends Entity {
 
     private static final int ENEMY_SIZE = 20;
-    private static final double ENEMY_SPEED = 2;
+    private static final double ENEMY_SPEED = 3.5;
+
     private static final double ENEMY_MAX_HP = 1.0;
     private static final double ENEMY_MAX_STAMINA = 1.0;
     private static final double ENEMY_MAX_MANA = 0;
 
     private static final int ATTACK_RANGE = 30;
-    private static final int ATTACK_COOLDOWN_FRAMES = 120;
-    private static final int ATTACK_DURATION_FRAMES = 8;
-    private static final double ATTACK_DAMAGE = 1.0;
 
-    // Animation cadence (match Player)
-    private static final int FPS = 60;
-    private static final int TICK_MS = 1000 / FPS;
+    // --- 30 Hz timing ---
+    private static final int TICKS_PER_SECOND = 30;
+    private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
+
+    private static final int ATTACK_COOLDOWN_TICKS = 60; // 2.0s @30Hz
+    private static final int ATTACK_DURATION_TICKS = 3;  // 0.1s  @30Hz
+    private static final int HURT_FLASH_TICKS = 6;  // ~0.2s
 
     private int hurtTimer = 0;
     private int attackCooldown = 0;
     private int attackTimer = 0;
 
-    // Animation state
     private long animTimeMs = 0L;
     private boolean movedThisTick = false;
 
@@ -46,20 +47,18 @@ public class Enemy extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        // Try melee attack
         double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
         if (distToPlayer <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
-            attackTimer = ATTACK_DURATION_FRAMES;
-            attackCooldown = ATTACK_COOLDOWN_FRAMES;
-            player.damage(ATTACK_DAMAGE);
+            attackTimer = ATTACK_DURATION_TICKS;
+            attackCooldown = ATTACK_COOLDOWN_TICKS;
+            player.damage(1.0);
             player.applyKnockback(x, y);
         }
 
-        // Desired direction toward player
         double dx = player.getX() - x;
         double dy = player.getY() - y;
         double dist = distToPlayer;
-        if (dist > 0.0001) {
+        if (dist > 1e-4) {
             dx /= dist;
             dy /= dist;
         } else {
@@ -67,34 +66,26 @@ public class Enemy extends Entity {
             dy = 0;
         }
 
-        // Update knockback first
         updateKnockbackWithMap(map);
 
-        // Only move under own control if not being knocked back
         double vx = 0, vy = 0;
         if (knockbackTimer == 0) {
             double desiredSpeed = speed;
             if (dist > 300 || attackTimer > 0) {
-                // Far away or in attack windup: lazy wander
                 double angle = (System.nanoTime() / 1_000_000_000.0 + hash()) % (2 * Math.PI);
                 dx = Math.cos(angle);
                 dy = Math.sin(angle);
                 desiredSpeed = 0.6;
             }
-
             vx = dx * desiredSpeed;
             vy = dy * desiredSpeed;
-
             moveWithCollision(vx, vy, map, player);
         }
 
-        // Update facing from actual velocity this tick (prefer axis with larger magnitude)
         updateFacing(vx, vy);
-
-        // Movement flag for animation (ignore pure knockback)
         movedThisTick = (Math.abs(vx) + Math.abs(vy)) > 1e-3 && knockbackTimer == 0;
 
-        // Advance enemy-local animation clock
+        // 30 Hz animation clock
         animTimeMs += TICK_MS;
     }
 
@@ -118,7 +109,7 @@ public class Enemy extends Entity {
     @Override
     public void damage(double amount) {
         super.damage(amount);
-        hurtTimer = 10;
+        hurtTimer = HURT_FLASH_TICKS;
     }
 
     @Override

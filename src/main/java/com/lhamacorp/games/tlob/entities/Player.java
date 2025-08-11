@@ -6,6 +6,7 @@ import com.lhamacorp.games.tlob.managers.KeyManager;
 import com.lhamacorp.games.tlob.managers.TextureManager;
 import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
+import com.lhamacorp.games.tlob.world.InputState;
 import com.lhamacorp.games.tlob.world.PlayerInputView;
 
 import java.awt.*;
@@ -17,17 +18,17 @@ import java.util.List;
 public class Player extends Entity {
 
     private static final int PLAYER_SIZE = 22;
-    private static final double PLAYER_SPEED = 1.8;
+    private static final double PLAYER_SPEED = 3;
     private static final double PLAYER_MAX_HP = 6.0;
     private static final double PLAYER_MAX_STAMINA = 6.0;
     private static final double PLAYER_MAX_MANA = 0;
     private static final double PLAYER_MAX_SHIELD = 0;
 
-    private static final int FPS = 60;
-    private static final int TICK_MS = 1000 / FPS;
+    private static final int TICKS_PER_SECOND = 30;
+    private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
-    private static final int STAMINA_DRAIN_INTERVAL = FPS;
-    private static final int STAMINA_REGEN_INTERVAL = FPS * 3;
+    private static final int STAMINA_DRAIN_INTERVAL = TICKS_PER_SECOND;
+    private static final int STAMINA_REGEN_INTERVAL = TICKS_PER_SECOND * 3;
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
@@ -114,13 +115,40 @@ public class Player extends Entity {
 
     @Override
     public void update(Object... args) {
-        // Accept either a pure PlayerInputView or the existing KeyManager
         final PlayerInputView input;
-        Object k0 = args[0];
+        Object k0 = (args.length > 0) ? args[0] : null;
+
         if (k0 instanceof PlayerInputView piv) {
             input = piv;
-        } else {
-            KeyManager km = (KeyManager) k0;
+
+        } else if (k0 instanceof InputState is) {
+            input = new PlayerInputView() {
+                public boolean left() {
+                    return is.left;
+                }
+
+                public boolean right() {
+                    return is.right;
+                }
+
+                public boolean up() {
+                    return is.up;
+                }
+
+                public boolean down() {
+                    return is.down;
+                }
+
+                public boolean sprint() {
+                    return is.shift;
+                }
+
+                public boolean attack() {
+                    return is.attack;
+                }
+            };
+
+        } else if (k0 instanceof KeyManager km) {
             input = new PlayerInputView() {
                 public boolean left() {
                     return km.left;
@@ -146,13 +174,41 @@ public class Player extends Entity {
                     return km.attack;
                 }
             };
+
+        } else {
+            // Fallback: no input this tick
+            input = new PlayerInputView() {
+                public boolean left() {
+                    return false;
+                }
+
+                public boolean right() {
+                    return false;
+                }
+
+                public boolean up() {
+                    return false;
+                }
+
+                public boolean down() {
+                    return false;
+                }
+
+                public boolean sprint() {
+                    return false;
+                }
+
+                public boolean attack() {
+                    return false;
+                }
+            };
         }
 
         TileMap map = (TileMap) args[1];
         @SuppressWarnings("unchecked")
         List<Enemy> enemies = (List<Enemy>) args[2];
 
-        // Input + 8-way facing
+        // --- Input -> 8-way facing ---
         int dxRaw = 0, dyRaw = 0;
         if (input.left()) dxRaw -= 1;
         if (input.right()) dxRaw += 1;
@@ -173,10 +229,10 @@ public class Player extends Entity {
             }
         }
 
-        // Movement (normalize diagonals)
+        // --- Movement (normalize diagonals) ---
         double dx = dxRaw, dy = dyRaw;
         if (dx != 0 && dy != 0) {
-            double inv = Math.sqrt(0.5);
+            double inv = Math.sqrt(0.5); // keep diagonal speed == cardinal speed
             dx *= inv;
             dy *= inv;
         }
@@ -184,6 +240,7 @@ public class Player extends Entity {
         // Are we moving under player control this tick (not just knockback)?
         movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
 
+        // --- Sprint / stamina ---
         boolean sprinting = input.sprint() && stamina >= 1.0;
         double speedBase = effectiveBaseSpeed();
         if (sprinting) {
@@ -217,11 +274,11 @@ public class Player extends Entity {
         }
         wasSprinting = sprinting;
 
-        // Knockback & movement
+        // --- Knockback & movement ---
         updateKnockbackWithMap(map);
         if (knockbackTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
 
-        // Attack
+        // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
@@ -241,16 +298,16 @@ public class Player extends Entity {
                     hitSomething = true;
                 }
             }
-
             if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
 
             if (hitSomething) AudioManager.playSound("slash-hit.wav", -15.0f);
             else AudioManager.playSound("slash-clean.wav");
         }
 
-        // Advance local animation time each tick
+        // --- Advance local animation clock (30 Hz sim) ---
         animTimeMs += TICK_MS;
     }
+
 
     private void moveWithCollision(double dx, double dy, TileMap map, List<Enemy> enemies) {
         double newX = x + dx;
