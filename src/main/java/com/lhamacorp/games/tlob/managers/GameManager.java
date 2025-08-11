@@ -25,25 +25,22 @@ public class GameManager extends JPanel implements Runnable {
     private static final Color BG_DARK = new Color(10, 10, 15);
     private static final float VOLUME_DB_MIN = -40.0f;
     private static final float VOLUME_DB_MAX = 0.0f;
-
-    // checksum cadence (JVM: -Dtlob.cs.every=60)
     private static final int CHECKSUM_EVERY_TICKS = Integer.getInteger("tlob.cs.every", 120);
 
     private enum GameState {START, PLAYING, PAUSED, VICTORY, GAME_OVER}
-
     private GameState state;
 
     private Thread gameThread;
     private volatile boolean running = false;
 
-    // Input snapshot (30 Hz sim)
     private final InputState input = new InputState();
-
-    // 30 Hz tile/ambient tick
     private int animTick30 = 0;
-
-    // sim tick for checksum cadence
     private long simTick = 0;
+
+    // latest cursor in SCREEN coords + inside flag
+    private int mouseScreenX = SCREEN_WIDTH / 2;
+    private int mouseScreenY = SCREEN_HEIGHT / 2;
+    private boolean mouseInside = false;
 
     // Core systems
     private final KeyManager keyManager;
@@ -80,12 +77,9 @@ public class GameManager extends JPanel implements Runnable {
     private boolean musicMuted = false;
     private float musicVolumeDb = -12.0f;
 
-    // Start screen toggle
     private final boolean startScreenEnabled;
 
-    public GameManager() {
-        this(!Boolean.getBoolean("tlob.skipStart"));
-    }
+    public GameManager() { this(!Boolean.getBoolean("tlob.skipStart")); }
 
     public GameManager(boolean enableStartScreen) {
         this.startScreenEnabled = enableStartScreen;
@@ -99,7 +93,11 @@ public class GameManager extends JPanel implements Runnable {
         addMouseListener(keyManager);
         setFocusable(true);
 
-        addMouseMotionListener(new UIMouseMotionHandler());
+        // unified mouse handler (moved/dragged + entered/exited)
+        UIMouseHandler mouseHandler = new UIMouseHandler();
+        addMouseMotionListener(mouseHandler);
+        addMouseListener(mouseHandler);
+
         addMouseListener(new UIMouseClickHandler());
         addKeyListener(new GlobalKeyHandler());
         if (startScreenEnabled) {
@@ -109,17 +107,16 @@ public class GameManager extends JPanel implements Runnable {
             state = GameState.PLAYING;
         }
 
-        // Seed & RNG (property takes precedence, then env; otherwise time)
+        // Seed & RNG
         this.worldSeed = readSeed();
         this.rootRng = new Random(worldSeed);
-        this.mapsRoot = new Random(rootRng.nextLong());    // independent stream for maps
-        this.spawnsRoot = new Random(rootRng.nextLong());  // independent stream for spawns
+        this.mapsRoot = new Random(rootRng.nextLong());
+        this.spawnsRoot = new Random(rootRng.nextLong());
         System.out.println("World seed = " + worldSeed);
 
         // RNG-aware systems
         levelManager = new LevelManager(80, 60, 0.45, 2500, mapsRoot);
-        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16),
-            new Random(spawnsRoot.nextLong()));
+        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16), new Random(spawnsRoot.nextLong()));
 
         // World init
         TileMap map = levelManager.map();
@@ -139,7 +136,6 @@ public class GameManager extends JPanel implements Runnable {
 
         enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
 
-        // Layout static UI
         pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
 
@@ -154,11 +150,8 @@ public class GameManager extends JPanel implements Runnable {
             : (envU != null && !envU.isBlank()) ? envU
             : (envL != null && !envL.isBlank()) ? envL
             : null;
-        try {
-            return (raw != null) ? Long.parseLong(raw.trim()) : System.currentTimeMillis();
-        } catch (NumberFormatException e) {
-            return System.currentTimeMillis();
-        }
+        try { return (raw != null) ? Long.parseLong(raw.trim()) : System.currentTimeMillis(); }
+        catch (NumberFormatException e) { return System.currentTimeMillis(); }
     }
 
     public void startGameThread() {
@@ -210,17 +203,18 @@ public class GameManager extends JPanel implements Runnable {
                 input.attack = keyManager.attack;
                 input.shift = keyManager.shift;
 
-                if (!player.isAlive()) {
-                    enterGameOver();
-                    return;
-                }
-                if (enemies.isEmpty()) {
-                    enterVictory();
-                    return;
+                if (!player.isAlive()) { enterGameOver(); return; }
+                if (enemies.isEmpty()) { enterVictory(); return; }
+
+                // Mouse aim only if the cursor is currently inside the panel
+                Point aimWorld = null;
+                if (mouseInside) {
+                    aimWorld = new Point(mouseScreenX + camera.offsetX(),
+                        mouseScreenY + camera.offsetY());
                 }
 
                 // Simulation (30 Hz)
-                player.update(input, levelManager.map(), enemies);
+                player.update(input, levelManager.map(), enemies, aimWorld);
                 for (int i = enemies.size() - 1; i >= 0; i--) {
                     Enemy e = enemies.get(i);
                     e.update(player, levelManager.map());
@@ -232,10 +226,8 @@ public class GameManager extends JPanel implements Runnable {
                 int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
                 camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-                // 30 Hz ambient tick
+                // ticks
                 animTick30++;
-
-                // checksum cadence
                 simTick++;
                 logChecksumIfDue();
             }
@@ -286,7 +278,6 @@ public class GameManager extends JPanel implements Runnable {
         player.draw(g2, camera.offsetX(), camera.offsetY());
     }
 
-    /** Draw a tiny, low-contrast seed tag in the bottom-right corner. */
     private void drawSeedOverlay(Graphics2D g2) {
         String text = "seed: " + worldSeed;
         Font oldF = g2.getFont();
@@ -314,7 +305,6 @@ public class GameManager extends JPanel implements Runnable {
         g2.setColor(oldCol);
     }
 
-    /** Print a deterministic checksum of the current gameplay state every N ticks. */
     private void logChecksumIfDue() {
         if (CHECKSUM_EVERY_TICKS <= 0) return;
         if ((simTick % CHECKSUM_EVERY_TICKS) != 0) return;
@@ -323,9 +313,8 @@ public class GameManager extends JPanel implements Runnable {
         System.out.printf("tick=%d checksum=%016x enemies=%d%n", simTick, cs, enemies.size());
     }
 
-    /** Build a simple FNV-1a-ish checksum across player, enemies, and map walls/floors. */
     private long computeChecksum() {
-        long h = 0xcbf29ce484222325L; // FNV-1a 64-bit basis
+        long h = 0xcbf29ce484222325L;
 
         h = mix(h, Double.doubleToLongBits(player.getX()));
         h = mix(h, Double.doubleToLongBits(player.getY()));
@@ -350,7 +339,7 @@ public class GameManager extends JPanel implements Runnable {
 
     private static long mix(long h, long v) {
         h ^= v;
-        h *= 0x100000001b3L; // FNV prime
+        h *= 0x100000001b3L;
         h ^= (h >>> 32);
         return h;
     }
@@ -380,10 +369,7 @@ public class GameManager extends JPanel implements Runnable {
 
     private void restartGame() {
         state = GameState.PLAYING;
-
-        // reseed spawns for deterministic restart (requires SpawnManager.reseed(Random))
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
-
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
         animTick30 = 0;
         simTick = 0;
@@ -395,9 +381,7 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private void startNextLevel() {
-        // reseed spawns for the next level (requires SpawnManager.reseed(Random))
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
-
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
         animTick30 = 0;
@@ -416,8 +400,7 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private class GlobalKeyHandler extends KeyAdapter {
-        @Override
-        public void keyPressed(KeyEvent e) {
+        @Override public void keyPressed(KeyEvent e) {
             if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
                 if (state == GameState.PLAYING) pauseGame();
                 else if (state == GameState.PAUSED) resumeGame();
@@ -426,8 +409,7 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private class StartScreenKeyHandler extends KeyAdapter {
-        @Override
-        public void keyTyped(KeyEvent e) {
+        @Override public void keyTyped(KeyEvent e) {
             if (state != GameState.START) return;
             startScreenRenderer.keyTyped(e.getKeyChar());
             if (startScreenRenderer.isComplete()) {
@@ -438,22 +420,32 @@ public class GameManager extends JPanel implements Runnable {
         }
     }
 
-    private class UIMouseMotionHandler extends MouseMotionAdapter {
-        @Override
-        public void mouseDragged(MouseEvent e) {
+    /** One handler for move/drag AND enter/exit so we know if the cursor is inside. */
+    private class UIMouseHandler extends MouseAdapter {
+        @Override public void mouseEntered(MouseEvent e) { mouseInside = true; }
+        @Override public void mouseExited(MouseEvent e)  { mouseInside = false; }
+        @Override public void mouseMoved(MouseEvent e) {
+            if (state == GameState.PLAYING) {
+                mouseScreenX = e.getX();
+                mouseScreenY = e.getY();
+            }
+        }
+        @Override public void mouseDragged(MouseEvent e) {
             if (state == GameState.PAUSED) {
                 float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
                 if (!Float.isNaN(maybeDb)) {
                     musicVolumeDb = maybeDb;
                     if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
                 }
+            } else if (state == GameState.PLAYING) {
+                mouseScreenX = e.getX();
+                mouseScreenY = e.getY();
             }
         }
     }
 
     private class UIMouseClickHandler extends MouseAdapter {
-        @Override
-        public void mouseClicked(MouseEvent e) {
+        @Override public void mouseClicked(MouseEvent e) {
             switch (state) {
                 case START -> requestFocusInWindow();
                 case GAME_OVER -> { if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame(); }

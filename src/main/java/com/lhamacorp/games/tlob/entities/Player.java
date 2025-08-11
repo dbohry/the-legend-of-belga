@@ -65,19 +65,16 @@ public class Player extends Entity {
     }
 
     public void increaseMaxHealthByPercent(double pct) {
-        double oldMax = getMaxHealth();
-        this.maxHealth = Math.ceil(oldMax * (1.0 + pct));
+        this.maxHealth = Math.ceil(getMaxHealth() * (1.0 + pct));
     }
 
     public void increaseMaxStaminaByPercent(double pct) {
-        double oldMax = getMaxStamina();
-        this.maxStamina = Math.ceil(oldMax * (1.0 + pct));
+        this.maxStamina = Math.ceil(getMaxStamina() * (1.0 + pct));
     }
 
     public void increaseMaxManaByPercent(double pct) {
         if (getMaxMana() == 0) this.maxMana = 1.0;
-        double oldMax = getMaxMana();
-        this.maxMana = Math.ceil(oldMax * (1.0 + pct));
+        this.maxMana = Math.ceil(getMaxMana() * (1.0 + pct));
     }
 
     private double effectiveBaseSpeed() {
@@ -93,15 +90,11 @@ public class Player extends Entity {
     }
 
     public void increaseAttackDamageByPercent(double pct) {
-        int currentDamage = weapon.getDamage();
-        int newDamage = (int) Math.ceil(currentDamage * (1.0 + pct));
-        weapon.setDamage(newDamage);
+        weapon.setDamage((int) Math.ceil(weapon.getDamage() * (1.0 + pct)));
     }
 
     public void increaseWeaponRangeByPercent(double pct) {
-        int currentReach = weapon.getReach();
-        int newReach = (int) Math.ceil(currentReach * (1.0 + pct));
-        weapon.setReach(newReach);
+        weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
     }
 
     public void increaseShield() {
@@ -109,8 +102,7 @@ public class Player extends Entity {
     }
 
     public void increaseWeaponWidth() {
-        int currentWidth = this.weapon.getWidth();
-        this.weapon.setWidth(currentWidth + 1);
+        weapon.setWidth(weapon.getWidth() + 1);
     }
 
     @Override
@@ -120,7 +112,6 @@ public class Player extends Entity {
 
         if (k0 instanceof PlayerInputView piv) {
             input = piv;
-
         } else if (k0 instanceof InputState is) {
             input = new PlayerInputView() {
                 public boolean left() {
@@ -147,7 +138,6 @@ public class Player extends Entity {
                     return is.attack;
                 }
             };
-
         } else if (k0 instanceof KeyManager km) {
             input = new PlayerInputView() {
                 public boolean left() {
@@ -174,9 +164,7 @@ public class Player extends Entity {
                     return km.attack;
                 }
             };
-
         } else {
-            // Fallback: no input this tick
             input = new PlayerInputView() {
                 public boolean left() {
                     return false;
@@ -205,39 +193,52 @@ public class Player extends Entity {
         }
 
         TileMap map = (TileMap) args[1];
-        @SuppressWarnings("unchecked")
-        List<Enemy> enemies = (List<Enemy>) args[2];
+        @SuppressWarnings("unchecked") List<Enemy> enemies = (List<Enemy>) args[2];
 
-        // --- Input -> 8-way facing ---
+        // Optional mouse-aim point in WORLD coords
+        Point aimPoint = null;
+        if (args.length >= 4 && args[3] instanceof Point p) aimPoint = p;
+
+        // --- Input -> movement intent (WASD) ---
         int dxRaw = 0, dyRaw = 0;
         if (input.left()) dxRaw -= 1;
         if (input.right()) dxRaw += 1;
         if (input.up()) dyRaw -= 1;
         if (input.down()) dyRaw += 1;
 
-        if (dxRaw != 0 || dyRaw != 0) {
-            if (dyRaw < 0) {
-                if (dxRaw < 0) facing = Direction.UP_LEFT;
-                else if (dxRaw > 0) facing = Direction.UP_RIGHT;
-                else facing = Direction.UP;
-            } else if (dyRaw > 0) {
-                if (dxRaw < 0) facing = Direction.DOWN_LEFT;
-                else if (dxRaw > 0) facing = Direction.DOWN_RIGHT;
-                else facing = Direction.DOWN;
-            } else {
-                facing = (dxRaw < 0) ? Direction.LEFT : Direction.RIGHT;
+        // --- Facing ---
+        if (aimPoint != null) {
+            double ax = aimPoint.x - x;
+            double ay = aimPoint.y - y;
+            if (Math.abs(ax) > 1e-6 || Math.abs(ay) > 1e-6) {
+                double angle = Math.atan2(ay, ax);            // -PI..PI
+                int oct = (int) Math.round(angle / (Math.PI / 4.0)); // nearest 45°
+                switch (oct) {
+                    case 0 -> facing = Direction.RIGHT;
+                    case 1 -> facing = Direction.DOWN_RIGHT;
+                    case 2 -> facing = Direction.DOWN;
+                    case 3 -> facing = Direction.DOWN_LEFT;
+                    case -1 -> facing = Direction.UP_RIGHT;
+                    case -2 -> facing = Direction.UP;
+                    case -3 -> facing = Direction.UP_LEFT;
+                    default -> facing = Direction.LEFT; // 4 or -4
+                }
             }
+        } else if (dxRaw != 0 || dyRaw != 0) {
+            if (dyRaw < 0) facing = (dxRaw < 0) ? Direction.UP_LEFT : (dxRaw > 0) ? Direction.UP_RIGHT : Direction.UP;
+            else if (dyRaw > 0)
+                facing = (dxRaw < 0) ? Direction.DOWN_LEFT : (dxRaw > 0) ? Direction.DOWN_RIGHT : Direction.DOWN;
+            else facing = (dxRaw < 0) ? Direction.LEFT : Direction.RIGHT;
         }
 
         // --- Movement (normalize diagonals) ---
         double dx = dxRaw, dy = dyRaw;
         if (dx != 0 && dy != 0) {
-            double inv = Math.sqrt(0.5); // keep diagonal speed == cardinal speed
+            double inv = Math.sqrt(0.5);
             dx *= inv;
             dy *= inv;
         }
 
-        // Are we moving under player control this tick (not just knockback)?
         movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
 
         // --- Sprint / stamina ---
@@ -245,8 +246,7 @@ public class Player extends Entity {
         double speedBase = effectiveBaseSpeed();
         if (sprinting) {
             speed = speedBase * 2.0;
-            staminaDrainCounter++;
-            if (staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
+            if (++staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
                 stamina = Math.max(0, stamina - 1.0);
                 staminaDrainCounter = 0;
             }
@@ -254,18 +254,17 @@ public class Player extends Entity {
         } else {
             speed = speedBase;
             if (!wasSprinting) {
-                staminaRegenCounter++;
-                if (staminaRegenCounter >= STAMINA_REGEN_INTERVAL) {
-                    boolean didRegen = false;
+                if (++staminaRegenCounter >= STAMINA_REGEN_INTERVAL) {
+                    boolean did = false;
                     if (stamina < maxStamina) {
                         stamina = Math.min(maxStamina, stamina + 1.0);
-                        didRegen = true;
+                        did = true;
                     }
                     if (shield < maxShield) {
                         shield = Math.min(maxShield, shield + 1.0);
-                        didRegen = true;
+                        did = true;
                     }
-                    if (didRegen) staminaRegenCounter = 0;
+                    if (did) staminaRegenCounter = 0;
                 }
             } else {
                 staminaRegenCounter = 0;
@@ -308,36 +307,28 @@ public class Player extends Entity {
         animTimeMs += TICK_MS;
     }
 
-
     private void moveWithCollision(double dx, double dy, TileMap map, List<Enemy> enemies) {
-        double newX = x + dx;
-        double newY = y + dy;
+        double newX = x + dx, newY = y + dy;
 
-        if (!collidesWithMap(newX, y, map) && !collidesWithEnemies(newX, y, enemies)) {
-            x = newX;
-        } else {
+        if (!collidesWithMap(newX, y, map) && !collidesWithEnemies(newX, y, enemies)) x = newX;
+        else {
             int step = (int) Math.signum(dx);
-            while (step != 0 && !collidesWithMap(x + step, y, map) && !collidesWithEnemies(x + step, y, enemies)) {
+            while (step != 0 && !collidesWithMap(x + step, y, map) && !collidesWithEnemies(x + step, y, enemies))
                 x += step;
-            }
         }
 
-        if (!collidesWithMap(x, newY, map) && !collidesWithEnemies(x, newY, enemies)) {
-            y = newY;
-        } else {
+        if (!collidesWithMap(x, newY, map) && !collidesWithEnemies(x, newY, enemies)) y = newY;
+        else {
             int step = (int) Math.signum(dy);
-            while (step != 0 && !collidesWithMap(x, y + step, map) && !collidesWithEnemies(x, y + step, enemies)) {
+            while (step != 0 && !collidesWithMap(x, y + step, map) && !collidesWithEnemies(x, y + step, enemies))
                 y += step;
-            }
         }
     }
 
     private boolean collidesWithEnemies(double cx, double cy, List<Enemy> enemies) {
         Rectangle playerBounds = getBoundsAt(cx, cy);
         for (Enemy enemy : enemies) {
-            if (enemy.isAlive() && playerBounds.intersects(enemy.getBounds())) {
-                return true;
-            }
+            if (enemy.isAlive() && playerBounds.intersects(enemy.getBounds())) return true;
         }
         return false;
     }
@@ -440,7 +431,7 @@ public class Player extends Entity {
             g2.draw(swing);
         }
 
-        // Facing indicator
+        // Facing indicator (kept)
         g2.setColor(new Color(10, 40, 15));
         int px = (int) Math.round(x) - camX;
         int py = (int) Math.round(y) - camY;
