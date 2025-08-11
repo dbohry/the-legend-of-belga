@@ -1,6 +1,7 @@
 package com.lhamacorp.games.tlob.common.net;
 
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
@@ -148,6 +149,62 @@ public final class Protocol {
         out.write("END\n");
         out.flush();
     }
+
+    // ---------- Map transfer ----------
+
+    public static final class MapData {
+        public int w, h;
+        public boolean[][] walls; // [h][w], true = wall
+    }
+
+    /** Server -> Client: write the collision map as plain text rows of '#' (wall) and '.' (floor). */
+    public static void writeMap(int w, int h, java.util.function.BiPredicate<Integer, Integer> isWall, Writer out) throws IOException {
+        out.write("MAP w=" + w + " h=" + h + "\n");
+        for (int y = 0; y < h; y++) {
+            StringBuilder row = new StringBuilder(w);
+            for (int x = 0; x < w; x++) {
+                row.append(isWall.test(x, y) ? '#' : '.');
+            }
+            out.write(row.toString());
+            out.write("\n");
+        }
+        out.write("ENDMAP\n");
+        out.flush();
+    }
+
+    /** Client: read a MAP block that starts with the given firstLine ("MAP ...") and ends with "ENDMAP". */
+    public static MapData readMap(BufferedReader in, String firstLine) throws IOException {
+        if (firstLine == null) return null;
+        String head = firstLine.trim();
+        if (!head.startsWith("MAP")) return null;
+
+        int w = 0, h = 0;
+        for (String tok : head.split("\\s+")) {
+            if (tok.startsWith("w=")) w = parseInt(tok.substring(2), 0);
+            if (tok.startsWith("h=")) h = parseInt(tok.substring(2), 0);
+        }
+        if (w <= 0 || h <= 0) throw new IOException("Invalid MAP header: " + head);
+
+        boolean[][] walls = new boolean[h][w];
+        for (int y = 0; y < h; y++) {
+            String row = in.readLine();
+            if (row == null) throw new EOFException("Unexpected EOF in MAP at row " + y);
+            if (row.length() < w) throw new IOException("MAP row too short at y=" + y);
+            for (int x = 0; x < w; x++) {
+                char c = row.charAt(x);
+                walls[y][x] = (c == '#');
+            }
+        }
+        // Read and validate ENDMAP (consume extra lines until we see it, for safety)
+        String end = in.readLine();
+        while (end != null && !end.trim().equals("ENDMAP")) end = in.readLine();
+        if (end == null) throw new EOFException("Missing ENDMAP");
+
+        MapData md = new MapData();
+        md.w = w; md.h = h; md.walls = walls;
+        return md;
+    }
+
 
     // ---------- utils ----------
     private interface KV {

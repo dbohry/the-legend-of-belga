@@ -57,8 +57,14 @@ final class GameSession implements Runnable {
     private final List<EnemyState> enemies = new CopyOnWriteArrayList<>();
     private final BlockingQueue<ClientPacket> inputQ = new LinkedBlockingQueue<>();
     private final List<ClientConn> conns = new CopyOnWriteArrayList<>();
-    private static int lcgNext(int s) { return s * 1664525 + 1013904223; }
-    private static double lcg01(int s) { return ((s >>> 8) & 0xFFFFFF) / (double)(1 << 24); }
+
+    private static int lcgNext(int s) {
+        return s * 1664525 + 1013904223;
+    }
+
+    private static double lcg01(int s) {
+        return ((s >>> 8) & 0xFFFFFF) / (double) (1 << 24);
+    }
 
     private final GridMap grid;
 
@@ -104,6 +110,10 @@ final class GameSession implements Runnable {
         conn.send("HELLO proto=1");
         conn.send("SEED " + seed);
         conn.send("TICKRATE " + tickrate);
+
+        // Send authoritative MAP before READY so client draws & collides against the same grid
+        sendMap(conn);
+
         conn.send("YOU id=" + id);
         conn.send("READY");
         conn.send("WELCOME " + Protocol.urlEnc(safeName));
@@ -115,6 +125,7 @@ final class GameSession implements Runnable {
             id, safeName, socket.getRemoteSocketAddress());
         return id;
     }
+
 
     /** Graceful stop and autosave. */
     void shutdown() {
@@ -336,6 +347,14 @@ final class GameSession implements Runnable {
 
     // ----- Net out -----
 
+    private void sendMap(ClientConn conn) {
+        try (StringWriter sw = new StringWriter()) {
+            Protocol.writeMap(MAP_W, MAP_H, grid::isWallTile, sw);
+            conn.send(sw.toString().trim());
+        } catch (IOException ignored) {
+        }
+    }
+
     private void broadcastSnapshot() {
         Snapshot snap = new Snapshot();
         snap.tick = tick;
@@ -367,7 +386,7 @@ final class GameSession implements Runnable {
         for (ClientConn c : conns) {
             try (StringWriter sw = new StringWriter()) {
                 Protocol.writeSnapshot(snap, sw);
-                c.send(sw.toString().trim()); // send() adds trailing newline
+                c.send(sw.toString().trim());
             } catch (IOException ignored) {
             }
         }
@@ -646,4 +665,15 @@ final class GameSession implements Runnable {
         }
         return quoted;
     }
+
+    /** True if the given tile (tx,ty) is a wall, inferred via collision at tile center. */
+    private boolean isWallTile(int tx, int ty) {
+        final int ts = Constants.TILE_SIZE;
+        final double cx = tx * ts + ts / 2.0;
+        final double cy = ty * ts + ts / 2.0;
+        // probe with a box that fits inside the tile: "half" ~ half tile minus 1px
+        final int half = (ts / 2) - 1;
+        return grid.collidesBox(cx, cy, half);
+    }
+
 }

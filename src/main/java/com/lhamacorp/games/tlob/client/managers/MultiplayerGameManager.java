@@ -26,10 +26,13 @@ public class MultiplayerGameManager extends BaseGameManager {
     private boolean showNetBanner = false;
     private int netBannerTicks = 0;
     private String netBannerText = "";
+    private volatile Protocol.MapData serverMap = null;
 
     private NetConn net;
     private volatile int myNetId = -1;
     private volatile double meTargetX = Double.NaN, meTargetY = Double.NaN;
+    private volatile double mePrevHp = Double.NaN;
+    private volatile double mePrevShield = Double.NaN;
 
     // Remote views driven by snapshots
     private final ConcurrentHashMap<Integer, RemotePlayerView> remotePlayers = new ConcurrentHashMap<>();
@@ -90,17 +93,26 @@ public class MultiplayerGameManager extends BaseGameManager {
         while ((line = in.readLine()) != null) {
             line = line.trim();
             if (line.isEmpty()) continue;
+
             if (line.startsWith("HELLO")) {
                 sendLine(out, "LOGIN name=" + safe(playerName));
+
             } else if (line.startsWith("SEED")) {
                 String[] p = line.split("\\s+");
                 if (p.length >= 2) seed = parseLong(p[1], 0L);
+
             } else if (line.startsWith("TICKRATE")) {
                 String[] p = line.split("\\s+");
                 if (p.length >= 2) tick = (int) parseLong(p[1], 60L);
+
+            } else if (line.startsWith("MAP")) {
+                // read the full MAP block now
+                this.serverMap = Protocol.readMap(in, line);
+
             } else if (line.startsWith("YOU")) {
                 int eq = line.indexOf("id=");
                 if (eq >= 0) myId = (int) parseLong(line.substring(eq + 3).trim(), -1);
+
             } else if (line.equals("READY")) {
                 break;
             }
@@ -126,7 +138,6 @@ public class MultiplayerGameManager extends BaseGameManager {
         return nc;
     }
 
-
     // ---------- Snapshot reader ----------
 
     private void snapshotReaderLoop(NetConn nc) {
@@ -136,24 +147,68 @@ public class MultiplayerGameManager extends BaseGameManager {
                 line = line.trim();
                 if (!line.startsWith("SNAPSHOT")) continue;
 
-                // Let Protocol read the full block (until END)
+                // Let Protocol read the rest of the block (until END) from nc.in:
                 Snapshot snap = Protocol.readSnapshot(nc.in, line);
                 if (snap == null) continue;
 
-                // --- my player: set authoritative target only; smooth in update loop
-                PlayerSnap me = snap.players.get(nc.myId);
-                if (me != null) {
-                    meTargetX = me.x;
-                    meTargetY = me.y;
-                    if (player != null) {
-                        player.setHealth(me.hp);
-                        player.setStamina(me.st);
-                        player.setShield(me.sh);
-                        player.setFacingOctant(me.facing);
+                // --- my authoritative state ---
+                if (snap.players.containsKey(nc.myId) && player != null) {
+                    PlayerSnap me = snap.players.get(nc.myId);
+
+                    // Before applying, detect damage (hp+shield drop) to trigger knockback + sounds client-side
+                    double oldHp = mePrevHp, oldSh = mePrevShield;
+                    double prevTotal = (Double.isNaN(oldHp) ? me.hp : oldHp) + (Double.isNaN(oldSh) ? me.sh : oldSh);
+                    double newTotal = me.hp + me.sh;
+
+                    // Apply authoritative state
+                    player.setPosition(me.x, me.y);
+                    player.setStamina(me.st);
+                    player.setShield(me.sh);
+                    player.setHealth(me.hp);
+                    player.setFacingOctant(me.facing);
+
+                    // Damage detection -> knockback + audio (SP parity)
+                    if (newTotal < prevTotal - 1e-6) {
+                        RemoteEnemyView nearest = null;
+                        double best = Double.POSITIVE_INFINITY;
+                        double px = player.getX(), py = player.getY();
+
+                        for (RemoteEnemyView e : remoteEnemies.values()) {
+                            if (!e.alive) continue;
+                            double d = Math.hypot(e.x - px, e.y - py);
+                            if (d < best) {
+                                best = d;
+                                nearest = e;
+                            }
+                        }
+
+                        // Use server melee range (a bit generous for smoothed positions)
+                        if (nearest != null && best <= 20.0) {
+                            // Knock me away from the attacker like SP
+                            player.applyKnockback(nearest.x, nearest.y);
+                        }
+
+                        // Play hurt sound (death handled below too)
+                        try {
+                            AudioManager.playSound("hero-hurt.wav", -10f);
+                        } catch (Throwable ignored) {
+                        }
                     }
+
+                    // Death sound if we just hit 0 HP
+                    if (!Double.isNaN(oldHp) && oldHp > 0 && me.hp <= 0) {
+                        try {
+                            AudioManager.playSound("hero-death.wav");
+                        } catch (Throwable ignored) {
+                        }
+                    }
+
+                    // Update previous totals
+                    mePrevHp = me.hp;
+                    mePrevShield = me.sh;
                 }
 
-                // --- remote players
+                // --- Remote players (excluding me) ---
                 java.util.Set<Integer> seenP =
                     java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
                 for (PlayerSnap ps : snap.players.values()) {
@@ -161,24 +216,32 @@ public class MultiplayerGameManager extends BaseGameManager {
                     seenP.add(ps.id);
                     remotePlayers.compute(ps.id, (id, prev) -> {
                         if (prev == null) prev = new RemotePlayerView(id);
-                        prev.apply(ps);   // sets new target; smoothing happens in tick()
+                        prev.apply(ps);
                         return prev;
                     });
                 }
                 remotePlayers.keySet().removeIf(id -> !seenP.contains(id));
 
-                // --- remote enemies
+                // --- Remote enemies ---
                 java.util.Set<Integer> seenE =
                     java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
                 for (EnemySnap es : snap.enemies.values()) {
                     seenE.add(es.id);
                     if (!es.alive) {
-                        remoteEnemies.remove(es.id);
+                        remoteEnemies.computeIfPresent(es.id, (id, prev) -> {
+                            if (prev.alive) {
+                                try {
+                                    AudioManager.playSound("slash-hit.wav");
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                            return null;
+                        });
                         continue;
                     }
                     remoteEnemies.compute(es.id, (id, prev) -> {
                         if (prev == null) prev = new RemoteEnemyView(id);
-                        prev.apply(es);   // sets new target; smoothing happens in tick()
+                        prev.apply(es);
                         return prev;
                     });
                 }
@@ -256,6 +319,48 @@ public class MultiplayerGameManager extends BaseGameManager {
         }
     }
 
+    @Override
+    protected void drawWorld(Graphics2D g2) {
+        if (serverMap == null || player == null) {
+            super.drawWorld(g2);
+            return;
+        }
+
+        final int ts = TILE_SIZE;
+        final int camX = camera.offsetX();
+        final int camY = camera.offsetY();
+
+        int w = serverMap.w, h = serverMap.h;
+        int startX = Math.max(0, camX / ts);
+        int endX   = Math.min(w - 1, (camX + getWidth()) / ts);
+        int startY = Math.max(0, camY / ts);
+        int endY   = Math.min(h - 1, (camY + getHeight()) / ts);
+
+        // floor
+        g2.setColor(new Color(26, 30, 36));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        // walls
+        for (int ty = startY; ty <= endY; ty++) {
+            for (int tx = startX; tx <= endX; tx++) {
+                if (serverMap.walls[ty][tx]) {
+                    int sx = tx * ts - camX;
+                    int sy = ty * ts - camY;
+                    g2.setColor(new Color(40, 44, 52));
+                    g2.fillRect(sx, sy, ts, ts);
+                    g2.setColor(new Color(60, 66, 78));
+                    g2.drawRect(sx, sy, ts - 1, ts - 1);
+                }
+            }
+        }
+
+        // Remote entities then local player
+        drawRemotePlayers(g2, camX, camY);
+        drawRemoteEnemies(g2, camX, camY);
+        player.draw(g2, camX, camY);
+    }
+
+
     // ---------- Input -> server ----------
 
     private void sendInputToServer(Point aimWorld) {
@@ -300,14 +405,32 @@ public class MultiplayerGameManager extends BaseGameManager {
 
     // ---------- Helpers/inner types ----------
 
-    /** Client-side AABB vs tile grid for my player (must match server PLAYER_HALF=11). */
+    /** Client-side AABB vs tile grid for my player. Prefer serverMap if present. */
     private boolean collidesPlayerBox(double cx, double cy) {
+        final int half = 11;
+        final int ts = TILE_SIZE;
+
+        // If we have the authoritative grid, use it (treat out-of-bounds as solid)
+        Protocol.MapData sm = this.serverMap;
+        if (sm != null && sm.walls != null) {
+            int left = (int) Math.floor((cx - half) / ts);
+            int right = (int) Math.floor((cx + half - 1) / ts);
+            int top = (int) Math.floor((cy - half) / ts);
+            int bot = (int) Math.floor((cy + half - 1) / ts);
+
+            for (int ty = top; ty <= bot; ty++) {
+                for (int tx = left; tx <= right; tx++) {
+                    if (tx < 0 || ty < 0 || tx >= sm.w || ty >= sm.h) return true;
+                    if (sm.walls[ty][tx]) return true;
+                }
+            }
+            return false;
+        }
+
+        // Fallback to local map (SP path) if server map not yet received
         if (levelManager == null) return false;
         TileMap m = levelManager.map();
         if (m == null) return false;
-
-        final int half = 11;
-        final int ts = TILE_SIZE;
 
         int left = (int) Math.floor((cx - half) / ts);
         int right = (int) Math.floor((cx + half - 1) / ts);
@@ -321,7 +444,6 @@ public class MultiplayerGameManager extends BaseGameManager {
         }
         return false;
     }
-
 
     private static int angleToOctant(double ang) {
         int o = (int) Math.round(ang / (Math.PI / 4.0));
@@ -369,7 +491,7 @@ public class MultiplayerGameManager extends BaseGameManager {
             this.alive = ps.alive;
             this.tx = ps.x;
             this.ty = ps.y;
-            if (!initialized) { // snap to first sample to avoid slide-in from (0,0)
+            if (!initialized) {
                 this.x = tx;
                 this.y = ty;
                 initialized = true;
@@ -417,35 +539,46 @@ public class MultiplayerGameManager extends BaseGameManager {
         static final int SIZE = 20;
 
         final int id;
-        // rendered position
         double x, y;
-        // server target
         double tx, ty;
-        double hp;
+        double hp = Double.NaN;
         boolean alive;
         long animMs;
         boolean initialized = false;
 
-        RemoteEnemyView(int id) { this.id = id; }
+        RemoteEnemyView(int id) {
+            this.id = id;
+        }
 
         void apply(EnemySnap es) {
             boolean wasAlive = this.alive;
+            double prevHp = this.hp;
 
             this.tx = es.x;
             this.ty = es.y;
-            this.hp = es.hp;
             this.alive = es.alive;
+            this.hp = es.hp;
 
-            if (!initialized) { this.x = tx; this.y = ty; initialized = true; }
+            if (!initialized) {
+                this.x = tx;
+                this.y = ty;
+                initialized = true;
+            }
 
-            // play death sound once on transition alive -> dead
+            // Play slash-hit when HP drops but enemy still alive
+            if (wasAlive && this.alive && !Double.isNaN(prevHp) && es.hp < prevHp - 1e-6) {
+                try {
+                    AudioManager.playSound("slash-hit.wav", -15.0f);
+                } catch (Throwable ignored) {
+                }
+            }
+
+            // Death sound on transition alive -> dead
             if (wasAlive && !this.alive) {
-                SwingUtilities.invokeLater(() -> {
-                    try {
-                        // pick the name you actually use in SP; keep a fallback chain
-                        AudioManager.playSound("enemy-death.wav");
-                    } catch (Throwable ignored) { }
-                });
+                try {
+                    AudioManager.playSound("enemy-death.wav");
+                } catch (Throwable ignored) {
+                }
             }
         }
 
@@ -463,7 +596,10 @@ public class MultiplayerGameManager extends BaseGameManager {
             int py = (int) Math.round(y - SIZE / 2.0) - camY;
 
             BufferedImage tex = null;
-            try { tex = TextureManager.getEnemyTexture(); } catch (Throwable ignored) {}
+            try {
+                tex = TextureManager.getEnemyTexture();
+            } catch (Throwable ignored) {
+            }
             if (tex != null) g2.drawImage(tex, px, py, SIZE, SIZE, null);
             else {
                 g2.setColor(new Color(200, 70, 70, 220));

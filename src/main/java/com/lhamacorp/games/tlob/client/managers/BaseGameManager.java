@@ -291,7 +291,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         g2.dispose();
     }
 
-    private void drawWorld(Graphics2D g2) {
+    protected void drawWorld(Graphics2D g2) {
         if (levelManager == null || player == null) return;
         TileMap map = levelManager.map();
         map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
