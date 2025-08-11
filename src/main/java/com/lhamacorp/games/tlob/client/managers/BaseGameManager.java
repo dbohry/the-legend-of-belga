@@ -275,7 +275,16 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         g2.fillRect(0, 0, getWidth(), getHeight());
 
         drawWorld(g2);
-        hudRenderer.draw(g2, player, 8, 8);
+
+        if (player != null) {
+            hudRenderer.draw(g2, player, 8, 8);
+        } else {
+            g2.setFont(new Font("Arial", Font.PLAIN, 12));
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
+            g2.setColor(new Color(230, 235, 240));
+            g2.drawString("Connecting...", 10, 18);
+        }
+
         drawLevelCounters(g2);
         drawOverlays(g2);
 
@@ -287,8 +296,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         TileMap map = levelManager.map();
         map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
 
-        drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
         drawRemotePlayers(g2, camera.offsetX(), camera.offsetY());
+        drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
 
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
         player.draw(g2, camera.offsetX(), camera.offsetY());

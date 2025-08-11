@@ -44,7 +44,7 @@ final class GameSession implements Runnable {
     private static final int ENEMY_HALF = 10;
 
     // Sword + enemy tuning (simple, deterministic)
-    private static final double SWORD_REACH = 28.0, SWORD_WIDTH = 10.0, SWORD_DMG = 2.0;
+    private static final double SWORD_REACH = 30, SWORD_WIDTH = 16.0, SWORD_DMG = 2.0;
     private static final int SWORD_COOLDOWN_TICKS = 10, SWORD_DURATION_TICKS = 16;
 
     private static final double ENEMY_SPEED = 55.0;
@@ -129,6 +129,7 @@ final class GameSession implements Runnable {
     @Override
     public void run() {
         final long stepNs = 1_000_000_000L / tickrate;
+        final int broadcastDiv = Math.max(1, tickrate / 30); // ~30 Hz snapshots
         long last = System.nanoTime();
 
         while (running) {
@@ -151,13 +152,17 @@ final class GameSession implements Runnable {
             updatePlayers();
             updateEnemies();
 
-            // 3) broadcast at ~20 Hz
-            if ((tick % Math.max(1, tickrate / 20)) == 0) broadcastSnapshot();
+            // 3) broadcast snapshots at ~30 Hz
+            if ((tick % broadcastDiv) == 0) {
+                broadcastSnapshot();
+            }
 
             // 4) autosave every 10s
-            if ((tick % (tickrate * 10)) == 0) try {
-                saveState();
-            } catch (Exception ignored) {
+            if ((tick % (tickrate * 10)) == 0) {
+                try {
+                    saveState();
+                } catch (Exception ignored) {
+                }
             }
 
             tick++;
@@ -170,6 +175,8 @@ final class GameSession implements Runnable {
         final double dt = 1.0 / tickrate;
 
         for (PlayerState ps : players.values()) {
+            if (!ps.alive) continue;  // <- do not update dead players
+
             Input ci = ps.pending;
             ps.pending = null;
 
@@ -184,7 +191,7 @@ final class GameSession implements Runnable {
                 if (ci.facing >= 0) facing = ci.facing;
             }
 
-            // normalize diagonals
+            // normalize diagonal
             double vx = dx, vy = dy;
             if (vx != 0 && vy != 0) {
                 double inv = 1.0 / Math.sqrt(2.0);
@@ -192,58 +199,89 @@ final class GameSession implements Runnable {
                 vy *= inv;
             }
 
-            // stamina/sprint
             double speed = ps.speedPps;
             if (sprint && ps.stamina >= 1.0) {
-                ps.stamina = Math.max(0, ps.stamina - (1.0 * dt)); // 1 stamina/sec
+                ps.stamina = Math.max(0.0, ps.stamina - (1.0 * dt)); // cost while sprinting
                 speed *= 2.0;
                 ps.sprinting = true;
             } else {
                 ps.sprinting = false;
-                ps.stamina = Math.min(ps.maxStamina, ps.stamina + (0.5 * dt)); // regen 0.5/sec
+                ps.stamina = Math.min(ps.maxStamina, ps.stamina + (0.5 * dt)); // regen
             }
 
-            // collision per axis
+            // move with collisions
             ps.x = moveAxis(ps.x, ps.y, vx * speed * dt, true, PLAYER_HALF);
             ps.y = moveAxis(ps.x, ps.y, vy * speed * dt, false, PLAYER_HALF);
             ps.facing = facing;
 
-            // melee timing + damage
+            // timers
             if (ps.attackCooldown > 0) ps.attackCooldown--;
             if (ps.attackTimer > 0) ps.attackTimer--;
 
-            if (attack && ps.attackCooldown == 0 && ps.attackTimer == 0 && ps.stamina > 0) {
+            // swing is active -> keep checking hits
+            if (ps.attackTimer > 0) {
+                applySwordHits(ps);
+            }
+
+            // start a new swing if allowed
+            if (attack && ps.attackCooldown == 0 && ps.attackTimer == 0 && ps.stamina > 0.0) {
                 ps.stamina -= 0.5;
                 ps.attackTimer = SWORD_DURATION_TICKS;
                 ps.attackCooldown = SWORD_COOLDOWN_TICKS;
+                ps.swingSeq++;
                 applySwordHits(ps);
             }
+
+            // final clamp to avoid drift
+            if (ps.stamina < 0.0) ps.stamina = 0.0;
+            else if (ps.stamina > ps.maxStamina) ps.stamina = ps.maxStamina;
         }
     }
 
     private void applySwordHits(PlayerState ps) {
+        // forward unit from 8-way facing
         double ang = Dir8.octantToAngle(ps.facing);
-        double ux = Math.cos(ang), uy = Math.sin(ang); // forward unit
-        double px = -uy, py = ux;                      // side unit
+        double ux = Math.cos(ang), uy = Math.sin(ang);
 
-        for (EnemyState e : enemies)
-            if (e.alive) {
-                double dx = e.x - ps.x, dy = e.y - ps.y;
-                double along = dx * ux + dy * uy;         // forward distance
-                if (along < 0 || along > SWORD_REACH) continue;
-                double off = Math.abs(dx * px + dy * py); // side distance
-                if (off <= SWORD_WIDTH / 2.0) {
-                    e.hp -= SWORD_DMG;
-                    if (e.hp <= 0) {
-                        e.hp = 0;
-                        e.alive = false;
-                    }
-                    // tiny knockback
-                    double kb = 4.0, nx = e.x + ux * kb, ny = e.y + uy * kb;
-                    if (!grid.collidesBox(nx, e.y, ENEMY_HALF)) e.x = nx;
-                    if (!grid.collidesBox(e.x, ny, ENEMY_HALF)) e.y = ny;
+        // segment from player center to forward reach
+        double x0 = ps.x, y0 = ps.y;
+        double x1 = ps.x + ux * SWORD_REACH;
+        double y1 = ps.y + uy * SWORD_REACH;
+
+        // capsule radius (blade thickness + enemy radius)
+        double r = (SWORD_WIDTH * 0.5) + ENEMY_HALF;
+        double r2 = r * r;
+
+        long swingTag = (((long) ps.id) << 32) | (ps.swingSeq & 0xFFFFFFFFL);
+
+        for (EnemyState e : enemies) {
+            if (!e.alive) continue;
+            if (e.lastSwingTag == swingTag) continue;
+
+            double vx = x1 - x0, vy = y1 - y0;
+            double wx = e.x - x0, wy = e.y - y0;
+            double vv = vx * vx + vy * vy;
+            double t = (vv <= 1e-9) ? 0.0 : (wx * vx + wy * vy) / vv;
+            if (t < 0.0) t = 0.0;
+            else if (t > 1.0) t = 1.0;
+            double cx = x0 + t * vx, cy = y0 + t * vy;
+            double dx = e.x - cx, dy = e.y - cy;
+            double d2 = dx * dx + dy * dy;
+
+            if (d2 <= r2) {
+                e.lastSwingTag = swingTag;
+                e.hp -= SWORD_DMG;
+                if (e.hp <= 0) {
+                    e.hp = 0;
+                    e.alive = false;
                 }
+
+                // small knockback along the swing direction
+                double kb = 4.0, nx = e.x + ux * kb, ny = e.y + uy * kb;
+                if (!grid.collidesBox(nx, e.y, ENEMY_HALF)) e.x = nx;
+                if (!grid.collidesBox(e.x, ny, ENEMY_HALF)) e.y = ny;
             }
+        }
     }
 
     // ----- Per-tick: enemies -----
@@ -508,6 +546,7 @@ final class GameSession implements Runnable {
         double hp = 6.0, stamina = 6.0, shield = 0.0, maxStamina = 6.0, speedPps = 90.0;
         boolean alive = true, sprinting = false;
         int facing = 0, attackTimer = 0, attackCooldown = 0;
+        int swingSeq = 0;
         transient Input pending;
 
         PlayerState(int id, String name, double x, double y) {
@@ -522,6 +561,7 @@ final class GameSession implements Runnable {
         int id;
         double x, y, hp;
         boolean alive = true;
+        long lastSwingTag = 0L;
     }
 
     // ----- Small utils -----

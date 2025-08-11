@@ -67,6 +67,14 @@ public final class Protocol {
         return ci;
     }
 
+    public static Snapshot readSnapshot(java.io.Reader r) throws IOException {
+        java.io.BufferedReader br = (r instanceof java.io.BufferedReader)
+            ? (java.io.BufferedReader) r
+            : new java.io.BufferedReader(r);
+        String first = br.readLine();
+        return readSnapshot(br, first);
+    }
+
     /** Reads a full SNAPSHOT block (starting at "SNAPSHOT..." line) from a reader. */
     public static Snapshot readSnapshot(BufferedReader in, String firstLine) throws IOException {
         if (firstLine == null) return null;

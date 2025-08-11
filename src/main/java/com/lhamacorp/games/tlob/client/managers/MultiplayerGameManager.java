@@ -1,18 +1,19 @@
+// GameManagerMultiplayer.java
 package com.lhamacorp.games.tlob.client.managers;
+
+import com.lhamacorp.games.tlob.common.net.Protocol;
+import com.lhamacorp.games.tlob.common.net.Protocol.EnemySnap;
+import com.lhamacorp.games.tlob.common.net.Protocol.PlayerSnap;
+import com.lhamacorp.games.tlob.common.net.Protocol.Snapshot;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import com.lhamacorp.games.tlob.common.math.Dir8;
-import com.lhamacorp.games.tlob.common.net.Protocol;
-import com.lhamacorp.games.tlob.common.net.Protocol.Snapshot;
-import com.lhamacorp.games.tlob.common.net.Protocol.PlayerSnap;
-import com.lhamacorp.games.tlob.common.net.Protocol.EnemySnap;
 
 public class MultiplayerGameManager extends BaseGameManager {
 
@@ -26,12 +27,18 @@ public class MultiplayerGameManager extends BaseGameManager {
     private String netBannerText = "";
 
     private NetConn net;
-    private final ConcurrentHashMap<Integer, NetPlayer> netPlayers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Integer, NetEnemy> netEnemies = new ConcurrentHashMap<>();
     private volatile int myNetId = -1;
+    private volatile double meTargetX = Double.NaN, meTargetY = Double.NaN;
+
+    // Remote views driven by snapshots
+    private final ConcurrentHashMap<Integer, RemotePlayerView> remotePlayers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, RemoteEnemyView> remoteEnemies = new ConcurrentHashMap<>();
 
     private boolean prevAttack = false;
     private int lastFacingOct = 0;
+
+    // simple local animation clock for remote sprites
+    private static final int TICK_MS = 1000 / 60;
 
     public MultiplayerGameManager(String host, int port, String heroName) {
         super();
@@ -40,6 +47,8 @@ public class MultiplayerGameManager extends BaseGameManager {
         this.heroName = (heroName == null || heroName.isBlank()) ? "Hero" : heroName;
         connectAsync();
     }
+
+    // ---------- Net connect -----------
 
     private void connectAsync() {
         new Thread(() -> {
@@ -53,118 +62,29 @@ public class MultiplayerGameManager extends BaseGameManager {
                     netBannerText = "Connected: " + host + ":" + port + " • " + serverTickrate + " Hz";
                     showNetBanner = true;
                     netBannerTicks = 180;
-                    initWorld(nc.seed); // map & player only; enemies come from server
-                    enemies.clear();
-                    netEnemies.clear();
+                    initWorld(nc.seed);
                 });
             } catch (IOException ex) {
-                SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(this,
-                        "Failed to connect to " + host + ":" + port + "\n" + ex.getMessage(),
-                        "Connection error", JOptionPane.ERROR_MESSAGE);
-                });
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                    this, "Failed to connect to " + host + ":" + port + "\n" + ex.getMessage(),
+                    "Connection error", JOptionPane.ERROR_MESSAGE));
             }
         }, "NetConnect").start();
     }
-
-    @Override
-    protected void updatePlaying(Point aimWorld) {
-        sendInputToServer(aimWorld);
-        boolean movingKeys = input.left || input.right || input.up || input.down;
-        if (player != null) player.tickClientAnimations(movingKeys);
-
-        if (showNetBanner && --netBannerTicks <= 0) {
-            showNetBanner = false;
-            netBannerTicks = 0;
-        }
-    }
-
-    @Override
-    protected void drawRemotePlayers(Graphics2D g2, int camX, int camY) {
-        // Draw other players
-        for (NetPlayer np : netPlayers.values()) {
-            if (np.id == myNetId) continue;
-            int px = (int) Math.round(np.x) - camX;
-            int py = (int) Math.round(np.y) - camY;
-            g2.setColor(new Color(60, 160, 255, 220));
-            g2.fillOval(px - 8, py - 8, 16, 16);
-            if (np.name != null) {
-                g2.setColor(new Color(240, 240, 255, 220));
-                g2.setFont(new Font("Arial", Font.PLAIN, 11));
-                g2.drawString(np.name, px - 12, py - 12);
-            }
-        }
-
-        // Draw server enemies
-        for (NetEnemy ne : netEnemies.values()) {
-            if (!ne.alive) continue;
-            int ex = (int) Math.round(ne.x) - camX;
-            int ey = (int) Math.round(ne.y) - camY;
-            g2.setColor(new Color(220, 70, 70, 230));
-            g2.fillOval(ex - 10, ey - 10, 20, 20);
-            g2.setColor(new Color(255,255,255,180));
-            g2.drawOval(ex - 10, ey - 10, 20, 20);
-        }
-    }
-
-    @Override
-    protected void drawRemoteEnemies(Graphics2D g2, int camX, int camY) {
-        for (NetEnemy ne : netEnemies.values()) {
-            if (!ne.alive) continue;
-            int px = (int) Math.round(ne.x) - camX;
-            int py = (int) Math.round(ne.y) - camY;
-
-            g2.setColor(new Color(200, 60, 60, 220));
-            g2.fillOval(px - 9, py - 9, 18, 18);
-        }
-    }
-
-    @Override
-    protected String[] topRightExtraLines() {
-        return new String[]{"Net: " + serverTickrate + " Hz"};
-    }
-
-    // Draw connection banner on top of base paint
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        if (!showNetBanner || netBannerText == null || netBannerText.isBlank()) return;
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        int fadeTicks = Math.min(netBannerTicks, 60);
-        float alpha = Math.max(0f, Math.min(1f, fadeTicks / 60f));
-
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        FontMetrics fm = g2.getFontMetrics();
-        int w = fm.stringWidth(netBannerText) + 16;
-        int h = fm.getHeight() + 10;
-
-        int x = (getWidth() - w) / 2;
-        int y = 12;
-
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f * alpha));
-        g2.setColor(Color.BLACK);
-        g2.fillRoundRect(x, y, w, h, 10, 10);
-
-        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.9f * alpha));
-        g2.setColor(new Color(235, 240, 245));
-        g2.drawString(netBannerText, x + 8, y + 6 + fm.getAscent());
-
-        g2.dispose();
-    }
-    // --- networking ---
 
     private NetConn connectToServer(String host, int port, String playerName) throws IOException {
         Socket sock = new Socket();
         sock.connect(new InetSocketAddress(host, port), 4000);
         sock.setSoTimeout(8000);
+        sock.setTcpNoDelay(true);
 
         var out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream(), StandardCharsets.UTF_8));
-        var in  = new BufferedReader(new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8));
+        var in = new BufferedReader(new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8));
 
         long seed = 0L;
         int tick = 60;
         int myId = -1;
+
         String line;
         while ((line = in.readLine()) != null) {
             line = line.trim();
@@ -198,57 +118,135 @@ public class MultiplayerGameManager extends BaseGameManager {
         nc.reader.setDaemon(true);
         nc.reader.start();
 
-        try { sock.setSoTimeout(0); } catch (Exception ignored) {}
+        try {
+            sock.setSoTimeout(0);
+        } catch (Exception ignored) {
+        }
         return nc;
     }
 
-    // Add to GameManagerMultiplayer
+
+    // ---------- Snapshot reader ----------
+
     private void snapshotReaderLoop(NetConn nc) {
         try {
             String line;
             while (nc.running && (line = nc.in.readLine()) != null) {
-                if (line.startsWith("SNAPSHOT")) {
-                    Snapshot s = Protocol.readSnapshot(nc.in, line);
+                line = line.trim();
+                if (!line.startsWith("SNAPSHOT")) continue;
 
-                    if (nc.myId > 0 && player != null) {
-                        PlayerSnap me = s.players.get(nc.myId);
-                        if (me != null) {
-                            player.setPosition(me.x, me.y);
-                            player.setHealth(me.hp);
-                            player.setStamina(me.st);
-                            player.setShield(me.sh);
-                            player.setFacingOctant(me.facing);
-                        }
-                    }
+                // Let Protocol read the full block (until END)
+                Snapshot snap = Protocol.readSnapshot(nc.in, line);
+                if (snap == null) continue;
 
-                    // publish for drawing
-                    netPlayers.clear();
-                    for (PlayerSnap p : s.players.values()) {
-                        NetPlayer np = new NetPlayer();
-                        np.id = p.id; np.x = p.x; np.y = p.y; np.hp = p.hp; np.st = p.st; np.sh = p.sh;
-                        np.facing = p.facing; np.alive = p.alive; np.name = p.name;
-                        netPlayers.put(np.id, np);
-                    }
-                    netEnemies.clear();
-                    for (EnemySnap e : s.enemies.values()) {
-                        NetEnemy ne = new NetEnemy();
-                        ne.id = e.id; ne.x = e.x; ne.y = e.y; ne.hp = e.hp; ne.alive = e.alive;
-                        netEnemies.put(ne.id, ne);
+                // --- my player: set authoritative target only; smooth in update loop
+                PlayerSnap me = snap.players.get(nc.myId);
+                if (me != null) {
+                    meTargetX = me.x;
+                    meTargetY = me.y;
+                    if (player != null) {
+                        player.setHealth(me.hp);
+                        player.setStamina(me.st);
+                        player.setShield(me.sh);
+                        player.setFacingOctant(me.facing);
                     }
                 }
+
+                // --- remote players
+                java.util.Set<Integer> seenP =
+                    java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+                for (PlayerSnap ps : snap.players.values()) {
+                    if (ps.id == nc.myId) continue;
+                    seenP.add(ps.id);
+                    remotePlayers.compute(ps.id, (id, prev) -> {
+                        if (prev == null) prev = new RemotePlayerView(id);
+                        prev.apply(ps);   // sets new target; smoothing happens in tick()
+                        return prev;
+                    });
+                }
+                remotePlayers.keySet().removeIf(id -> !seenP.contains(id));
+
+                // --- remote enemies
+                java.util.Set<Integer> seenE =
+                    java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+                for (EnemySnap es : snap.enemies.values()) {
+                    seenE.add(es.id);
+                    if (!es.alive) {
+                        remoteEnemies.remove(es.id);
+                        continue;
+                    }
+                    remoteEnemies.compute(es.id, (id, prev) -> {
+                        if (prev == null) prev = new RemoteEnemyView(id);
+                        prev.apply(es);   // sets new target; smoothing happens in tick()
+                        return prev;
+                    });
+                }
+                remoteEnemies.keySet().removeIf(id -> !seenE.contains(id));
             }
         } catch (IOException ignored) {
         } finally {
             nc.running = false;
-            try { nc.sock.close(); } catch (IOException ignored) {}
+            try {
+                nc.sock.close();
+            } catch (IOException ignored) {
+            }
         }
     }
+
+    // ---------- Game loop integration ----------
+
+    @Override
+    protected void updatePlaying(Point aimWorld) {
+        sendInputToServer(aimWorld);
+
+        if (player != null && !Double.isNaN(meTargetX)) {
+            final double gain = 0.18;
+            double nx = player.getX() + (meTargetX - player.getX()) * gain;
+            double ny = player.getY() + (meTargetY - player.getY()) * gain;
+            player.setPosition(nx, ny);
+        }
+
+        remotePlayers.values().forEach(RemotePlayerView::tick);
+        remoteEnemies.values().forEach(RemoteEnemyView::tick);
+
+        boolean movingKeys = input.left || input.right || input.up || input.down;
+        if (player != null) player.tickClientAnimations(movingKeys);
+
+        if (showNetBanner && --netBannerTicks <= 0) {
+            showNetBanner = false;
+            netBannerTicks = 0;
+        }
+    }
+
+
+    @Override
+    protected String[] topRightExtraLines() {
+        return new String[]{"Net: " + serverTickrate + " Hz"};
+    }
+
+    // ---------- Drawing hooks (textures!) ----------
+
+    @Override
+    protected void drawRemotePlayers(Graphics2D g2, int camX, int camY) {
+        for (RemotePlayerView p : remotePlayers.values()) {
+            p.draw(g2, camX, camY);
+        }
+    }
+
+    @Override
+    protected void drawRemoteEnemies(Graphics2D g2, int camX, int camY) {
+        for (RemoteEnemyView e : remoteEnemies.values()) {
+            e.draw(g2, camX, camY);
+        }
+    }
+
+    // ---------- Input -> server ----------
 
     private void sendInputToServer(Point aimWorld) {
         if (net == null || !net.running) return;
 
         int dx = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-        int dy = (input.down  ? 1 : 0) - (input.up   ? 1 : 0);
+        int dy = (input.down ? 1 : 0) - (input.up ? 1 : 0);
         boolean atk = input.attack;
 
         int facing = lastFacingOct;
@@ -284,10 +282,151 @@ public class MultiplayerGameManager extends BaseGameManager {
         prevAttack = atk;
     }
 
+    // ---------- Helpers/inner types ----------
+
     private static int angleToOctant(double ang) {
         int o = (int) Math.round(ang / (Math.PI / 4.0));
         if (o < 0) o += 8;
         return o & 7;
+    }
+
+    private static TextureManager.Direction octantToCardinal(int o) {
+        // 0→R, 1/2/3→DOWN, 4→LEFT, 5/6/7→UP
+        switch (o & 7) {
+            case 0:
+                return TextureManager.Direction.RIGHT;
+            case 4:
+                return TextureManager.Direction.LEFT;
+            case 1:
+            case 2:
+            case 3:
+                return TextureManager.Direction.DOWN;
+            default:
+                return TextureManager.Direction.UP;
+        }
+    }
+
+    private static final class RemotePlayerView {
+        static final int SIZE = 22;
+
+        final int id;
+        String name;
+        // rendered position
+        double x, y;
+        // server target position (latest snapshot)
+        double tx, ty;
+        int facingOct;
+        boolean alive;
+        long animMs;
+        boolean initialized = false;
+
+        RemotePlayerView(int id) {
+            this.id = id;
+        }
+
+        void apply(PlayerSnap ps) {
+            this.name = ps.name;
+            this.facingOct = ps.facing;
+            this.alive = ps.alive;
+            this.tx = ps.x;
+            this.ty = ps.y;
+            if (!initialized) { // snap to first sample to avoid slide-in from (0,0)
+                this.x = tx;
+                this.y = ty;
+                initialized = true;
+            }
+        }
+
+        void tick() {
+            animMs += TICK_MS;
+            if (!initialized) return;
+            // smooth toward server target
+            final double gain = 0.20;
+            x += (tx - x) * gain;
+            y += (ty - y) * gain;
+        }
+
+        void draw(Graphics2D g2, int camX, int camY) {
+            if (!alive) return;
+
+            boolean moving = (Math.abs(tx - x) + Math.abs(ty - y)) > 0.1;
+            TextureManager.Direction dir = octantToCardinal(facingOct);
+            TextureManager.Motion motion = moving ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
+
+            TextureManager.SpriteAnimation anim = TextureManager.getPlayerAnimation(dir, motion);
+            BufferedImage tex = (anim != null && anim.length() > 0) ? anim.frameAt(animMs)
+                : TextureManager.getPlayerTexture();
+
+            int px = (int) Math.round(x - SIZE / 2.0) - camX;
+            int py = (int) Math.round(y - SIZE / 2.0) - camY;
+
+            if (tex != null) g2.drawImage(tex, px, py, SIZE, SIZE, null);
+            else {
+                g2.setColor(new Color(60, 160, 255, 220));
+                g2.fillOval(px, py, SIZE, SIZE);
+            }
+
+            if (name != null && !name.isBlank()) {
+                g2.setColor(new Color(240, 240, 255, 220));
+                g2.setFont(new Font("Arial", Font.PLAIN, 11));
+                g2.drawString(name, px - 12, py - 4);
+            }
+        }
+    }
+
+    private static final class RemoteEnemyView {
+        static final int SIZE = 20;
+
+        final int id;
+        // rendered position
+        double x, y;
+        // server target
+        double tx, ty;
+        double hp;
+        boolean alive;
+        long animMs;
+        boolean initialized = false;
+
+        RemoteEnemyView(int id) {
+            this.id = id;
+        }
+
+        void apply(EnemySnap es) {
+            this.tx = es.x;
+            this.ty = es.y;
+            this.hp = es.hp;
+            this.alive = es.alive;
+            if (!initialized) {
+                this.x = tx;
+                this.y = ty;
+                initialized = true;
+            }
+        }
+
+        void tick() {
+            animMs += TICK_MS;
+            if (!initialized) return;
+            final double gain = 0.22;
+            x += (tx - x) * gain;
+            y += (ty - y) * gain;
+        }
+
+        void draw(Graphics2D g2, int camX, int camY) {
+            if (!alive) return;
+            int px = (int) Math.round(x - SIZE / 2.0) - camX;
+            int py = (int) Math.round(y - SIZE / 2.0) - camY;
+
+            BufferedImage tex = null;
+            try {
+                tex = TextureManager.getEnemyTexture();
+            } catch (Throwable ignored) {
+            }
+            if (tex != null) g2.drawImage(tex, px, py, SIZE, SIZE, null);
+            else {
+                g2.setColor(new Color(200, 70, 70, 220));
+                g2.fillOval(px, py, SIZE, SIZE);
+            }
+        }
     }
 
     private static void sendLine(Writer out, String s) throws IOException {
@@ -301,20 +440,11 @@ public class MultiplayerGameManager extends BaseGameManager {
     }
 
     private static long parseLong(String s, long def) {
-        try { return Long.parseLong(s.trim()); } catch (Exception e) { return def; }
-    }
-
-    private static final class NetPlayer {
-        int id, facing;
-        double x, y, hp, st, sh;
-        boolean alive;
-        String name;
-    }
-
-    private static final class NetEnemy {
-        int id;
-        double x, y, hp;
-        boolean alive;
+        try {
+            return Long.parseLong(s.trim());
+        } catch (Exception e) {
+            return def;
+        }
     }
 
     private static final class NetConn {
