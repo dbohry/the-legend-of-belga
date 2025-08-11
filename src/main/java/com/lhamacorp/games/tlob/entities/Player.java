@@ -34,6 +34,7 @@ public class Player extends Entity {
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
     private boolean wasSprinting = false;
+    private double facingAngle = 0.0;
 
     private int attackTimer = 0;
     private int attackCooldown = 0;
@@ -212,8 +213,10 @@ public class Player extends Entity {
             double ax = aimPoint.x - x;
             double ay = aimPoint.y - y;
             if (Math.abs(ax) > 1e-6 || Math.abs(ay) > 1e-6) {
-                double angle = Math.atan2(ay, ax);            // -PI..PI
-                int oct = (int) Math.round(angle / (Math.PI / 4.0)); // nearest 45°
+                double angle = Math.atan2(ay, ax); // -PI..PI
+                facingAngle = angle;
+                // keep enum for sprite rows (nearest 45°)
+                int oct = (int) Math.round(angle / (Math.PI / 4.0));
                 switch (oct) {
                     case 0 -> facing = Direction.RIGHT;
                     case 1 -> facing = Direction.DOWN_RIGHT;
@@ -226,10 +229,20 @@ public class Player extends Entity {
                 }
             }
         } else if (dxRaw != 0 || dyRaw != 0) {
-            if (dyRaw < 0) facing = (dxRaw < 0) ? Direction.UP_LEFT : (dxRaw > 0) ? Direction.UP_RIGHT : Direction.UP;
-            else if (dyRaw > 0)
-                facing = (dxRaw < 0) ? Direction.DOWN_LEFT : (dxRaw > 0) ? Direction.DOWN_RIGHT : Direction.DOWN;
-            else facing = (dxRaw < 0) ? Direction.LEFT : Direction.RIGHT;
+            double angle = Math.atan2(dyRaw, dxRaw);
+            facingAngle = angle;
+            // keep enum for sprite rows (same octant map)
+            int oct = (int) Math.round(angle / (Math.PI / 4.0));
+            switch (oct) {
+                case 0 -> facing = Direction.RIGHT;
+                case 1 -> facing = Direction.DOWN_RIGHT;
+                case 2 -> facing = Direction.DOWN;
+                case 3 -> facing = Direction.DOWN_LEFT;
+                case -1 -> facing = Direction.UP_RIGHT;
+                case -2 -> facing = Direction.UP;
+                case -3 -> facing = Direction.UP_LEFT;
+                default -> facing = Direction.LEFT;
+            }
         }
 
         // --- Movement (normalize diagonals) ---
@@ -284,7 +297,7 @@ public class Player extends Entity {
 
         if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
-            attackTimer    = scaleFrom60(weapon.getDuration());
+            attackTimer = scaleFrom60(weapon.getDuration());
             attackCooldown = scaleFrom60(weapon.getCooldown());
 
             Shape swing = getSwordSwingShape();
@@ -339,67 +352,27 @@ public class Player extends Entity {
     }
 
     private Shape getSwordSwingShape() {
-        int cx = (int) Math.round(x);
-        int cy = (int) Math.round(y);
         int r = weapon.getReach();
         int w = weapon.getWidth();
 
-        int left = (int) Math.round(x - width / 2.0);
-        int right = (int) Math.round(x + width / 2.0);
-        int top = (int) Math.round(y - height / 2.0);
-        int bottom = (int) Math.round(y + height / 2.0);
+        // Anchor the swing in front of the player, starting from the edge of the body
+        double theta = facingAngle;
+        double cos = Math.cos(theta), sin = Math.sin(theta);
 
-        double theta, ax, ay;
-        switch (facing) {
-            case UP -> {
-                theta = -Math.PI / 2;
-                ax = cx;
-                ay = top;
-            }
-            case DOWN -> {
-                theta = Math.PI / 2;
-                ax = cx;
-                ay = bottom;
-            }
-            case LEFT -> {
-                theta = Math.PI;
-                ax = left;
-                ay = cy;
-            }
-            case RIGHT -> {
-                theta = 0.0;
-                ax = right;
-                ay = cy;
-            }
-            case UP_RIGHT -> {
-                theta = -Math.PI / 4;
-                ax = right;
-                ay = top;
-            }
-            case UP_LEFT -> {
-                theta = -3 * Math.PI / 4;
-                ax = left;
-                ay = top;
-            }
-            case DOWN_RIGHT -> {
-                theta = Math.PI / 4;
-                ax = right;
-                ay = bottom;
-            }
-            case DOWN_LEFT -> {
-                theta = 3 * Math.PI / 4;
-                ax = left;
-                ay = bottom;
-            }
-            default -> {
-                theta = 0.0;
-                ax = right;
-                ay = cy;
-            }
-        }
+        int cx = (int) Math.round(x);
+        int cy = (int) Math.round(y);
 
-        double cxBlade = ax + Math.cos(theta) * (r / 2.0);
-        double cyBlade = ay + Math.sin(theta) * (r / 2.0);
+        // push the swing origin out to the player's edge in the facing direction
+        double halfW = width / 2.0;
+        double halfH = height / 2.0;
+        // approximate radius to the rectangle edge in facing direction
+        double edge = Math.hypot(halfW * cos, halfH * sin);
+        double ax = cx + cos * edge;
+        double ay = cy + sin * edge;
+
+        // center of the blade rectangle (midpoint of reach)
+        double cxBlade = ax + cos * (r / 2.0);
+        double cyBlade = ay + sin * (r / 2.0);
 
         Rectangle2D.Double blade = new Rectangle2D.Double(-r / 2.0, -w / 2.0, r, w);
 
@@ -436,20 +409,15 @@ public class Player extends Entity {
             g2.draw(swing);
         }
 
-        // Facing indicator (kept)
         g2.setColor(new Color(10, 40, 15));
         int px = (int) Math.round(x) - camX;
         int py = (int) Math.round(y) - camY;
-        switch (facing) {
-            case UP -> g2.fillRect(px - 2, py - height / 2 - 4, 4, 4);
-            case DOWN -> g2.fillRect(px - 2, py + height / 2, 4, 4);
-            case LEFT -> g2.fillRect(px - width / 2 - 4, py - 2, 4, 4);
-            case RIGHT -> g2.fillRect(px + width / 2, py - 2, 4, 4);
-            case UP_RIGHT -> g2.fillRect(px + width / 2, py - height / 2 - 4, 4, 4);
-            case DOWN_RIGHT -> g2.fillRect(px + width / 2, py + height / 2, 4, 4);
-            case UP_LEFT -> g2.fillRect(px - width / 2 - 4, py - height / 2 - 4, 4, 4);
-            case DOWN_LEFT -> g2.fillRect(px - width / 2 - 4, py + height / 2, 4, 4);
-        }
+        int len = Math.max(width, height) / 2 + 6;
+        int tx = px + (int) Math.round(Math.cos(facingAngle) * len);
+        int ty = py + (int) Math.round(Math.sin(facingAngle) * len);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawLine(px, py, tx, ty);
+
     }
 
     @Override

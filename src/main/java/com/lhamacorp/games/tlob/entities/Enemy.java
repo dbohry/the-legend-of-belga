@@ -60,13 +60,13 @@ public class Enemy extends Entity {
         lcg = (seed == 0) ? 1 : seed;
 
         // personalize
-        speedScale       = 0.90 + 0.30 * rand01();                    // 0.90..1.20
-        aimNoiseRad      = Math.toRadians((rand01() - 0.5) * 14.0);   // ~±7°
-        boolean willStrafe = rand01() < 0.45;                          // ~45% strafe
-        strafeStrength   = willStrafe ? 0.20 + 0.25 * rand01() : 0.0; // 0.20..0.45
-        strafeFreqHz     = 0.6 + 0.8 * rand01();                      // 0.6..1.4 Hz
-        strafePhase      = rand01() * Math.PI * 2.0;
-        aggressionRadius = 220 + 140 * rand01();                      // 220..360 px
+        speedScale = 0.50 + 0.30 * rand01(); // 0.90..1.20
+        aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0); // ~±7°
+        boolean willStrafe = rand01() < 0.45; // ~45% strafe
+        strafeStrength = willStrafe ? 0.20 + 0.25 * rand01() : 0.0; // 0.20..0.45
+        strafeFreqHz = 0.6 + 0.8 * rand01(); // 0.6..1.4 Hz
+        strafePhase = rand01() * Math.PI * 2.0;
+        aggressionRadius = 220 + 140 * rand01(); // 220..360 px
 
         baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01())); // 0.85x..1.35x
         baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));     // 3 or sometimes 4
@@ -123,7 +123,8 @@ public class Enemy extends Entity {
                     double s = Math.sin(aimNoiseRad), c = Math.cos(aimNoiseRad);
                     double rx = dirX * c - dirY * s;
                     double ry = dirX * s + dirY * c;
-                    dirX = rx; dirY = ry;
+                    dirX = rx;
+                    dirY = ry;
                 }
                 // optional strafing: add small perpendicular oscillation
                 if (strafeStrength > 0.0) {
@@ -133,7 +134,10 @@ public class Enemy extends Entity {
                     dirX += osc * px;
                     dirY += osc * py;
                     double len = Math.hypot(dirX, dirY);
-                    if (len > 1e-6) { dirX /= len; dirY /= len; }
+                    if (len > 1e-6) {
+                        dirX /= len;
+                        dirY /= len;
+                    }
                 }
             }
 
@@ -156,6 +160,7 @@ public class Enemy extends Entity {
         lcg = lcg * 1664525 + 1013904223;
         return lcg;
     }
+
     private double rand01() {
         // 24-bit mantissa -> [0,1)
         return ((nextRand() >>> 8) & 0xFFFFFF) / (double) (1 << 24);
