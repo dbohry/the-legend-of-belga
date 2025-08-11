@@ -35,7 +35,7 @@ public final class LevelManager {
 
     private TileMap buildNewMap() {
         // derive independent substreams so generator and map helpers don't interfere
-        Random genRng  = new Random(mapsRoot.nextLong());
+        Random genRng = new Random(mapsRoot.nextLong());
         Random tileRng = new Random(mapsRoot.nextLong());
         int[][] tiles = new MapGenerator(width, height, density, carveSteps, genRng).generate();
         return new TileMap(tiles, tileRng);

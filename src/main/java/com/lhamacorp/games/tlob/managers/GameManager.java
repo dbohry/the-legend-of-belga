@@ -26,6 +26,9 @@ public class GameManager extends JPanel implements Runnable {
     private static final float VOLUME_DB_MIN = -40.0f;
     private static final float VOLUME_DB_MAX = 0.0f;
 
+    // checksum cadence (JVM: -Dtlob.cs.every=60)
+    private static final int CHECKSUM_EVERY_TICKS = Integer.getInteger("tlob.cs.every", 120);
+
     private enum GameState {START, PLAYING, PAUSED, VICTORY, GAME_OVER}
 
     private GameState state;
@@ -38,6 +41,9 @@ public class GameManager extends JPanel implements Runnable {
 
     // 30 Hz tile/ambient tick
     private int animTick30 = 0;
+
+    // sim tick for checksum cadence
+    private long simTick = 0;
 
     // Core systems
     private final KeyManager keyManager;
@@ -105,12 +111,12 @@ public class GameManager extends JPanel implements Runnable {
 
         // Seed & RNG (property takes precedence, then env; otherwise time)
         this.worldSeed = readSeed();
-        this.rootRng   = new Random(worldSeed);
-        this.mapsRoot  = new Random(rootRng.nextLong());   // independent stream for maps
-        this.spawnsRoot= new Random(rootRng.nextLong());   // independent stream for spawns
+        this.rootRng = new Random(worldSeed);
+        this.mapsRoot = new Random(rootRng.nextLong());    // independent stream for maps
+        this.spawnsRoot = new Random(rootRng.nextLong());  // independent stream for spawns
         System.out.println("World seed = " + worldSeed);
 
-        // RNG-aware systems (each gets its own substream)
+        // RNG-aware systems
         levelManager = new LevelManager(80, 60, 0.45, 2500, mapsRoot);
         enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16),
             new Random(spawnsRoot.nextLong()));
@@ -119,15 +125,16 @@ public class GameManager extends JPanel implements Runnable {
         TileMap map = levelManager.map();
         int[] spawn = map.findSpawnTile();
         Weapon sword = new Sword(2, 28, 10, 10, 16);
-        player = new Player(spawn[0] * TILE_SIZE + TILE_SIZE / 2.0,
+        player = new Player(
+            spawn[0] * TILE_SIZE + TILE_SIZE / 2.0,
             spawn[1] * TILE_SIZE + TILE_SIZE / 2.0,
-            sword);
+            sword
+        );
 
         if (!startScreenEnabled) {
             try {
                 if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
 
         enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
@@ -143,7 +150,7 @@ public class GameManager extends JPanel implements Runnable {
         String prop = System.getProperty("tlob.seed");
         String envU = System.getenv("TLOB_SEED");
         String envL = System.getenv("tlob.seed");
-        String raw  = (prop != null && !prop.isBlank()) ? prop
+        String raw = (prop != null && !prop.isBlank()) ? prop
             : (envU != null && !envU.isBlank()) ? envU
             : (envL != null && !envL.isBlank()) ? envL
             : null;
@@ -193,9 +200,7 @@ public class GameManager extends JPanel implements Runnable {
         }
 
         switch (state) {
-            case START, GAME_OVER, VICTORY, PAUSED -> {
-                return;
-            }
+            case START, GAME_OVER, VICTORY, PAUSED -> { return; }
             case PLAYING -> {
                 // Input snapshot
                 input.up = keyManager.up;
@@ -229,6 +234,10 @@ public class GameManager extends JPanel implements Runnable {
 
                 // 30 Hz ambient tick
                 animTick30++;
+
+                // checksum cadence
+                simTick++;
+                logChecksumIfDue();
             }
         }
     }
@@ -246,20 +255,24 @@ public class GameManager extends JPanel implements Runnable {
             case PLAYING -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                drawSeedOverlay(g2);
             }
             case PAUSED -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                drawSeedOverlay(g2);
                 pauseMenuRenderer.draw(g2, musicVolumeDb);
             }
             case GAME_OVER -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                drawSeedOverlay(g2);
                 gameOverRenderer.draw(g2);
             }
             case VICTORY -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                drawSeedOverlay(g2);
                 victoryRenderer.draw(g2);
             }
         }
@@ -271,6 +284,75 @@ public class GameManager extends JPanel implements Runnable {
         map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
         player.draw(g2, camera.offsetX(), camera.offsetY());
+    }
+
+    /** Draw a tiny, low-contrast seed tag in the bottom-right corner. */
+    private void drawSeedOverlay(Graphics2D g2) {
+        String text = "seed: " + worldSeed;
+        Font oldF = g2.getFont();
+        Composite oldC = g2.getComposite();
+        Color oldCol = g2.getColor();
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 11));
+        FontMetrics fm = g2.getFontMetrics();
+        int pad = 6;
+        int w = fm.stringWidth(text);
+
+        int x = getWidth() - w - pad;
+        int y = getHeight() - pad;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
+        g2.setColor(Color.BLACK);
+        g2.drawString(text, x + 1, y + 1);
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
+        g2.setColor(new Color(230, 235, 240));
+        g2.drawString(text, x, y);
+
+        g2.setFont(oldF);
+        g2.setComposite(oldC);
+        g2.setColor(oldCol);
+    }
+
+    /** Print a deterministic checksum of the current gameplay state every N ticks. */
+    private void logChecksumIfDue() {
+        if (CHECKSUM_EVERY_TICKS <= 0) return;
+        if ((simTick % CHECKSUM_EVERY_TICKS) != 0) return;
+
+        long cs = computeChecksum();
+        System.out.printf("tick=%d checksum=%016x enemies=%d%n", simTick, cs, enemies.size());
+    }
+
+    /** Build a simple FNV-1a-ish checksum across player, enemies, and map walls/floors. */
+    private long computeChecksum() {
+        long h = 0xcbf29ce484222325L; // FNV-1a 64-bit basis
+
+        h = mix(h, Double.doubleToLongBits(player.getX()));
+        h = mix(h, Double.doubleToLongBits(player.getY()));
+
+        for (int i = 0; i < enemies.size(); i++) {
+            Enemy e = enemies.get(i);
+            h = mix(h, i);
+            h = mix(h, Double.doubleToLongBits(e.getX()));
+            h = mix(h, Double.doubleToLongBits(e.getY()));
+            h = mix(h, e.isAlive() ? 1 : 0);
+        }
+
+        TileMap m = levelManager.map();
+        int mw = m.getWidth(), mh = m.getHeight();
+        for (int y = 0; y < mh; y++) {
+            for (int x = 0; x < mw; x++) {
+                h = mix(h, m.isWall(x, y) ? 1 : 0);
+            }
+        }
+        return h;
+    }
+
+    private static long mix(long h, long v) {
+        h ^= v;
+        h *= 0x100000001b3L; // FNV prime
+        h ^= (h >>> 32);
+        return h;
     }
 
     private void enterGameOver() {
@@ -299,11 +381,12 @@ public class GameManager extends JPanel implements Runnable {
     private void restartGame() {
         state = GameState.PLAYING;
 
-        // reseed spawns for deterministic restart
+        // reseed spawns for deterministic restart (requires SpawnManager.reseed(Random))
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
 
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
         animTick30 = 0;
+        simTick = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
@@ -312,12 +395,13 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private void startNextLevel() {
-        // reseed spawns for the next level
+        // reseed spawns for the next level (requires SpawnManager.reseed(Random))
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
 
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
         animTick30 = 0;
+        simTick = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
@@ -347,10 +431,7 @@ public class GameManager extends JPanel implements Runnable {
             if (state != GameState.START) return;
             startScreenRenderer.keyTyped(e.getKeyChar());
             if (startScreenRenderer.isComplete()) {
-                try {
-                    player.setName(startScreenRenderer.getHeroName());
-                } catch (Exception ignored) {
-                }
+                try { player.setName(startScreenRenderer.getHeroName()); } catch (Exception ignored) {}
                 state = GameState.PLAYING;
             }
             repaint();
@@ -375,9 +456,7 @@ public class GameManager extends JPanel implements Runnable {
         public void mouseClicked(MouseEvent e) {
             switch (state) {
                 case START -> requestFocusInWindow();
-                case GAME_OVER -> {
-                    if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame();
-                }
+                case GAME_OVER -> { if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame(); }
                 case PAUSED -> {
                     float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
                     if (!Float.isNaN(maybeDb)) {
