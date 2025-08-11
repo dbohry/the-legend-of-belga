@@ -103,7 +103,7 @@ public class GameManager extends JPanel implements Runnable {
 
         // Seed & RNG
         long seed;
-        String seedProp = System.getProperty("tlob.seed");
+        String seedProp = System.getenv("tlob.seed");
         try {
             seed = (seedProp != null) ? Long.parseLong(seedProp) : System.currentTimeMillis();
         } catch (NumberFormatException nfe) {
