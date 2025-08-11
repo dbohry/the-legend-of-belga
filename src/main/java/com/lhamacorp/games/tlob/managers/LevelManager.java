@@ -13,7 +13,7 @@ public final class LevelManager {
     private final int width, height;
     private final double density;
     private final int carveSteps;
-    private final Random rng;
+    private final Random mapsRoot;
 
     private TileMap current;
     private int completed;
@@ -23,19 +23,22 @@ public final class LevelManager {
         this(width, height, density, carveSteps, new Random());
     }
 
-    public LevelManager(int width, int height, double density, int carveSteps, Random rng) {
+    public LevelManager(int width, int height, double density, int carveSteps, Random mapsRoot) {
         this.width = width;
         this.height = height;
         this.density = density;
         this.carveSteps = carveSteps;
-        this.rng = rng;
+        this.mapsRoot = (mapsRoot != null) ? mapsRoot : new Random();
         this.current = buildNewMap();
         this.completed = 0;
     }
 
     private TileMap buildNewMap() {
-        int[][] tiles = new MapGenerator(width, height, density, carveSteps, rng).generate();
-        return new TileMap(tiles, rng);
+        // derive independent substreams so generator and map helpers don't interfere
+        Random genRng  = new Random(mapsRoot.nextLong());
+        Random tileRng = new Random(mapsRoot.nextLong());
+        int[][] tiles = new MapGenerator(width, height, density, carveSteps, genRng).generate();
+        return new TileMap(tiles, tileRng);
     }
 
     public TileMap map() {

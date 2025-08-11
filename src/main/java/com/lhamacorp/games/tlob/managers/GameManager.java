@@ -58,7 +58,9 @@ public class GameManager extends JPanel implements Runnable {
 
     // Deterministic world RNG
     private final long worldSeed;
-    private final Random worldRng;
+    private final Random rootRng;
+    private final Random mapsRoot;
+    private final Random spawnsRoot;
 
     // Systems that need RNG
     private final LevelManager levelManager;
@@ -101,21 +103,17 @@ public class GameManager extends JPanel implements Runnable {
             state = GameState.PLAYING;
         }
 
-        // Seed & RNG
-        long seed;
-        String seedProp = System.getenv("tlob.seed");
-        try {
-            seed = (seedProp != null) ? Long.parseLong(seedProp) : System.currentTimeMillis();
-        } catch (NumberFormatException nfe) {
-            seed = System.currentTimeMillis();
-        }
-        worldSeed = seed;
-        worldRng = new Random(worldSeed);
+        // Seed & RNG (property takes precedence, then env; otherwise time)
+        this.worldSeed = readSeed();
+        this.rootRng   = new Random(worldSeed);
+        this.mapsRoot  = new Random(rootRng.nextLong());   // independent stream for maps
+        this.spawnsRoot= new Random(rootRng.nextLong());   // independent stream for spawns
         System.out.println("World seed = " + worldSeed);
 
-        // RNG-aware systems
-        levelManager = new LevelManager(80, 60, 0.45, 2500, worldRng);
-        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16), worldRng);
+        // RNG-aware systems (each gets its own substream)
+        levelManager = new LevelManager(80, 60, 0.45, 2500, mapsRoot);
+        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16),
+            new Random(spawnsRoot.nextLong()));
 
         // World init
         TileMap map = levelManager.map();
@@ -139,6 +137,21 @@ public class GameManager extends JPanel implements Runnable {
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
 
         AudioManager.playRandomMusic(musicVolumeDb);
+    }
+
+    private static long readSeed() {
+        String prop = System.getProperty("tlob.seed");
+        String envU = System.getenv("TLOB_SEED");
+        String envL = System.getenv("tlob.seed");
+        String raw  = (prop != null && !prop.isBlank()) ? prop
+            : (envU != null && !envU.isBlank()) ? envU
+            : (envL != null && !envL.isBlank()) ? envL
+            : null;
+        try {
+            return (raw != null) ? Long.parseLong(raw.trim()) : System.currentTimeMillis();
+        } catch (NumberFormatException e) {
+            return System.currentTimeMillis();
+        }
     }
 
     public void startGameThread() {
@@ -285,8 +298,11 @@ public class GameManager extends JPanel implements Runnable {
 
     private void restartGame() {
         state = GameState.PLAYING;
-        levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
 
+        // reseed spawns for deterministic restart
+        enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
+
+        levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
         animTick30 = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
@@ -296,9 +312,11 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private void startNextLevel() {
+        // reseed spawns for the next level
+        enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
+
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
-
         animTick30 = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;

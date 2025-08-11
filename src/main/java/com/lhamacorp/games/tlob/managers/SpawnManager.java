@@ -11,7 +11,7 @@ import java.util.Random;
 public class SpawnManager {
 
     private final Weapon enemyWeapon;
-    private final Random rng;
+    private Random rng;
 
     // Back-compat ctor (non-deterministic)
     public SpawnManager(Weapon enemyWeapon) {
@@ -20,6 +20,11 @@ public class SpawnManager {
 
     public SpawnManager(Weapon enemyWeapon, Random rng) {
         this.enemyWeapon = enemyWeapon;
+        this.rng = (rng != null) ? rng : new Random();
+    }
+
+    /** Reseed this spawner’s RNG (used on restart / next-level for deterministic runs). */
+    public void reseed(Random rng) {
         this.rng = (rng != null) ? rng : new Random();
     }
 
