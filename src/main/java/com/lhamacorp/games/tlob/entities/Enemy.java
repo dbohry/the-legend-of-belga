@@ -10,55 +10,73 @@ import java.awt.image.BufferedImage;
 public class Enemy extends Entity {
 
     private static final int ENEMY_SIZE = 20;
-    private static final double ENEMY_SPEED = 3.5;
+    private static final double ENEMY_BASE_SPEED = 3.5;
 
     private static final double ENEMY_MAX_HP = 1.0;
     private static final double ENEMY_MAX_STAMINA = 1.0;
     private static final double ENEMY_MAX_MANA = 0;
-    private static final double ENEMY_SPEED_PPS = 105.0;
 
     private static final int ATTACK_RANGE = 30;
 
-    // --- 30 Hz timing ---
-    private static final int TICKS_PER_SECOND = 60;
+    // --- timing base (keep 30Hz for anim feel, independent from sim Hz) ---
+    private static final int TICKS_PER_SECOND = 30;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
-    private static final int ATTACK_COOLDOWN_TICKS = (int) Math.round(2.0 * TICKS_PER_SECOND); // 2.0s
-    private static final int ATTACK_DURATION_TICKS = (int) Math.round(0.10 * TICKS_PER_SECOND); // 0.1s
-    private static final int HURT_FLASH_TICKS = (int) Math.round(0.20 * TICKS_PER_SECOND); // 0.2s
+    // defaults (per-enemy jitter is applied on top)
+    private static final int ATTACK_COOLDOWN_TICKS = 60; // 2.0s @30Hz
+    private static final int ATTACK_DURATION_TICKS = 3;  // ~0.1s
 
-    // Timers/state
+    private static final int HURT_FLASH_TICKS = 6;       // ~0.2s
+
+    // state
     private int hurtTimer = 0;
     private int attackCooldown = 0;
     private int attackTimer = 0;
 
-    // Animation state
     private long animTimeMs = 0L;
     private boolean movedThisTick = false;
 
-    // Deterministic wander (simple LCG; seeded from spawn)
-    private int lcg;
+    // wander
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
 
-    public Enemy(double x, double y, Weapon weapon) {
-        super(
-            x, y,
-            ENEMY_SIZE, ENEMY_SIZE,
-            ENEMY_SPEED_PPS / TICKS_PER_SECOND,
-            ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA,
-            0, weapon, "Zombie"
-        );
+    // per-enemy RNG (tiny LCG) + personalization
+    private int lcg;
+    private final double speedScale;        // ~0.9 .. 1.2
+    private final double aimNoiseRad;       // small fixed offset on approach
+    private final double strafeStrength;    // 0 (most) or up to ~0.4
+    private final double strafeFreqHz;      // ~0.6 .. 1.4 Hz
+    private final double strafePhase;       // 0..2π
+    private final double aggressionRadius;  // when to stop wandering and engage
+    private final int baseAttackCooldown;   // +/- jittered cooldown
+    private final int baseAttackDuration;   // usually 3, can jitter small
+    private int ageTicks = 0;
 
+    public Enemy(double x, double y, Weapon weapon) {
+        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_BASE_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0, weapon, "Zombie");
+
+        // seed LCG from position so it’s deterministic per spawn
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
-        pickNewWanderDir();
+
+        // personalize
+        speedScale       = 0.90 + 0.30 * rand01();                    // 0.90..1.20
+        aimNoiseRad      = Math.toRadians((rand01() - 0.5) * 14.0);   // ~±7°
+        boolean willStrafe = rand01() < 0.45;                          // ~45% strafe
+        strafeStrength   = willStrafe ? 0.20 + 0.25 * rand01() : 0.0; // 0.20..0.45
+        strafeFreqHz     = 0.6 + 0.8 * rand01();                      // 0.6..1.4 Hz
+        strafePhase      = rand01() * Math.PI * 2.0;
+        aggressionRadius = 220 + 140 * rand01();                      // 220..360 px
+
+        baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01())); // 0.85x..1.35x
+        baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));     // 3 or sometimes 4
+
+        pickNewWanderDir(); // initial wander vector
     }
 
     @Override
     public void update(Object... args) {
         if (!isAlive()) return;
-
         Player player = (Player) args[0];
         TileMap map = (TileMap) args[1];
 
@@ -66,68 +84,89 @@ public class Enemy extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        // Melee attack
-        double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
-        if (distToPlayer <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
-            attackTimer = ATTACK_DURATION_TICKS;
-            attackCooldown = ATTACK_COOLDOWN_TICKS;
+        // Try melee attack
+        double dxToP = player.getX() - x;
+        double dyToP = player.getY() - y;
+        double distToP = Math.hypot(dxToP, dyToP);
+
+        if (distToP <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
+            attackTimer = baseAttackDuration;
+            attackCooldown = baseAttackCooldown;
             player.damage(1.0);
             player.applyKnockback(x, y);
         }
 
-        // Desired direction: chase player (normalized)
-        double dx = player.getX() - x;
-        double dy = player.getY() - y;
-        if (distToPlayer > 1e-4) {
-            dx /= distToPlayer;
-            dy /= distToPlayer;
-        } else {
-            dx = dy = 0;
+        // Desired direction (unit) toward player
+        double dirX = 0, dirY = 0;
+        if (distToP > 1e-6) {
+            dirX = dxToP / distToP;
+            dirY = dyToP / distToP;
         }
 
-        // Resolve knockback
+        // knockback first
         updateKnockbackWithMap(map);
 
         double vx = 0, vy = 0;
         if (knockbackTimer == 0) {
-            double desiredSpeed = speed;
+            double desiredSpeed = speed * speedScale;
 
-            // Far away or during attack windup: wander deterministically
-            if (distToPlayer > 300 || attackTimer > 0) {
+            // choose wander vs engage
+            boolean wander = (distToP > aggressionRadius) || (attackTimer > 0);
+            if (wander) {
                 if (--wanderTimer <= 0) pickNewWanderDir();
-                dx = wanderDx;
-                dy = wanderDy;
-                desiredSpeed = 0.6;
+                dirX = wanderDx;
+                dirY = wanderDy;
+                desiredSpeed = 0.6 * speedScale;
             } else {
-                // Reset wander cadence when actively chasing
-                wanderTimer = 0;
+                // slight aim noise (fixed per enemy)
+                if (Math.abs(aimNoiseRad) > 1e-6) {
+                    double s = Math.sin(aimNoiseRad), c = Math.cos(aimNoiseRad);
+                    double rx = dirX * c - dirY * s;
+                    double ry = dirX * s + dirY * c;
+                    dirX = rx; dirY = ry;
+                }
+                // optional strafing: add small perpendicular oscillation
+                if (strafeStrength > 0.0) {
+                    double phase = strafePhase + (ageTicks * 2.0 * Math.PI * strafeFreqHz) / TICKS_PER_SECOND;
+                    double osc = Math.sin(phase) * strafeStrength;
+                    double px = -dirY, py = dirX; // perp
+                    dirX += osc * px;
+                    dirY += osc * py;
+                    double len = Math.hypot(dirX, dirY);
+                    if (len > 1e-6) { dirX /= len; dirY /= len; }
+                }
             }
 
-            vx = dx * desiredSpeed;
-            vy = dy * desiredSpeed;
+            vx = dirX * desiredSpeed;
+            vy = dirY * desiredSpeed;
+
             moveWithCollision(vx, vy, map, player);
         }
 
-        // Visual facing & animation flags
+        // facing from actual velocity
         updateFacing(vx, vy);
-        movedThisTick = (vx * vx + vy * vy) > 1e-6 && knockbackTimer == 0;
+        movedThisTick = (Math.abs(vx) + Math.abs(vy)) > 1e-3 && knockbackTimer == 0;
 
         animTimeMs += TICK_MS;
+        ageTicks++;
     }
 
-    // LCG: wraps on int overflow intentionally
+    // ---- tiny LCG helpers ----
     private int nextRand() {
         lcg = lcg * 1664525 + 1013904223;
         return lcg;
     }
+    private double rand01() {
+        // 24-bit mantissa -> [0,1)
+        return ((nextRand() >>> 8) & 0xFFFFFF) / (double) (1 << 24);
+    }
 
     private void pickNewWanderDir() {
-        // Hold direction for ~0.5–1.2s @30Hz
-        wanderTimer = 15 + Math.abs(nextRand()) % 21; // 15..35 ticks
+        // next change 0.5–1.2s @30Hz
+        int span = 15 + (int) Math.floor(rand01() * 21.0); // 15..35 ticks
+        wanderTimer = span;
 
-        // Angle in [0, 2π)
-        double u = (nextRand() >>> 1) * (1.0 / 2147483648.0); // [0,1)
-        double ang = u * Math.PI * 2.0;
+        double ang = rand01() * Math.PI * 2.0;
         wanderDx = Math.cos(ang);
         wanderDy = Math.sin(ang);
     }
@@ -157,19 +196,18 @@ public class Enemy extends Entity {
 
         TextureManager.Direction dir = toCardinal(facing);
         TextureManager.Motion motion = movedThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
-        BufferedImage tex = TextureManager.getEnemyFrame(dir, motion, animTimeMs);
 
+        BufferedImage tex = TextureManager.getEnemyFrame(dir, motion, animTimeMs);
         int px = (int) Math.round(x - width / 2.0) - camX;
         int py = (int) Math.round(y - height / 2.0) - camY;
 
         if (tex != null) {
             g2.drawImage(tex, px, py, width, height, null);
 
-            // Simple state tints
             if (hurtTimer > 0 || attackTimer > 0) {
-                g2.setColor((hurtTimer > 0)
-                    ? new Color(255, 120, 120, 100)
-                    : new Color(255, 200, 60, 100));
+                Color overlay = (hurtTimer > 0) ? new Color(255, 120, 120, 100)
+                    : new Color(255, 200, 60, 100);
+                g2.setColor(overlay);
                 g2.fillRect(px, py, width, height);
             }
         } else {
@@ -189,7 +227,6 @@ public class Enemy extends Entity {
         }
     }
 
-    // Map 8-way to 4-way animation rows
     private static TextureManager.Direction toCardinal(Direction f) {
         return switch (f) {
             case UP, UP_LEFT, UP_RIGHT -> TextureManager.Direction.UP;

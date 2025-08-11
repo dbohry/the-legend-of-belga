@@ -11,7 +11,10 @@ import com.lhamacorp.games.tlob.world.InputState;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -28,6 +31,7 @@ public class GameManager extends JPanel implements Runnable {
     private static final int CHECKSUM_EVERY_TICKS = Integer.getInteger("tlob.cs.every", 120);
 
     private enum GameState {START, PLAYING, PAUSED, VICTORY, GAME_OVER}
+
     private GameState state;
 
     private Thread gameThread;
@@ -72,6 +76,7 @@ public class GameManager extends JPanel implements Runnable {
     // World
     private final Player player;
     private final List<Enemy> enemies = new ArrayList<>();
+    private int enemiesAtLevelStart = 0;
 
     // Audio
     private boolean musicMuted = false;
@@ -79,7 +84,9 @@ public class GameManager extends JPanel implements Runnable {
 
     private final boolean startScreenEnabled;
 
-    public GameManager() { this(!Boolean.getBoolean("tlob.skipStart")); }
+    public GameManager() {
+        this(!Boolean.getBoolean("tlob.skipStart"));
+    }
 
     public GameManager(boolean enableStartScreen) {
         this.startScreenEnabled = enableStartScreen;
@@ -131,10 +138,12 @@ public class GameManager extends JPanel implements Runnable {
         if (!startScreenEnabled) {
             try {
                 if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
+        enemiesAtLevelStart = enemies.size();
 
         pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -150,8 +159,11 @@ public class GameManager extends JPanel implements Runnable {
             : (envU != null && !envU.isBlank()) ? envU
             : (envL != null && !envL.isBlank()) ? envL
             : null;
-        try { return (raw != null) ? Long.parseLong(raw.trim()) : System.currentTimeMillis(); }
-        catch (NumberFormatException e) { return System.currentTimeMillis(); }
+        try {
+            return (raw != null) ? Long.parseLong(raw.trim()) : System.currentTimeMillis();
+        } catch (NumberFormatException e) {
+            return System.currentTimeMillis();
+        }
     }
 
     public void startGameThread() {
@@ -193,7 +205,9 @@ public class GameManager extends JPanel implements Runnable {
         }
 
         switch (state) {
-            case START, GAME_OVER, VICTORY, PAUSED -> { return; }
+            case START, GAME_OVER, VICTORY, PAUSED -> {
+                return;
+            }
             case PLAYING -> {
                 // Input snapshot
                 input.up = keyManager.up;
@@ -203,8 +217,14 @@ public class GameManager extends JPanel implements Runnable {
                 input.attack = keyManager.attack;
                 input.shift = keyManager.shift;
 
-                if (!player.isAlive()) { enterGameOver(); return; }
-                if (enemies.isEmpty()) { enterVictory(); return; }
+                if (!player.isAlive()) {
+                    enterGameOver();
+                    return;
+                }
+                if (enemies.isEmpty()) {
+                    enterVictory();
+                    return;
+                }
 
                 // Mouse aim only if the cursor is currently inside the panel
                 Point aimWorld = null;
@@ -228,7 +248,7 @@ public class GameManager extends JPanel implements Runnable {
 
                 // ticks
                 simTick++;
-                if ( (simTick & 1) == 0 ) animTick30++;
+                if ((simTick & 1) == 0) animTick30++;
                 logChecksumIfDue();
             }
         }
@@ -246,29 +266,76 @@ public class GameManager extends JPanel implements Runnable {
             case START -> startScreenRenderer.draw(g2);
             case PLAYING -> {
                 drawWorld(g2);
-                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                hudRenderer.draw(g2, player, 8, 8);
+                drawLevelCounters(g2);
                 drawSeedOverlay(g2);
             }
             case PAUSED -> {
                 drawWorld(g2);
-                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                hudRenderer.draw(g2, player, 8, 8);
+                drawLevelCounters(g2);
                 drawSeedOverlay(g2);
                 pauseMenuRenderer.draw(g2, musicVolumeDb);
             }
             case GAME_OVER -> {
                 drawWorld(g2);
-                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                hudRenderer.draw(g2, player, 8, 8);
                 drawSeedOverlay(g2);
                 gameOverRenderer.draw(g2);
             }
             case VICTORY -> {
                 drawWorld(g2);
-                hudRenderer.draw(g2, player, enemies.size(), 8, 8);
+                hudRenderer.draw(g2, player, 8, 8);
+                drawLevelCounters(g2);
                 drawSeedOverlay(g2);
                 victoryRenderer.draw(g2);
             }
         }
         g2.dispose();
+    }
+
+    /** Small top-right overlay: maps completed and enemy left/total. */
+    private void drawLevelCounters(Graphics2D g2) {
+        final int pad = 10;
+
+        int completed = levelManager.completed();
+        int left = enemies.size();
+        int total = Math.max(enemiesAtLevelStart, left); // guard if called before spawn
+
+        String line1 = "Maps: " + completed;
+        String line2 = "Enemies: " + left + "/" + total; // e.g., 10/100
+
+        Font oldF = g2.getFont();
+        Color oldCol = g2.getColor();
+        Composite oldCmp = g2.getComposite();
+
+        // Subtle text
+        Font f = new Font("Arial", Font.PLAIN, 12);
+        g2.setFont(f);
+        FontMetrics fm = g2.getFontMetrics();
+
+        int w = Math.max(fm.stringWidth(line1), fm.stringWidth(line2)) + 12;
+        int h = fm.getHeight() * 2 + 8;
+
+        int x = getWidth() - w - pad;
+        int y = pad;
+
+        // Soft panel
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
+        g2.setColor(new Color(0, 0, 0));
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+
+        // Text
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(new Color(235, 240, 245));
+        int ty = y + fm.getAscent() + 4;
+        g2.drawString(line1, x + 6, ty);
+        ty += fm.getHeight();
+        g2.drawString(line2, x + 6, ty);
+
+        g2.setFont(oldF);
+        g2.setColor(oldCol);
+        g2.setComposite(oldCmp);
     }
 
     private void drawWorld(Graphics2D g2) {
@@ -371,6 +438,7 @@ public class GameManager extends JPanel implements Runnable {
         state = GameState.PLAYING;
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
+        enemiesAtLevelStart = enemies.size();
         animTick30 = 0;
         simTick = 0;
 
@@ -384,6 +452,7 @@ public class GameManager extends JPanel implements Runnable {
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
+        enemiesAtLevelStart = enemies.size();
         animTick30 = 0;
         simTick = 0;
 
@@ -400,7 +469,8 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private class GlobalKeyHandler extends KeyAdapter {
-        @Override public void keyPressed(KeyEvent e) {
+        @Override
+        public void keyPressed(KeyEvent e) {
             if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
                 if (state == GameState.PLAYING) pauseGame();
                 else if (state == GameState.PAUSED) resumeGame();
@@ -409,11 +479,15 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private class StartScreenKeyHandler extends KeyAdapter {
-        @Override public void keyTyped(KeyEvent e) {
+        @Override
+        public void keyTyped(KeyEvent e) {
             if (state != GameState.START) return;
             startScreenRenderer.keyTyped(e.getKeyChar());
             if (startScreenRenderer.isComplete()) {
-                try { player.setName(startScreenRenderer.getHeroName()); } catch (Exception ignored) {}
+                try {
+                    player.setName(startScreenRenderer.getHeroName());
+                } catch (Exception ignored) {
+                }
                 state = GameState.PLAYING;
             }
             repaint();
@@ -422,15 +496,26 @@ public class GameManager extends JPanel implements Runnable {
 
     /** One handler for move/drag AND enter/exit so we know if the cursor is inside. */
     private class UIMouseHandler extends MouseAdapter {
-        @Override public void mouseEntered(MouseEvent e) { mouseInside = true; }
-        @Override public void mouseExited(MouseEvent e)  { mouseInside = false; }
-        @Override public void mouseMoved(MouseEvent e) {
+        @Override
+        public void mouseEntered(MouseEvent e) {
+            mouseInside = true;
+        }
+
+        @Override
+        public void mouseExited(MouseEvent e) {
+            mouseInside = false;
+        }
+
+        @Override
+        public void mouseMoved(MouseEvent e) {
             if (state == GameState.PLAYING) {
                 mouseScreenX = e.getX();
                 mouseScreenY = e.getY();
             }
         }
-        @Override public void mouseDragged(MouseEvent e) {
+
+        @Override
+        public void mouseDragged(MouseEvent e) {
             if (state == GameState.PAUSED) {
                 float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
                 if (!Float.isNaN(maybeDb)) {
@@ -445,10 +530,13 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private class UIMouseClickHandler extends MouseAdapter {
-        @Override public void mouseClicked(MouseEvent e) {
+        @Override
+        public void mouseClicked(MouseEvent e) {
             switch (state) {
                 case START -> requestFocusInWindow();
-                case GAME_OVER -> { if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame(); }
+                case GAME_OVER -> {
+                    if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame();
+                }
                 case PAUSED -> {
                     float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
                     if (!Float.isNaN(maybeDb)) {

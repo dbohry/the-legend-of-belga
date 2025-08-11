@@ -12,13 +12,12 @@ public final class HudRenderer {
         this.bodyFont = bodyFont;
     }
 
-    public void draw(Graphics2D g2, Player player, int enemiesLeft, int x, int y) {
+    public void draw(Graphics2D g2, Player player, int x, int y) {
         g2.setFont(bodyFont);
         int nextY = drawHpShield(g2, player, x, y);
         nextY = drawMana(g2, player, x, nextY);
         nextY = drawStamina(g2, player, x, nextY);
         g2.setColor(Color.WHITE);
-        g2.drawString("Enemies: " + enemiesLeft, x, nextY + 16);
     }
 
     private int drawHpShield(Graphics2D g2, Player p, int x, int y) {
