@@ -42,7 +42,6 @@ public class Player extends Entity {
     private double speedMultiplier = 1.0;
     private double damageMultiplier = 1.0;
 
-    // Animation state
     private long animTimeMs = 0L;
     private boolean movingThisTick = false;
 
@@ -85,7 +84,6 @@ public class Player extends Entity {
     }
 
     private int effectiveStaminaRegenInterval() {
-        // smaller interval = faster regen; clamp to at least 1 tick
         double interval = STAMINA_REGEN_INTERVAL / Math.max(0.0001, staminaRegenRateMult);
         return Math.max(1, (int) Math.round(interval));
     }

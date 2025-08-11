@@ -194,9 +194,9 @@ public class PerkManager {
         });
 
         register("STAMINA_REGEN", Rarity.RARE, r -> {
-            double p = pct(r, 0.5, 0.10);
+            double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Stamina Regeneration";
-            String desc = String.format("Stamina regenerates faster permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Stamina regenerates faster permanently (+%d%%).", (int)Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseStaminaRegenByPercent(p));
         });
 
