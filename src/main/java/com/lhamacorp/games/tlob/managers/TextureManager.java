@@ -29,6 +29,9 @@ public final class TextureManager {
     private static final int DEFAULT_FRAME_DURATION_MS = 120;
 
     // ===== Cached textures =====
+    private static final boolean ANIMATE_GRASS = Boolean.getBoolean("tlob.anim.grass");
+    private static final int GRASS_FRAMES = 4;
+    private static BufferedImage[] grassFrames;
     private static BufferedImage grassTexture;
     private static BufferedImage stoneTexture;
 
@@ -100,6 +103,14 @@ public final class TextureManager {
         return enemyAnimations.get(new Key(motion, dir));
     }
 
+    public static BufferedImage getGrassTextureFrame(int tick30) {
+        ensureLoaded();
+        if (!ANIMATE_GRASS) return grassTexture;
+        if (grassFrames == null || grassFrames.length == 0) return grassTexture;
+        int idx = Math.floorMod(tick30 / 2, GRASS_FRAMES);
+        return grassFrames[idx];
+    }
+
     // ===== Internal load =====
     private static synchronized void ensureLoaded() {
         if (loaded) return;
@@ -139,7 +150,52 @@ public final class TextureManager {
         playerFirstFrame = playerAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
         enemyFirstFrame  = enemyAnimations .get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
 
+        // Build animated grass frames only if enabled
+        if (ANIMATE_GRASS && grassFrames == null) {
+            grassFrames = new BufferedImage[GRASS_FRAMES];
+            BufferedImage base = (grassTexture != null) ? grassTexture : generateGrassTexture(32, 32);
+            grassFrames[0] = base;
+            for (int i = 1; i < GRASS_FRAMES; i++) {
+                grassFrames[i] = swayAndTintGrass(base, i);
+            }
+        }
+
         loaded = true;
+    }
+
+    private static BufferedImage swayAndTintGrass(BufferedImage base, int phase) {
+        int w = base.getWidth(), h = base.getHeight();
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // Sway amounts (-0.06 .. +0.06)
+        double shearX = switch (phase % GRASS_FRAMES) {
+            case 1 -> -0.04;
+            case 2 ->  0.00;
+            case 3 ->  0.04;
+            default ->  0.00;
+        };
+
+        // Shear around vertical center to keep within bounds
+        AffineTransform at = new AffineTransform();
+        at.translate(-shearX * (h / 2.0), 0); // compensate x shift introduced by shear
+        at.shear(shearX, 0);
+        g.drawImage(base, at, null);
+
+        // Tiny lighting change so it doesn’t look like a pure transform
+        // (alternates a gentle highlight/darken overlay)
+        int alpha = 18; // very subtle
+        if (phase % 2 == 1) {
+            g.setColor(new Color(255, 255, 255, alpha));
+        } else {
+            g.setColor(new Color(0, 0, 0, alpha));
+        }
+        g.fillRect(0, 0, w, h);
+
+        g.dispose();
+        return out;
     }
 
     private static boolean looksLikeSheet(BufferedImage img, int fw, int fh) {

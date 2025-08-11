@@ -20,9 +20,17 @@ public class Enemy extends Entity {
     private static final int ATTACK_DURATION_FRAMES = 8;
     private static final double ATTACK_DAMAGE = 1.0;
 
+    // Animation cadence (match Player)
+    private static final int FPS = 60;
+    private static final int TICK_MS = 1000 / FPS;
+
     private int hurtTimer = 0;
     private int attackCooldown = 0;
     private int attackTimer = 0;
+
+    // Animation state
+    private long animTimeMs = 0L;
+    private boolean movedThisTick = false;
 
     public Enemy(double x, double y, Weapon weapon) {
         super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0, weapon, "Zombie");
@@ -38,39 +46,56 @@ public class Enemy extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        // Check if we can attack the player
+        // Try melee attack
         double distToPlayer = Math.hypot(player.getX() - x, player.getY() - y);
         if (distToPlayer <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
             attackTimer = ATTACK_DURATION_FRAMES;
             attackCooldown = ATTACK_COOLDOWN_FRAMES;
             player.damage(ATTACK_DAMAGE);
-            player.applyKnockback(x, y); // Apply knockback from enemy position
+            player.applyKnockback(x, y);
         }
 
+        // Desired direction toward player
         double dx = player.getX() - x;
         double dy = player.getY() - y;
         double dist = distToPlayer;
         if (dist > 0.0001) {
             dx /= dist;
             dy /= dist;
+        } else {
+            dx = 0;
+            dy = 0;
         }
 
         // Update knockback first
         updateKnockbackWithMap(map);
 
-        // Only allow movement if not being knocked back
+        // Only move under own control if not being knocked back
+        double vx = 0, vy = 0;
         if (knockbackTimer == 0) {
             double desiredSpeed = speed;
             if (dist > 300 || attackTimer > 0) {
-                // Far away: wander slowly
+                // Far away or in attack windup: lazy wander
                 double angle = (System.nanoTime() / 1_000_000_000.0 + hash()) % (2 * Math.PI);
                 dx = Math.cos(angle);
                 dy = Math.sin(angle);
                 desiredSpeed = 0.6;
             }
 
-            moveWithCollision(dx * desiredSpeed, dy * desiredSpeed, map, player);
+            vx = dx * desiredSpeed;
+            vy = dy * desiredSpeed;
+
+            moveWithCollision(vx, vy, map, player);
         }
+
+        // Update facing from actual velocity this tick (prefer axis with larger magnitude)
+        updateFacing(vx, vy);
+
+        // Movement flag for animation (ignore pure knockback)
+        movedThisTick = (Math.abs(vx) + Math.abs(vy)) > 1e-3 && knockbackTimer == 0;
+
+        // Advance enemy-local animation clock
+        animTimeMs += TICK_MS;
     }
 
     private int hash() {
@@ -100,29 +125,48 @@ public class Enemy extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        BufferedImage tex = TextureManager.getEnemyTexture();
+        TextureManager.Direction dir = toCardinal(facing);
+        TextureManager.Motion motion = movedThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
+
+        BufferedImage tex = TextureManager.getEnemyFrame(dir, motion, animTimeMs);
+        int px = (int) Math.round(x - width / 2.0) - camX;
+        int py = (int) Math.round(y - height / 2.0) - camY;
+
         if (tex != null) {
-            int px = (int) Math.round(x - width / 2.0) - camX;
-            int py = (int) Math.round(y - height / 2.0) - camY;
             g2.drawImage(tex, px, py, width, height, null);
 
-            // Overlay color based on state
+            // State overlays
             if (hurtTimer > 0 || attackTimer > 0) {
-                Color overlay = hurtTimer > 0 ? new Color(255, 120, 120, 100) : new Color(255, 200, 60, 100);
+                Color overlay = (hurtTimer > 0) ? new Color(255, 120, 120, 100)
+                    : new Color(255, 200, 60, 100);
                 g2.setColor(overlay);
                 g2.fillRect(px, py, width, height);
             }
         } else {
-            Color c;
-            if (hurtTimer > 0) {
-                c = new Color(255, 120, 120);
-            } else if (attackTimer > 0) {
-                c = new Color(255, 200, 60); // Attack color
-            } else {
-                c = new Color(200, 60, 60);
-            }
+            // Fallback rectangle if texture missing
+            Color c = (hurtTimer > 0) ? new Color(255, 120, 120)
+                : (attackTimer > 0) ? new Color(255, 200, 60)
+                : new Color(200, 60, 60);
             drawCenteredRect(g2, camX, camY, width, height, c);
         }
     }
 
+    private void updateFacing(double vx, double vy) {
+        if (Math.abs(vx) < 1e-3 && Math.abs(vy) < 1e-3) return; // keep current
+        if (Math.abs(vx) > Math.abs(vy)) {
+            facing = (vx < 0) ? Direction.LEFT : Direction.RIGHT;
+        } else {
+            facing = (vy < 0) ? Direction.UP : Direction.DOWN;
+        }
+    }
+
+    // Map 8-way Entity.Direction to 4 cardinal rows
+    private static TextureManager.Direction toCardinal(Direction f) {
+        return switch (f) {
+            case UP, UP_LEFT, UP_RIGHT -> TextureManager.Direction.UP;
+            case DOWN, DOWN_LEFT, DOWN_RIGHT -> TextureManager.Direction.DOWN;
+            case LEFT -> TextureManager.Direction.LEFT;
+            default -> TextureManager.Direction.RIGHT;
+        };
+    }
 }

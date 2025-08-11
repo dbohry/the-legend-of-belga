@@ -6,6 +6,7 @@ import com.lhamacorp.games.tlob.managers.KeyManager;
 import com.lhamacorp.games.tlob.managers.TextureManager;
 import com.lhamacorp.games.tlob.maps.TileMap;
 import com.lhamacorp.games.tlob.weapons.Weapon;
+import com.lhamacorp.games.tlob.world.PlayerInputView;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -113,17 +114,50 @@ public class Player extends Entity {
 
     @Override
     public void update(Object... args) {
-        KeyManager keys = (KeyManager) args[0];
+        // Accept either a pure PlayerInputView or the existing KeyManager
+        final PlayerInputView input;
+        Object k0 = args[0];
+        if (k0 instanceof PlayerInputView piv) {
+            input = piv;
+        } else {
+            KeyManager km = (KeyManager) k0;
+            input = new PlayerInputView() {
+                public boolean left() {
+                    return km.left;
+                }
+
+                public boolean right() {
+                    return km.right;
+                }
+
+                public boolean up() {
+                    return km.up;
+                }
+
+                public boolean down() {
+                    return km.down;
+                }
+
+                public boolean sprint() {
+                    return km.shift;
+                }
+
+                public boolean attack() {
+                    return km.attack;
+                }
+            };
+        }
+
         TileMap map = (TileMap) args[1];
         @SuppressWarnings("unchecked")
         List<Enemy> enemies = (List<Enemy>) args[2];
 
         // Input + 8-way facing
         int dxRaw = 0, dyRaw = 0;
-        if (keys.left) dxRaw -= 1;
-        if (keys.right) dxRaw += 1;
-        if (keys.up) dyRaw -= 1;
-        if (keys.down) dyRaw += 1;
+        if (input.left()) dxRaw -= 1;
+        if (input.right()) dxRaw += 1;
+        if (input.up()) dyRaw -= 1;
+        if (input.down()) dyRaw += 1;
 
         if (dxRaw != 0 || dyRaw != 0) {
             if (dyRaw < 0) {
@@ -150,7 +184,7 @@ public class Player extends Entity {
         // Are we moving under player control this tick (not just knockback)?
         movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
 
-        boolean sprinting = keys.shift && stamina >= 1.0;
+        boolean sprinting = input.sprint() && stamina >= 1.0;
         double speedBase = effectiveBaseSpeed();
         if (sprinting) {
             speed = speedBase * 2.0;
@@ -191,7 +225,7 @@ public class Player extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        if (keys.attack && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
+        if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
             attackTimer = weapon.getDuration();
             attackCooldown = weapon.getCooldown();
@@ -251,7 +285,6 @@ public class Player extends Entity {
         return false;
     }
 
-    // Rotated blade shape honoring reach & width for all 8 directions
     private Shape getSwordSwingShape() {
         int cx = (int) Math.round(x);
         int cy = (int) Math.round(y);
@@ -265,51 +298,51 @@ public class Player extends Entity {
 
         double theta, ax, ay;
         switch (facing) {
-            case UP:
+            case UP -> {
                 theta = -Math.PI / 2;
                 ax = cx;
                 ay = top;
-                break;
-            case DOWN:
+            }
+            case DOWN -> {
                 theta = Math.PI / 2;
                 ax = cx;
                 ay = bottom;
-                break;
-            case LEFT:
+            }
+            case LEFT -> {
                 theta = Math.PI;
                 ax = left;
                 ay = cy;
-                break;
-            case RIGHT:
+            }
+            case RIGHT -> {
                 theta = 0.0;
                 ax = right;
                 ay = cy;
-                break;
-            case UP_RIGHT:
+            }
+            case UP_RIGHT -> {
                 theta = -Math.PI / 4;
                 ax = right;
                 ay = top;
-                break;
-            case UP_LEFT:
+            }
+            case UP_LEFT -> {
                 theta = -3 * Math.PI / 4;
                 ax = left;
                 ay = top;
-                break;
-            case DOWN_RIGHT:
+            }
+            case DOWN_RIGHT -> {
                 theta = Math.PI / 4;
                 ax = right;
                 ay = bottom;
-                break;
-            case DOWN_LEFT:
+            }
+            case DOWN_LEFT -> {
                 theta = 3 * Math.PI / 4;
                 ax = left;
                 ay = bottom;
-                break;
-            default:
+            }
+            default -> {
                 theta = 0.0;
                 ax = right;
                 ay = cy;
-                break;
+            }
         }
 
         double cxBlade = ax + Math.cos(theta) * (r / 2.0);
@@ -325,7 +358,6 @@ public class Player extends Entity {
 
     @Override
     public void draw(Graphics2D g2, int camX, int camY) {
-        // Map our 8-way facing to the 4 directional rows of the sprite sheet
         TextureManager.Direction dir = toCardinal(facing);
         TextureManager.Motion motion = movingThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
 
@@ -351,35 +383,40 @@ public class Player extends Entity {
             g2.draw(swing);
         }
 
-        // Facing indicator (includes diagonals) — unchanged
+        // Facing indicator
         g2.setColor(new Color(10, 40, 15));
         int px = (int) Math.round(x) - camX;
         int py = (int) Math.round(y) - camY;
         switch (facing) {
-            case UP:
-                g2.fillRect(px - 2, py - height / 2 - 4, 4, 4);
-                break;
-            case DOWN:
-                g2.fillRect(px - 2, py + height / 2, 4, 4);
-                break;
-            case LEFT:
-                g2.fillRect(px - width / 2 - 4, py - 2, 4, 4);
-                break;
-            case RIGHT:
-                g2.fillRect(px + width / 2, py - 2, 4, 4);
-                break;
-            case UP_RIGHT:
-                g2.fillRect(px + width / 2, py - height / 2 - 4, 4, 4);
-                break;
-            case DOWN_RIGHT:
-                g2.fillRect(px + width / 2, py + height / 2, 4, 4);
-                break;
-            case UP_LEFT:
-                g2.fillRect(px - width / 2 - 4, py - height / 2 - 4, 4, 4);
-                break;
-            case DOWN_LEFT:
-                g2.fillRect(px - width / 2 - 4, py + height / 2, 4, 4);
-                break;
+            case UP -> g2.fillRect(px - 2, py - height / 2 - 4, 4, 4);
+            case DOWN -> g2.fillRect(px - 2, py + height / 2, 4, 4);
+            case LEFT -> g2.fillRect(px - width / 2 - 4, py - 2, 4, 4);
+            case RIGHT -> g2.fillRect(px + width / 2, py - 2, 4, 4);
+            case UP_RIGHT -> g2.fillRect(px + width / 2, py - height / 2 - 4, 4, 4);
+            case DOWN_RIGHT -> g2.fillRect(px + width / 2, py + height / 2, 4, 4);
+            case UP_LEFT -> g2.fillRect(px - width / 2 - 4, py - height / 2 - 4, 4, 4);
+            case DOWN_LEFT -> g2.fillRect(px - width / 2 - 4, py + height / 2, 4, 4);
+        }
+    }
+
+    @Override
+    public void damage(double amount) {
+        super.damage(amount);
+        if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
+        else AudioManager.playSound("hero-death.wav");
+    }
+
+    @Override
+    protected void applyKnockbackMovement() {
+        double newX = x + knockbackX;
+        double newY = y + knockbackY;
+        if (!collidesWithMap(newX, newY, null)) {
+            x = newX;
+            y = newY;
+        } else {
+            knockbackTimer = 0;
+            knockbackX = 0;
+            knockbackY = 0;
         }
     }
 
@@ -405,43 +442,12 @@ public class Player extends Entity {
         return damaged;
     }
 
-    @Override
-    public void damage(double amount) {
-        super.damage(amount);
-        if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
-        else AudioManager.playSound("hero-death.wav");
-    }
-
-    @Override
-    protected void applyKnockbackMovement() {
-        double newX = x + knockbackX;
-        double newY = y + knockbackY;
-        if (!collidesWithMap(newX, newY, null)) {
-            x = newX;
-            y = newY;
-        } else {
-            knockbackTimer = 0;
-            knockbackX = 0;
-            knockbackY = 0;
-        }
-    }
-
-    // Map 8-way facing to the 4 sprite-sheet rows (DOWN, LEFT, RIGHT, UP)
     private static TextureManager.Direction toCardinal(Direction f) {
-        switch (f) {
-            case UP:
-            case UP_LEFT:
-            case UP_RIGHT:
-                return TextureManager.Direction.UP;
-            case DOWN:
-            case DOWN_LEFT:
-            case DOWN_RIGHT:
-                return TextureManager.Direction.DOWN;
-            case LEFT:
-                return TextureManager.Direction.LEFT;
-            case RIGHT:
-            default:
-                return TextureManager.Direction.RIGHT;
-        }
+        return switch (f) {
+            case UP, UP_LEFT, UP_RIGHT -> TextureManager.Direction.UP;
+            case DOWN, DOWN_LEFT, DOWN_RIGHT -> TextureManager.Direction.DOWN;
+            case LEFT -> TextureManager.Direction.LEFT;
+            default -> TextureManager.Direction.RIGHT;
+        };
     }
 }

@@ -14,15 +14,8 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Orchestrates high-level game flow; delegates UI and logic to extracted classes.
- * Toggle start screen:
- * - Code: new GameManager(false)
- * - JVM flag: -Dtlob.skipStart=true
- */
 public class GameManager extends JPanel implements Runnable {
 
-    // ===== Dimensions & Constants =====
     public static final int TILE_SIZE = 32;
     public static final int SCREEN_WIDTH = 1280;
     public static final int SCREEN_HEIGHT = 720;
@@ -31,16 +24,18 @@ public class GameManager extends JPanel implements Runnable {
     private static final float VOLUME_DB_MIN = -40.0f;
     private static final float VOLUME_DB_MAX = 0.0f;
 
-    // ===== State Machine =====
     private enum GameState {START, PLAYING, PAUSED, VICTORY, GAME_OVER}
 
     private GameState state;
 
-    // ===== Loop =====
     private Thread gameThread;
     private volatile boolean running = false;
 
-    // ===== Core Systems =====
+    // 30 Hz animation clock (increment every 2 logic updates @60hz)
+    private int logicTicks = 0;
+    private int animTick30 = 0;
+
+    // Core systems
     private final KeyManager keyManager;
     private final Camera camera = new Camera();
     private final PerkManager perkManager = new PerkManager();
@@ -59,20 +54,19 @@ public class GameManager extends JPanel implements Runnable {
     private final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
 
     private final LevelManager levelManager =
-        new LevelManager(/* width */80, /* height */60, /* density */0.45, /* carveSteps */2500);
+        new LevelManager(80, 60, 0.45, 2500);
 
-    // ===== World =====
+    // World
     private final Player player;
     private final List<Enemy> enemies = new ArrayList<>();
 
-    // ===== Audio =====
+    // Audio
     private boolean musicMuted = false;
     private float musicVolumeDb = -12.0f;
 
-    // ===== Start Screen Toggle =====
+    // Start screen toggle
     private final boolean startScreenEnabled;
 
-    // ===== Constructors =====
     public GameManager() {
         this(!Boolean.getBoolean("tlob.skipStart"));
     }
@@ -86,13 +80,12 @@ public class GameManager extends JPanel implements Runnable {
 
         keyManager = new KeyManager();
         addKeyListener(keyManager);
-        addMouseListener(keyManager);   // gameplay mouse remains handled by your existing KeyManager
+        addMouseListener(keyManager);
         setFocusable(true);
 
-        // UI listeners (state-routed)
         addMouseMotionListener(new UIMouseMotionHandler());
         addMouseListener(new UIMouseClickHandler());
-        addKeyListener(new GlobalKeyHandler());       // ESC, etc.
+        addKeyListener(new GlobalKeyHandler());
         if (startScreenEnabled) {
             addKeyListener(new StartScreenKeyHandler());
             state = GameState.START;
@@ -100,7 +93,7 @@ public class GameManager extends JPanel implements Runnable {
             state = GameState.PLAYING;
         }
 
-        // World init (via LevelManager)
+        // World init
         TileMap map = levelManager.map();
         int[] spawn = map.findSpawnTile();
         Weapon sword = new Sword(2, 28, 10, 10, 16);
@@ -117,17 +110,13 @@ public class GameManager extends JPanel implements Runnable {
 
         enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
 
-        // Initial layouts for static UIs
+        // Layout static UI
         pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Music
         AudioManager.playRandomMusic(musicVolumeDb);
     }
 
-    // =========================
-    // Game Loop
-    // =========================
     public void startGameThread() {
         if (running) return;
         running = true;
@@ -149,7 +138,7 @@ public class GameManager extends JPanel implements Runnable {
             last = now;
 
             while (delta >= 1) {
-                update();
+                update();      // 60hz simulation step
                 delta -= 1;
             }
 
@@ -167,11 +156,8 @@ public class GameManager extends JPanel implements Runnable {
         }
     }
 
-    // =========================
-    // Update
-    // =========================
     private void update() {
-        // Global mute toggle (driven by KeyManager)
+        // Mute toggle
         if (keyManager.mute != musicMuted) {
             musicMuted = keyManager.mute;
             if (musicMuted) AudioManager.stopMusic();
@@ -179,26 +165,20 @@ public class GameManager extends JPanel implements Runnable {
         }
 
         switch (state) {
-            case START:
-            case GAME_OVER:
-            case VICTORY:
-            case PAUSED:
-                // Overlays; no world simulation
+            case START, GAME_OVER, VICTORY, PAUSED -> {
+                // overlays; no world sim
                 return;
-
-            case PLAYING:
-                // Game over?
+            }
+            case PLAYING -> {
                 if (!player.isAlive()) {
                     enterGameOver();
                     return;
                 }
-                // Victory?
                 if (enemies.isEmpty()) {
                     enterVictory();
                     return;
                 }
 
-                // Normal simulation
                 player.update(keyManager, levelManager.map(), enemies);
                 for (int i = enemies.size() - 1; i >= 0; i--) {
                     Enemy e = enemies.get(i);
@@ -210,26 +190,24 @@ public class GameManager extends JPanel implements Runnable {
                 int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
                 int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
                 camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
-                return;
+
+                // Advance 30hz tile/ambient tick (every 2 logic ticks)
+                logicTicks++;
+                if ((logicTicks & 1) == 0) animTick30++;
+            }
         }
     }
 
-    // =========================
-    // Render
-    // =========================
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
 
-        // Clear
         g2.setColor(BG_DARK);
         g2.fillRect(0, 0, getWidth(), getHeight());
 
         switch (state) {
-            case START -> {
-                startScreenRenderer.draw(g2);
-            }
+            case START -> startScreenRenderer.draw(g2);
             case PLAYING -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, enemies.size(), 8, 8);
@@ -250,20 +228,17 @@ public class GameManager extends JPanel implements Runnable {
                 victoryRenderer.draw(g2);
             }
         }
-
         g2.dispose();
     }
 
     private void drawWorld(Graphics2D g2) {
         TileMap map = levelManager.map();
-        map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight());
+        // UPDATED: call the animated overload (see TileMap patch below)
+        map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
         player.draw(g2, camera.offsetX(), camera.offsetY());
     }
 
-    // =========================
-    // State transitions
-    // =========================
     private void enterGameOver() {
         state = GameState.GAME_OVER;
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -271,7 +246,7 @@ public class GameManager extends JPanel implements Runnable {
 
     private void enterVictory() {
         state = GameState.VICTORY;
-        perkManager.rollChoices();
+        perkManager.rollChoicesFor(player);              // eligibility-aware roll
         victoryRenderer.setChoices(perkManager.getChoices());
         victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
         AudioManager.playSound("map-complete.wav");
@@ -289,27 +264,19 @@ public class GameManager extends JPanel implements Runnable {
 
     private void restartGame() {
         state = GameState.PLAYING;
-
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
-
-        // Reset camera immediately
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
-
         requestFocusInWindow();
     }
 
     private void startNextLevel() {
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
-
-        // Back to gameplay
         state = GameState.PLAYING;
-
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
-
         requestFocusInWindow();
     }
 
@@ -319,9 +286,6 @@ public class GameManager extends JPanel implements Runnable {
         startNextLevel();
     }
 
-    // =========================
-    // Input routing
-    // =========================
     private class GlobalKeyHandler extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
@@ -365,14 +329,10 @@ public class GameManager extends JPanel implements Runnable {
         @Override
         public void mouseClicked(MouseEvent e) {
             switch (state) {
-                case START -> requestFocusInWindow(); // typing only
-
+                case START -> requestFocusInWindow();
                 case GAME_OVER -> {
-                    if (gameOverRenderer.hitTryAgain(e.getPoint())) {
-                        restartGame();
-                    }
+                    if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame();
                 }
-
                 case PAUSED -> {
                     float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
                     if (!Float.isNaN(maybeDb)) {
@@ -380,23 +340,15 @@ public class GameManager extends JPanel implements Runnable {
                         if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
                         return;
                     }
-                    if (pauseMenuRenderer.hitResume(e.getPoint())) {
-                        resumeGame();
-                    } else if (pauseMenuRenderer.hitRestart(e.getPoint())) {
-                        restartGame();
-                    } else if (pauseMenuRenderer.hitExit(e.getPoint())) {
-                        System.exit(0);
-                    }
+                    if (pauseMenuRenderer.hitResume(e.getPoint())) resumeGame();
+                    else if (pauseMenuRenderer.hitRestart(e.getPoint())) restartGame();
+                    else if (pauseMenuRenderer.hitExit(e.getPoint())) System.exit(0);
                 }
-
                 case VICTORY -> {
                     int idx = victoryRenderer.handleClick(e.getPoint());
                     if (idx >= 0) applyPerkAndContinue(idx);
                 }
-
-                case PLAYING -> {
-                    // gameplay clicks still handled by KeyManager (added as listener above)
-                }
+                case PLAYING -> { /* gameplay clicks handled by KeyManager */ }
             }
         }
     }

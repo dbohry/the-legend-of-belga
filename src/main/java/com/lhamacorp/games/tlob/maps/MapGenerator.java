@@ -7,16 +7,24 @@ public class MapGenerator {
     private final int height;
     private final double wallBias;
     private final int steps;
+    private final Random rng;
 
+    /** Backward-compatible ctor: pass density as wallBias (e.g., 0.45). */
     public MapGenerator(int width, int height, double wallBias, int steps) {
+        this(width, height, wallBias, steps, null);
+    }
+
+    public MapGenerator(int width, int height, double wallBias, int steps, Random rng) {
         this.width = width;
         this.height = height;
         this.wallBias = wallBias;
         this.steps = steps;
+        this.rng = (rng != null) ? rng : new Random();
     }
 
     public int[][] generate() {
         int[][] tiles = new int[width][height];
+
         // Start filled with walls
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
@@ -24,13 +32,12 @@ public class MapGenerator {
             }
         }
 
-        // Carve using drunkard walk from center
+        // Drunkard walk from center
         int cx = width / 2;
         int cy = height / 2;
-        Random rnd = new Random();
 
         int carved = 0;
-        int targetFloor = (int) (width * height * 0.45);
+        int targetFloor = (int) (width * height * wallBias); // keep original 0.45 behavior
         int maxSteps = Math.max(steps, width * height * 4);
 
         for (int i = 0; i < maxSteps && carved < targetFloor; i++) {
@@ -38,20 +45,11 @@ public class MapGenerator {
                 tiles[cx][cy] = TileMap.FLOOR;
                 carved++;
             }
-            int dir = rnd.nextInt(4);
-            switch (dir) {
-                case 0:
-                    cx += 1;
-                    break;
-                case 1:
-                    cx -= 1;
-                    break;
-                case 2:
-                    cy += 1;
-                    break;
-                case 3:
-                    cy -= 1;
-                    break;
+            switch (rng.nextInt(4)) {
+                case 0 -> cx += 1;
+                case 1 -> cx -= 1;
+                case 2 -> cy += 1;
+                case 3 -> cy -= 1;
             }
             cx = clamp(cx, 1, width - 2);
             cy = clamp(cy, 1, height - 2);
@@ -67,10 +65,8 @@ public class MapGenerator {
             tiles[width - 1][y] = TileMap.WALL;
         }
 
-        // Add some smoothing by filling isolated wall corners
-        tiles = smooth(tiles, 2);
-
-        return tiles;
+        // Smooth map a bit
+        return smooth(tiles, 2);
     }
 
     private int[][] smooth(int[][] tiles, int iterations) {
@@ -80,8 +76,7 @@ public class MapGenerator {
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
                     int walls = countNeighbors(result, x, y, 1);
-                    if (walls >= 5) next[x][y] = TileMap.WALL;
-                    else next[x][y] = TileMap.FLOOR;
+                    next[x][y] = (walls >= 5) ? TileMap.WALL : TileMap.FLOOR;
                 }
             }
             result = next;
@@ -97,7 +92,7 @@ public class MapGenerator {
                 int nx = x + dx;
                 int ny = y + dy;
                 if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
-                    count++; // treat out of bounds as wall
+                    count++; // out of bounds = wall
                 } else if (tiles[nx][ny] == TileMap.WALL) {
                     count++;
                 }
