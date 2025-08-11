@@ -15,16 +15,17 @@ public class Enemy extends Entity {
     private static final double ENEMY_MAX_HP = 1.0;
     private static final double ENEMY_MAX_STAMINA = 1.0;
     private static final double ENEMY_MAX_MANA = 0;
+    private static final double ENEMY_SPEED_PPS = 105.0;
 
     private static final int ATTACK_RANGE = 30;
 
     // --- 30 Hz timing ---
-    private static final int TICKS_PER_SECOND = 30;
+    private static final int TICKS_PER_SECOND = 60;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
-    private static final int ATTACK_COOLDOWN_TICKS = 60; // 2.0s @30Hz
-    private static final int ATTACK_DURATION_TICKS = 3;  // 0.1s @30Hz
-    private static final int HURT_FLASH_TICKS = 6;   // ~0.2s
+    private static final int ATTACK_COOLDOWN_TICKS = (int) Math.round(2.0 * TICKS_PER_SECOND); // 2.0s
+    private static final int ATTACK_DURATION_TICKS = (int) Math.round(0.10 * TICKS_PER_SECOND); // 0.1s
+    private static final int HURT_FLASH_TICKS = (int) Math.round(0.20 * TICKS_PER_SECOND); // 0.2s
 
     // Timers/state
     private int hurtTimer = 0;
@@ -41,9 +42,13 @@ public class Enemy extends Entity {
     private double wanderDx = 0, wanderDy = 0;
 
     public Enemy(double x, double y, Weapon weapon) {
-        super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED,
-            ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0,
-            weapon, "Zombie");
+        super(
+            x, y,
+            ENEMY_SIZE, ENEMY_SIZE,
+            ENEMY_SPEED_PPS / TICKS_PER_SECOND,
+            ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA,
+            0, weapon, "Zombie"
+        );
 
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;

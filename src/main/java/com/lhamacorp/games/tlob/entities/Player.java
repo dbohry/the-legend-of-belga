@@ -23,8 +23,9 @@ public class Player extends Entity {
     private static final double PLAYER_MAX_STAMINA = 6.0;
     private static final double PLAYER_MAX_MANA = 0;
     private static final double PLAYER_MAX_SHIELD = 0;
+    private static final double PLAYER_SPEED_PPS = 90.0;
 
-    private static final int TICKS_PER_SECOND = 30;
+    private static final int TICKS_PER_SECOND = 60;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
     private static final int STAMINA_DRAIN_INTERVAL = TICKS_PER_SECOND;
@@ -78,7 +79,7 @@ public class Player extends Entity {
     }
 
     private double effectiveBaseSpeed() {
-        return PLAYER_SPEED * speedMultiplier;
+        return (PLAYER_SPEED_PPS / TICKS_PER_SECOND) * speedMultiplier;
     }
 
     private double effectiveAttackDamage() {
@@ -283,8 +284,8 @@ public class Player extends Entity {
 
         if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
-            attackTimer = weapon.getDuration();
-            attackCooldown = weapon.getCooldown();
+            attackTimer    = scaleFrom60(weapon.getDuration());
+            attackCooldown = scaleFrom60(weapon.getCooldown());
 
             Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
@@ -305,6 +306,10 @@ public class Player extends Entity {
 
         // --- Advance local animation clock (30 Hz sim) ---
         animTimeMs += TICK_MS;
+    }
+
+    private static int scaleFrom60(int ticksAt60) {
+        return (int) Math.round(ticksAt60 * (TICKS_PER_SECOND / 60.0));
     }
 
     private void moveWithCollision(double dx, double dy, TileMap map, List<Enemy> enemies) {

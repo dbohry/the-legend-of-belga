@@ -163,7 +163,7 @@ public class GameManager extends JPanel implements Runnable {
 
     @Override
     public void run() {
-        final double simHz = 30.0;
+        final double simHz = 60.0;
         final double simStepNs = 1_000_000_000.0 / simHz;
 
         long last = System.nanoTime();
@@ -227,8 +227,8 @@ public class GameManager extends JPanel implements Runnable {
                 camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
                 // ticks
-                animTick30++;
                 simTick++;
+                if ( (simTick & 1) == 0 ) animTick30++;
                 logChecksumIfDue();
             }
         }
