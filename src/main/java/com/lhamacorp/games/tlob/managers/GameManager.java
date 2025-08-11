@@ -15,6 +15,10 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -46,6 +50,19 @@ public class GameManager extends JPanel implements Runnable {
     private int mouseScreenY = SCREEN_HEIGHT / 2;
     private boolean mouseInside = false;
 
+    // Game modes
+    public enum GameMode {SINGLEPLAYER, MULTIPLAYER}
+
+    private GameMode gameMode = GameMode.SINGLEPLAYER;
+    private String serverHost = "localhost";
+    private int serverPort = 7777;
+
+    // Net UI / tickrate
+    private int serverTickrate = 60;
+    private boolean showNetBanner = false;
+    private int netBannerTicks = 0;      // counts down each tick (~60/s)
+    private String netBannerText = "";
+
     // Core systems
     private final KeyManager keyManager;
     private final Camera camera = new Camera();
@@ -63,18 +80,18 @@ public class GameManager extends JPanel implements Runnable {
     private final VictoryScreenRenderer victoryRenderer = new VictoryScreenRenderer();
     private final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
 
-    // Deterministic world RNG
-    private final long worldSeed;
-    private final Random rootRng;
-    private final Random mapsRoot;
-    private final Random spawnsRoot;
+    // Deterministic world RNG (now LAZY / not-final so we can use server seed)
+    private long worldSeed = 0L;
+    private Random rootRng;
+    private Random mapsRoot;
+    private Random spawnsRoot;
 
-    // Systems that need RNG
-    private final LevelManager levelManager;
-    private final SpawnManager enemySpawner;
+    // Systems that need RNG (lazy)
+    private LevelManager levelManager;
+    private SpawnManager enemySpawner;
 
     // World
-    private final Player player;
+    private Player player;
     private final List<Enemy> enemies = new ArrayList<>();
     private int enemiesAtLevelStart = 0;
 
@@ -107,19 +124,27 @@ public class GameManager extends JPanel implements Runnable {
 
         addMouseListener(new UIMouseClickHandler());
         addKeyListener(new GlobalKeyHandler());
+
         if (startScreenEnabled) {
             addKeyListener(new StartScreenKeyHandler());
             state = GameState.START;
         } else {
+            // No start screen -> single-player with local seed immediately
             state = GameState.PLAYING;
+            initWorld(readSeed());
         }
+    }
 
-        // Seed & RNG
-        this.worldSeed = readSeed();
+    // Build the whole world from a given seed.
+    private void initWorld(long seed) {
+        this.worldSeed = seed;
         this.rootRng = new Random(worldSeed);
         this.mapsRoot = new Random(rootRng.nextLong());
         this.spawnsRoot = new Random(rootRng.nextLong());
-        System.out.println("World seed = " + worldSeed);
+        System.out.println("World seed = " + worldSeed + (gameMode == GameMode.MULTIPLAYER ? " (from server)" : ""));
+
+        // Clear old lists if re-init (in case of switching)
+        enemies.clear();
 
         // RNG-aware systems
         levelManager = new LevelManager(80, 60, 0.45, 2500, mapsRoot);
@@ -135,20 +160,27 @@ public class GameManager extends JPanel implements Runnable {
             sword
         );
 
-        if (!startScreenEnabled) {
-            try {
-                if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
-            } catch (Exception ignored) {
-            }
+        try {
+            if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
+        } catch (Exception ignored) {
         }
 
         enemySpawner.spawn(map, player, enemies, levelManager.completed(), TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
 
+        // Layout static UI
         pauseMenuRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT, 150, 40);
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        AudioManager.playRandomMusic(musicVolumeDb);
+        // Camera to player
+        int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+        int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+        camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        // Music
+        if (!musicMuted) AudioManager.playRandomMusic(musicVolumeDb);
+
+        repaint();
     }
 
     private static long readSeed() {
@@ -175,7 +207,7 @@ public class GameManager extends JPanel implements Runnable {
 
     @Override
     public void run() {
-        final double simHz = 60.0;
+        final double simHz = 60.0; // (server can advertise tickrate, but we keep 60 for now)
         final double simStepNs = 1_000_000_000.0 / simHz;
 
         long last = System.nanoTime();
@@ -209,6 +241,9 @@ public class GameManager extends JPanel implements Runnable {
                 return;
             }
             case PLAYING -> {
+                // Guard: must be initialized
+                if (player == null || levelManager == null) return;
+
                 // Input snapshot
                 input.up = keyManager.up;
                 input.down = keyManager.down;
@@ -233,7 +268,7 @@ public class GameManager extends JPanel implements Runnable {
                         mouseScreenY + camera.offsetY());
                 }
 
-                // Simulation (30 Hz)
+                // Simulation (player/enemies)
                 player.update(input, levelManager.map(), enemies, aimWorld);
                 for (int i = enemies.size() - 1; i >= 0; i--) {
                     Enemy e = enemies.get(i);
@@ -248,7 +283,16 @@ public class GameManager extends JPanel implements Runnable {
 
                 // ticks
                 simTick++;
-                if ((simTick & 1) == 0) animTick30++;
+                if ((simTick & 1) == 0) animTick30++; // keep 30Hz ambience at 60Hz sim
+
+                // net banner countdown
+                if (showNetBanner) {
+                    if (--netBannerTicks <= 0) {
+                        showNetBanner = false;
+                        netBannerTicks = 0;
+                    }
+                }
+
                 logChecksumIfDue();
             }
         }
@@ -268,12 +312,14 @@ public class GameManager extends JPanel implements Runnable {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, 8, 8);
                 drawLevelCounters(g2);
+                drawNetBanner(g2);
                 drawSeedOverlay(g2);
             }
             case PAUSED -> {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, 8, 8);
                 drawLevelCounters(g2);
+                drawNetBanner(g2);
                 drawSeedOverlay(g2);
                 pauseMenuRenderer.draw(g2, musicVolumeDb);
             }
@@ -287,6 +333,7 @@ public class GameManager extends JPanel implements Runnable {
                 drawWorld(g2);
                 hudRenderer.draw(g2, player, 8, 8);
                 drawLevelCounters(g2);
+                drawNetBanner(g2);
                 drawSeedOverlay(g2);
                 victoryRenderer.draw(g2);
             }
@@ -294,58 +341,97 @@ public class GameManager extends JPanel implements Runnable {
         g2.dispose();
     }
 
-    /** Small top-right overlay: maps completed and enemy left/total. */
+    /** Small top-right overlay: maps completed and enemy left/total (+ net tickrate in MP). */
     private void drawLevelCounters(Graphics2D g2) {
-        final int pad = 10;
+        if (levelManager == null) return;
 
+        final int pad = 10;
         int completed = levelManager.completed();
         int left = enemies.size();
-        int total = Math.max(enemiesAtLevelStart, left); // guard if called before spawn
+        int total = Math.max(enemiesAtLevelStart, left);
 
         String line1 = "Maps: " + completed;
-        String line2 = "Enemies: " + left + "/" + total; // e.g., 10/100
+        String line2 = "Enemies: " + left + "/" + total;
+        String line3 = (gameMode == GameMode.MULTIPLAYER) ? ("Net: " + serverTickrate + " Hz") : null;
 
         Font oldF = g2.getFont();
         Color oldCol = g2.getColor();
         Composite oldCmp = g2.getComposite();
 
-        // Subtle text
         Font f = new Font("Arial", Font.PLAIN, 12);
         g2.setFont(f);
         FontMetrics fm = g2.getFontMetrics();
 
-        int w = Math.max(fm.stringWidth(line1), fm.stringWidth(line2)) + 12;
-        int h = fm.getHeight() * 2 + 8;
+        int w = Math.max(fm.stringWidth(line1), Math.max(fm.stringWidth(line2), line3 == null ? 0 : fm.stringWidth(line3))) + 12;
+        int lines = (line3 != null) ? 3 : 2;
+        int h = fm.getHeight() * lines + 8;
 
         int x = getWidth() - w - pad;
         int y = pad;
 
-        // Soft panel
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
         g2.setColor(new Color(0, 0, 0));
         g2.fillRoundRect(x, y, w, h, 10, 10);
 
-        // Text
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
         g2.setColor(new Color(235, 240, 245));
         int ty = y + fm.getAscent() + 4;
         g2.drawString(line1, x + 6, ty);
         ty += fm.getHeight();
         g2.drawString(line2, x + 6, ty);
+        if (line3 != null) {
+            ty += fm.getHeight();
+            g2.drawString(line3, x + 6, ty);
+        }
 
         g2.setFont(oldF);
         g2.setColor(oldCol);
         g2.setComposite(oldCmp);
     }
 
+    /** Center-top transient banner after successful MP connect. */
+    private void drawNetBanner(Graphics2D g2) {
+        if (!showNetBanner || netBannerText == null || netBannerText.isBlank()) return;
+
+        int fadeTicks = Math.min(netBannerTicks, 60); // fade last ~1s
+        float alpha = Math.max(0f, Math.min(1f, fadeTicks / 60f));
+
+        Font oldF = g2.getFont();
+        Color oldC = g2.getColor();
+        Composite oldCmp = g2.getComposite();
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        FontMetrics fm = g2.getFontMetrics();
+        int w = fm.stringWidth(netBannerText) + 16;
+        int h = fm.getHeight() + 10;
+
+        int x = (getWidth() - w) / 2;
+        int y = 12;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f * alpha));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.9f * alpha));
+        g2.setColor(new Color(235, 240, 245));
+        g2.drawString(netBannerText, x + 8, y + 6 + fm.getAscent());
+
+        g2.setFont(oldF);
+        g2.setColor(oldC);
+        g2.setComposite(oldCmp);
+    }
+
     private void drawWorld(Graphics2D g2) {
+        if (levelManager == null || player == null) return;
         TileMap map = levelManager.map();
         map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
         player.draw(g2, camera.offsetX(), camera.offsetY());
     }
 
+    /** tiny, low-contrast seed tag bottom-right */
     private void drawSeedOverlay(Graphics2D g2) {
+        if (worldSeed == 0L) return;
         String text = "seed: " + worldSeed;
         Font oldF = g2.getFont();
         Composite oldC = g2.getComposite();
@@ -381,6 +467,8 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private long computeChecksum() {
+        if (player == null || levelManager == null) return 0L;
+
         long h = 0xcbf29ce484222325L;
 
         h = mix(h, Double.doubleToLongBits(player.getX()));
@@ -436,9 +524,11 @@ public class GameManager extends JPanel implements Runnable {
 
     private void restartGame() {
         state = GameState.PLAYING;
+
         enemySpawner.reseed(new Random(spawnsRoot.nextLong()));
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
+
         animTick30 = 0;
         simTick = 0;
 
@@ -453,6 +543,7 @@ public class GameManager extends JPanel implements Runnable {
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
         enemiesAtLevelStart = enemies.size();
+
         animTick30 = 0;
         simTick = 0;
 
@@ -468,6 +559,126 @@ public class GameManager extends JPanel implements Runnable {
         startNextLevel();
     }
 
+    // --- Start screen → begin game (reads mode/name/server) ---
+    private void beginFromStartScreen() {
+        StartScreenRenderer.Result res = startScreenRenderer.getResult();
+        String hero = (res.heroName == null || res.heroName.isBlank()) ? "Hero" : res.heroName;
+        try {
+            if (player != null) player.setName(hero);
+        } catch (Exception ignored) {
+        }
+
+        if (res.mode == StartScreenRenderer.Mode.MULTIPLAYER) {
+            gameMode = GameMode.MULTIPLAYER;
+            serverHost = res.host;
+            serverPort = res.port;
+
+            // connect in background; keep UI responsive
+            new Thread(() -> {
+                try {
+                    SeedHandshake sh = fetchSeedFromServer(serverHost, serverPort, hero);
+                    final long s = sh.seed;
+                    final int stk = sh.tickrate;
+                    SwingUtilities.invokeLater(() -> {
+                        serverTickrate = (stk > 0 ? stk : 60);
+                        netBannerText = "Connected: " + serverHost + ":" + serverPort + " • " + serverTickrate + " Hz";
+                        showNetBanner = true;
+                        netBannerTicks = 180; // ~3s at 60Hz
+
+                        initWorld(s);       // build world from server seed
+                        state = GameState.PLAYING;
+                        requestFocusInWindow();
+                    });
+                } catch (IOException ex) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this,
+                            "Failed to connect to server " + serverHost + ":" + serverPort +
+                                "\n" + ex.getMessage(),
+                            "Connection error", JOptionPane.ERROR_MESSAGE);
+                        // Stay on start screen
+                        requestFocusInWindow();
+                        repaint();
+                    });
+                }
+            }, "SeedHandshake").start();
+
+        } else {
+            gameMode = GameMode.SINGLEPLAYER;
+            showNetBanner = false;
+            netBannerTicks = 0;
+            netBannerText = "";
+            initWorld(readSeed());
+            state = GameState.PLAYING;
+            requestFocusInWindow();
+        }
+    }
+
+    // --- Simple seed handshake client (blocking, called off-EDT) ---
+    private static class SeedHandshake {
+        final long seed;
+        final int tickrate;
+
+        SeedHandshake(long s, int t) {
+            this.seed = s;
+            this.tickrate = t;
+        }
+    }
+
+    private SeedHandshake fetchSeedFromServer(String host, int port, String playerName) throws IOException {
+        try (Socket sock = new Socket()) {
+            sock.connect(new InetSocketAddress(host, port), 4000);
+            sock.setSoTimeout(5000);
+
+            try (var out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream(), StandardCharsets.UTF_8));
+                 var in = new BufferedReader(new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8))) {
+
+                long seed = 0L;
+                int tick = 60;
+
+                String line;
+                while ((line = in.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty()) continue;
+
+                    if (line.startsWith("HELLO")) {
+                        // Introduce ourselves
+                        sendLine(out, "LOGIN name=" + safe(playerName));
+                    } else if (line.startsWith("SEED")) {
+                        // SEED <long>
+                        String[] parts = line.split("\\s+");
+                        if (parts.length >= 2) seed = parseLong(parts[1], 0L);
+                    } else if (line.startsWith("TICKRATE")) {
+                        String[] parts = line.split("\\s+");
+                        if (parts.length >= 2) tick = (int) parseLong(parts[1], 60L);
+                    } else if (line.equals("READY")) {
+                        if (seed == 0L) throw new IOException("Server didn't provide a seed.");
+                        return new SeedHandshake(seed, tick);
+                    }
+                }
+                throw new IOException("Disconnected before READY.");
+            }
+        }
+    }
+
+    private static void sendLine(Writer out, String s) throws IOException {
+        out.write(s);
+        out.write("\n");
+        out.flush();
+    }
+
+    private static String safe(String s) {
+        return s.replaceAll("[\\r\\n\\t]", "_");
+    }
+
+    private static long parseLong(String s, long def) {
+        try {
+            return Long.parseLong(s.trim());
+        } catch (Exception e) {
+            return def;
+        }
+    }
+
+    // --- Input handlers ---
     private class GlobalKeyHandler extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
@@ -484,11 +695,7 @@ public class GameManager extends JPanel implements Runnable {
             if (state != GameState.START) return;
             startScreenRenderer.keyTyped(e.getKeyChar());
             if (startScreenRenderer.isComplete()) {
-                try {
-                    player.setName(startScreenRenderer.getHeroName());
-                } catch (Exception ignored) {
-                }
-                state = GameState.PLAYING;
+                beginFromStartScreen();
             }
             repaint();
         }
@@ -533,7 +740,15 @@ public class GameManager extends JPanel implements Runnable {
         @Override
         public void mouseClicked(MouseEvent e) {
             switch (state) {
-                case START -> requestFocusInWindow();
+                case START -> {
+                    startScreenRenderer.handleClick(e.getPoint());
+                    if (startScreenRenderer.isComplete()) {
+                        beginFromStartScreen();
+                    } else {
+                        requestFocusInWindow();
+                        repaint();
+                    }
+                }
                 case GAME_OVER -> {
                     if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame();
                 }

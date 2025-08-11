@@ -9,9 +9,10 @@ public class Game {
         String appName = "The Legend of Belga";
         String version = Game.class.getPackage().getImplementationVersion();
         if (version == null) version = "dev";
-
         JFrame window = new JFrame(appName + " v" + version);
-        GameManager panel = new GameManager(false);
+
+        boolean enableStartScreen = System.getenv("TLOB_START_SCREEN") == null || Boolean.parseBoolean(System.getenv("TLOB_START_SCREEN"));
+        GameManager panel = new GameManager(enableStartScreen);
         window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         window.setResizable(false);
         window.add(panel);
