@@ -20,7 +20,7 @@ test {
 }
 
 application {
-    mainClass = 'com.lhamacorp.games.tlob.Game'
+    mainClass = 'com.lhamacorp.games.tlob.client.Game'
 }
 
 jar {
