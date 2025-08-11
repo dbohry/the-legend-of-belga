@@ -14,6 +14,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class GameManager extends JPanel implements Runnable {
 
@@ -31,18 +32,17 @@ public class GameManager extends JPanel implements Runnable {
 
     private Thread gameThread;
     private volatile boolean running = false;
-    private final InputState input = new InputState();
-    private long simFrame = 0;
 
-    // 30 Hz animation clock (increment every 2 logic updates @60hz)
-    private int logicTicks = 0;
+    // Input snapshot (30 Hz sim)
+    private final InputState input = new InputState();
+
+    // 30 Hz tile/ambient tick
     private int animTick30 = 0;
 
     // Core systems
     private final KeyManager keyManager;
     private final Camera camera = new Camera();
     private final PerkManager perkManager = new PerkManager();
-    private final SpawnManager enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16));
     private final HudRenderer hudRenderer = new HudRenderer(new Font("Arial", Font.PLAIN, 16));
     private final PauseMenuRenderer pauseMenuRenderer =
         new PauseMenuRenderer(new Font("Arial", Font.BOLD, 48),
@@ -56,8 +56,13 @@ public class GameManager extends JPanel implements Runnable {
     private final VictoryScreenRenderer victoryRenderer = new VictoryScreenRenderer();
     private final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
 
-    private final LevelManager levelManager =
-        new LevelManager(80, 60, 0.45, 2500);
+    // Deterministic world RNG
+    private final long worldSeed;
+    private final Random worldRng;
+
+    // Systems that need RNG
+    private final LevelManager levelManager;
+    private final SpawnManager enemySpawner;
 
     // World
     private final Player player;
@@ -95,6 +100,22 @@ public class GameManager extends JPanel implements Runnable {
         } else {
             state = GameState.PLAYING;
         }
+
+        // Seed & RNG
+        long seed;
+        String seedProp = System.getProperty("tlob.seed");
+        try {
+            seed = (seedProp != null) ? Long.parseLong(seedProp) : System.currentTimeMillis();
+        } catch (NumberFormatException nfe) {
+            seed = System.currentTimeMillis();
+        }
+        worldSeed = seed;
+        worldRng = new Random(worldSeed);
+        System.out.println("World seed = " + worldSeed);
+
+        // RNG-aware systems
+        levelManager = new LevelManager(80, 60, 0.45, 2500, worldRng);
+        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16), worldRng);
 
         // World init
         TileMap map = levelManager.map();
@@ -140,7 +161,6 @@ public class GameManager extends JPanel implements Runnable {
             acc += (now - last);
             last = now;
 
-            // catch up sim in fixed 30 Hz steps
             while (acc >= simStepNs) {
                 update();
                 acc -= simStepNs;
@@ -152,7 +172,7 @@ public class GameManager extends JPanel implements Runnable {
     }
 
     private void update() {
-        // Mute toggle (unchanged)
+        // Mute toggle
         if (keyManager.mute != musicMuted) {
             musicMuted = keyManager.mute;
             if (musicMuted) AudioManager.stopMusic();
@@ -164,7 +184,7 @@ public class GameManager extends JPanel implements Runnable {
                 return;
             }
             case PLAYING -> {
-                // Fill input snapshot for this sim frame
+                // Input snapshot
                 input.up = keyManager.up;
                 input.down = keyManager.down;
                 input.left = keyManager.left;
@@ -181,7 +201,7 @@ public class GameManager extends JPanel implements Runnable {
                     return;
                 }
 
-                // --- Simulation (now 30 Hz) ---
+                // Simulation (30 Hz)
                 player.update(input, levelManager.map(), enemies);
                 for (int i = enemies.size() - 1; i >= 0; i--) {
                     Enemy e = enemies.get(i);
@@ -194,9 +214,7 @@ public class GameManager extends JPanel implements Runnable {
                 int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
                 camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-                // Advance frame counters
-                simFrame++;
-                // keep your old 30Hz tile tick tied to the sim (1:1 now)
+                // 30 Hz ambient tick
                 animTick30++;
             }
         }
@@ -269,9 +287,7 @@ public class GameManager extends JPanel implements Runnable {
         state = GameState.PLAYING;
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
 
-        logicTicks = 0;
         animTick30 = 0;
-        simFrame   = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
@@ -283,9 +299,7 @@ public class GameManager extends JPanel implements Runnable {
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
         state = GameState.PLAYING;
 
-        logicTicks = 0;
         animTick30 = 0;
-        simFrame   = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
@@ -361,8 +375,7 @@ public class GameManager extends JPanel implements Runnable {
                     int idx = victoryRenderer.handleClick(e.getPoint());
                     if (idx >= 0) applyPerkAndContinue(idx);
                 }
-                case PLAYING -> {
-                }
+                case PLAYING -> { /* gameplay clicks handled by KeyManager */ }
             }
         }
     }

@@ -18,10 +18,18 @@ public class TileMap {
     private final double[][] wallHealth;
     private static final double WALL_MAX_HP = 4.0;
 
+    private final Random rng;
+
+    // Back-compat (non-deterministic)
     public TileMap(int[][] tiles) {
+        this(tiles, new Random());
+    }
+
+    public TileMap(int[][] tiles, Random rng) {
         this.tiles = tiles;
         this.width = tiles.length;
         this.height = tiles[0].length;
+        this.rng = (rng != null) ? rng : new Random();
         this.wallHealth = new double[width][height];
 
         for (int x = 0; x < width; x++) {
@@ -89,7 +97,6 @@ public class TileMap {
                 int t = tiles[x][y];
                 boolean isWall = (t == WALL || t == EDGE_WALL);
 
-                // Use animated grass; stones are static
                 BufferedImage tex = isWall
                     ? TextureManager.getStoneTexture()
                     : TextureManager.getGrassTextureFrame(tick30);
@@ -97,15 +104,13 @@ public class TileMap {
                 if (tex != null) {
                     g.drawImage(tex, px, py, tileSize, tileSize, null);
 
-                    // Damage overlay only for destructible walls
                     if (t == WALL && wallHealth[x][y] > 0 && wallHealth[x][y] < WALL_MAX_HP) {
                         double damagePercent = 1.0 - (wallHealth[x][y] / WALL_MAX_HP);
-                        int overlayAlpha = (int) Math.round(damagePercent * 110); // a bit stronger
+                        int overlayAlpha = (int) Math.round(damagePercent * 110);
                         g.setColor(new Color(255, 60, 60, overlayAlpha));
                         g.fillRect(px, py, tileSize, tileSize);
                     }
                 } else {
-                    // Fallback rectangles (if image missing)
                     if (isWall) {
                         g.setColor(new Color(35, 35, 45));
                         g.fillRect(px, py, tileSize, tileSize);
@@ -130,22 +135,21 @@ public class TileMap {
     }
 
     public int[] findSpawnTile() {
-        for (int y = height / 2 - 1; y <= height / 2 + 1; y++) {
-            for (int x = width / 2 - 1; x <= width / 2 + 1; x++) {
+        for (int y = height / 2 - 1; y <= height / 2 + 1; y++)
+            for (int x = width / 2 - 1; x <= width / 2 + 1; x++)
                 if (!isWall(x, y)) return new int[]{x, y};
-            }
-        }
+
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
                 if (!isWall(x, y)) return new int[]{x, y};
+
         return new int[]{1, 1};
     }
 
     public int[] randomFloorTileFarFrom(double px, double py, int minDistance) {
-        Random rnd = new Random();
         for (int attempts = 0; attempts < 5000; attempts++) {
-            int x = rnd.nextInt(width);
-            int y = rnd.nextInt(height);
+            int x = rng.nextInt(width);
+            int y = rng.nextInt(height);
             if (!isWall(x, y)) {
                 double cx = x * GameManager.TILE_SIZE + GameManager.TILE_SIZE / 2.0;
                 double cy = y * GameManager.TILE_SIZE + GameManager.TILE_SIZE / 2.0;
@@ -156,10 +160,9 @@ public class TileMap {
     }
 
     public int[] getRandomFloorTile() {
-        Random rnd = new Random();
         for (int attempts = 0; attempts < 1000; attempts++) {
-            int x = rnd.nextInt(width);
-            int y = rnd.nextInt(height);
+            int x = rng.nextInt(width);
+            int y = rng.nextInt(height);
             if (!isWall(x, y)) return new int[]{x, y};
         }
         return findSpawnTile();
