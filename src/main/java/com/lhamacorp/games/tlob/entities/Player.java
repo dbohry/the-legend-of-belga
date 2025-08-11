@@ -33,6 +33,7 @@ public class Player extends Entity {
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
+    private double staminaRegenRateMult = 1.0;
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
 
@@ -77,6 +78,16 @@ public class Player extends Entity {
     public void increaseMaxManaByPercent(double pct) {
         if (getMaxMana() == 0) this.maxMana = 1.0;
         this.maxMana = Math.ceil(getMaxMana() * (1.0 + pct));
+    }
+
+    public void increaseStaminaRegenByPercent(double pct) {
+        staminaRegenRateMult *= (1.0 + pct);
+    }
+
+    private int effectiveStaminaRegenInterval() {
+        // smaller interval = faster regen; clamp to at least 1 tick
+        double interval = STAMINA_REGEN_INTERVAL / Math.max(0.0001, staminaRegenRateMult);
+        return Math.max(1, (int) Math.round(interval));
     }
 
     private double effectiveBaseSpeed() {
@@ -268,7 +279,7 @@ public class Player extends Entity {
         } else {
             speed = speedBase;
             if (!wasSprinting) {
-                if (++staminaRegenCounter >= STAMINA_REGEN_INTERVAL) {
+                if (++staminaRegenCounter >= effectiveStaminaRegenInterval()) {
                     boolean did = false;
                     if (stamina < maxStamina) {
                         stamina = Math.min(maxStamina, stamina + 1.0);

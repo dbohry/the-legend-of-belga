@@ -23,7 +23,10 @@ public class PerkManager {
     public enum Rarity {
         COMMON(10), UNCOMMON(6), RARE(3), EPIC(1), LEGENDARY(1);
         public final int weight;
-        Rarity(int w) { this.weight = w; }
+
+        Rarity(int w) {
+            this.weight = w;
+        }
     }
 
     /** Registry entry with weight (for rarity) and optional player-based eligibility. */
@@ -79,7 +82,9 @@ public class PerkManager {
     }
 
     /** Remove a perk by id. */
-    public void unregister(String id) { registry.remove(id); }
+    public void unregister(String id) {
+        registry.remove(id);
+    }
 
     /** Change a perk's weight (rarity) at runtime. Returns true if updated. */
     public boolean setWeight(String id, int newWeight) {
@@ -92,13 +97,19 @@ public class PerkManager {
     /* -------------------- Rolling & Applying -------------------- */
 
     /** Immutable view of rolled choices. */
-    public List<Perk> getChoices() { return Collections.unmodifiableList(currentChoices); }
+    public List<Perk> getChoices() {
+        return Collections.unmodifiableList(currentChoices);
+    }
 
     /** Clear rolled choices. */
-    public void clearChoices() { currentChoices.clear(); }
+    public void clearChoices() {
+        currentChoices.clear();
+    }
 
     /** Backward-compatible roll (no eligibility). Prefer rollChoicesFor(player). */
-    public void rollChoices() { rollChoicesFor(null); }
+    public void rollChoices() {
+        rollChoicesFor(null);
+    }
 
     /**
      * Roll up to 3 distinct perk choices, honoring eligibility if a player is provided.
@@ -128,7 +139,10 @@ public class PerkManager {
 
             for (int idx = 0; idx < pool.size(); idx++) {
                 cumulative += pool.get(idx).getValue().weight;
-                if (cumulative >= target) { chosenIdx = idx; break; }
+                if (cumulative >= target) {
+                    chosenIdx = idx;
+                    break;
+                }
             }
             if (chosenIdx < 0) chosenIdx = pool.size() - 1;
 
@@ -153,55 +167,59 @@ public class PerkManager {
     private void registerDefaults() {
         register("MAX_HEALTH", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Max Life +%d%%", (int)Math.round(p * 100));
-            String desc  = "Increases maximum life permanently.";
+            String label = "Max Life";
+            String desc = String.format("Increases maximum life permanently (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMaxHealthByPercent(p));
         });
 
         register("MAX_STAMINA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Max Stamina +%d%%", (int)Math.round(p * 100));
-            String desc  = "Increases maximum stamina permanently.";
+            String label = "Max Stamina";
+            String desc = String.format("Increases maximum stamina permanently (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMaxStaminaByPercent(p));
         });
 
-        register("MAX_MANA", Rarity.COMMON,
-            player -> player.getMaxMana() > 0,  // only offer if mana is relevant
-            r -> {
-                double p = pct(r, 0.10, 0.20);
-                String label = String.format("Max Mana +%d%%", (int)Math.round(p * 100));
-                String desc  = "Increases maximum mana permanently.";
-                return new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p));
-            }
-        );
+        register("MAX_MANA", Rarity.COMMON, r -> {
+            double p = pct(r, 0.10, 0.20);
+            String label = "Max Mana";
+            String desc = String.format("Increases maximum mana permanently (+%d%%).", (int) Math.round(p * 100));
+            return new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p));
+        });
 
         register("MOVE_SPEED", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.05, 0.10);
-            String label = String.format("Move Speed +%d%%", (int)Math.round(p * 100));
-            String desc  = "Increases movement speed permanently.";
+            String label = "Movement Speed";
+            String desc = String.format("Increases movement speed permanently (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p));
+        });
+
+        register("STAMINA_REGEN", Rarity.RARE, r -> {
+            double p = pct(r, 0.5, 0.10);
+            String label = "Stamina Regeneration";
+            String desc = String.format("Stamina regenerates faster permanently (+%d%%).", (int) Math.round(p * 100));
+            return new Perk(label, desc, pl -> pl.increaseStaminaRegenByPercent(p));
         });
 
         register("WEAPON_DAMAGE", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = String.format("Damage +%d%%", (int)Math.round(p * 100));
-            String desc  = "Increases melee damage permanently.";
+            String label = "Weapon Damage";
+            String desc = String.format("Increases melee damage permanently (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p));
         });
 
         register("WEAPON_RANGE", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10);
-            String label = String.format("Weapon Range +%d%%", (int)Math.round(p * 100));
-            String desc  = "Increased weapon range permanently.";
+            String label = "Weapon Range";
+            String desc = String.format("Increases weapon range permanently (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseWeaponRangeByPercent(p));
         });
 
         register("WEAPON_WIDTH", Rarity.LEGENDARY, r ->
-            new Perk("+1 Weapon Width", "Enlarge your weapon by 1", Player::increaseWeaponWidth)
+            new Perk("Weapon Width +1", "Enlarge your weapon by 1.", Player::increaseWeaponWidth)
         );
 
         register("SHIELD", Rarity.RARE, r ->
-            new Perk("+1 Shield", "Adds +1 to HP shield", Player::increaseShield)
+            new Perk("Shield +1", "Adds +1 to HP shield.", Player::increaseShield)
         );
     }
 
