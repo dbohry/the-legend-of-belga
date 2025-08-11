@@ -33,8 +33,15 @@ public class Enemy extends Entity {
     private long animTimeMs = 0L;
     private boolean movedThisTick = false;
 
+    private int wanderTimer = 0;
+    private int lcg;
+    private double wanderDx = 0, wanderDy = 0;
+
     public Enemy(double x, double y, Weapon weapon) {
         super(x, y, ENEMY_SIZE, ENEMY_SIZE, ENEMY_SPEED, ENEMY_MAX_HP, ENEMY_MAX_STAMINA, ENEMY_MAX_MANA, 0, weapon, "Zombie");
+        int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
+        lcg = (seed == 0) ? 1 : seed;
+        pickNewWanderDir(); // init
     }
 
     @Override
@@ -71,12 +78,15 @@ public class Enemy extends Entity {
         double vx = 0, vy = 0;
         if (knockbackTimer == 0) {
             double desiredSpeed = speed;
-            if (dist > 300 || attackTimer > 0) {
-                double angle = (System.nanoTime() / 1_000_000_000.0 + hash()) % (2 * Math.PI);
-                dx = Math.cos(angle);
-                dy = Math.sin(angle);
+
+            boolean wander = (distToPlayer > 300) || (attackTimer > 0);
+            if (wander) {
+                if (--wanderTimer <= 0) pickNewWanderDir();
+                dx = wanderDx;
+                dy = wanderDy;
                 desiredSpeed = 0.6;
             }
+
             vx = dx * desiredSpeed;
             vy = dy * desiredSpeed;
             moveWithCollision(vx, vy, map, player);
@@ -85,8 +95,24 @@ public class Enemy extends Entity {
         updateFacing(vx, vy);
         movedThisTick = (Math.abs(vx) + Math.abs(vy)) > 1e-3 && knockbackTimer == 0;
 
-        // 30 Hz animation clock
         animTimeMs += TICK_MS;
+    }
+
+    private int nextRand() {
+        lcg = lcg * 1664525 + 1013904223;
+        return lcg;
+    }
+
+    private void pickNewWanderDir() {
+        // new direction every 0.5–1.2s @30Hz
+        int span = 15 + Math.abs(nextRand()) % 21; // 15..35 ticks
+        wanderTimer = span;
+
+        // angle from RNG
+        double u = (nextRand() >>> 8) * (1.0 / (1 << 24)); // [0,1)
+        double ang = u * Math.PI * 2.0;
+        wanderDx = Math.cos(ang);
+        wanderDy = Math.sin(ang);
     }
 
     private int hash() {
