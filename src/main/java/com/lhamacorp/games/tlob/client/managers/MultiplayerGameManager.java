@@ -18,6 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MultiplayerGameManager extends BaseGameManager {
 
+    // MP HUD and completion tracking
+    private int mpCompleted = 0;
+    private int mpEnemiesAtLevelStart = 0;
+    private int prevEnemiesLeft = 0;
+
     private final String host;
     private final int port;
     private final String heroName;
@@ -247,6 +252,25 @@ public class MultiplayerGameManager extends BaseGameManager {
                     });
                 }
                 remoteEnemies.keySet().removeIf(id -> !seenE.contains(id));
+
+                // --- Enemy counter & map completion tracking (client-side, MP only) ---
+                int left = remoteEnemies.size();
+                // Detect start of a new map/wave when we go from 0 -> >0
+                if (prevEnemiesLeft == 0 && left > 0) {
+                    mpEnemiesAtLevelStart = left; // reset baseline for the new map
+                }
+                // Detect completion when we go from >0 -> 0
+                if (prevEnemiesLeft > 0 && left == 0) {
+                    mpCompleted++;
+                    try {
+                        AudioManager.playSound("map-complete.wav");
+                    } catch (Throwable ignored) {}
+                    // prepare for next map baseline to be set when enemies appear again
+                    mpEnemiesAtLevelStart = 0;
+                }
+                // Track the max seen for this map in case enemies join slightly later
+                if (left > mpEnemiesAtLevelStart) mpEnemiesAtLevelStart = left;
+                prevEnemiesLeft = left;
             }
         } catch (IOException ignored) {
         } finally {
@@ -302,6 +326,56 @@ public class MultiplayerGameManager extends BaseGameManager {
     @Override
     protected String[] topRightExtraLines() {
         return new String[]{"Net: " + serverTickrate + " Hz"};
+    }
+
+    @Override
+    protected void drawLevelCounters(Graphics2D g2) {
+        // Override SP behaviour: use remote enemy counters and MP-completed maps
+        final int pad = 10;
+        int completed = mpCompleted;
+        int left = remoteEnemies.size();
+        int total = Math.max(mpEnemiesAtLevelStart, left);
+
+        String line1 = "Maps: " + completed;
+        String line2 = "Enemies: " + left + "/" + total;
+        String[] extras = topRightExtraLines();
+
+        Font oldF = g2.getFont();
+        Color oldCol = g2.getColor();
+        Composite oldCmp = g2.getComposite();
+
+        Font f = new Font("Arial", Font.PLAIN, 12);
+        g2.setFont(f);
+        FontMetrics fm = g2.getFontMetrics();
+
+        int w = Math.max(fm.stringWidth(line1), fm.stringWidth(line2));
+        for (String ex : extras) w = Math.max(w, fm.stringWidth(ex));
+        w += 12;
+
+        int lines = 2 + extras.length;
+        int h = fm.getHeight() * lines + 8;
+
+        int x = getWidth() - w - pad;
+        int y = pad;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(new Color(235, 240, 245));
+        int ty = y + fm.getAscent() + 4;
+        g2.drawString(line1, x + 6, ty);
+        ty += fm.getHeight();
+        g2.drawString(line2, x + 6, ty);
+        for (String ex : extras) {
+            ty += fm.getHeight();
+            g2.drawString(ex, x + 6, ty);
+        }
+
+        g2.setFont(oldF);
+        g2.setColor(oldCol);
+        g2.setComposite(oldCmp);
     }
 
     // ---------- Drawing hooks (textures!) ----------
