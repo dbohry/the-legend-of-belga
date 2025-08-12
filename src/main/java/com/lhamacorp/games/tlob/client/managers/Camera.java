@@ -14,7 +14,11 @@ public final class Camera {
     }
     
     public void setShakeOffset(Point offset) {
-        this.shakeOffset = offset != null ? offset : new Point(0, 0);
+        this.shakeOffset = (offset != null) ? offset : new Point(0, 0);
+    }
+    
+    public void clearShake() {
+        this.shakeOffset = new Point(0, 0);
     }
 
     public int offsetX() {
@@ -23,6 +27,14 @@ public final class Camera {
 
     public int offsetY() {
         return y + shakeOffset.y;
+    }
+    
+    public int baseX() {
+        return x;
+    }
+    
+    public int baseY() {
+        return y;
     }
 
     private static int clamp(int v, int min, int max) {

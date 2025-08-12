@@ -7,6 +7,21 @@ import java.awt.event.MouseListener;
 
 public class KeyManager implements KeyListener, MouseListener {
 
+    // Key constants for better maintainability
+    private static final int KEY_W = KeyEvent.VK_W;
+    private static final int KEY_A = KeyEvent.VK_A;
+    private static final int KEY_S = KeyEvent.VK_S;
+    private static final int KEY_D = KeyEvent.VK_D;
+    private static final int KEY_UP = KeyEvent.VK_UP;
+    private static final int KEY_DOWN = KeyEvent.VK_DOWN;
+    private static final int KEY_LEFT = KeyEvent.VK_LEFT;
+    private static final int KEY_RIGHT = KeyEvent.VK_RIGHT;
+    private static final int KEY_SPACE = KeyEvent.VK_SPACE;
+    private static final int KEY_ENTER = KeyEvent.VK_ENTER;
+    private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
+    private static final int KEY_SHIFT = KeyEvent.VK_SHIFT;
+    private static final int KEY_M = KeyEvent.VK_M;
+
     public volatile boolean up;
     public volatile boolean down;
     public volatile boolean left;
@@ -44,41 +59,41 @@ public class KeyManager implements KeyListener, MouseListener {
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
         switch (code) {
-            case KeyEvent.VK_W:
-            case KeyEvent.VK_UP:
+            case KEY_W:
+            case KEY_UP:
                 up = true;
                 break;
-            case KeyEvent.VK_S:
-            case KeyEvent.VK_DOWN:
+            case KEY_S:
+            case KEY_DOWN:
                 down = true;
                 break;
-            case KeyEvent.VK_A:
-            case KeyEvent.VK_LEFT:
+            case KEY_A:
+            case KEY_LEFT:
                 left = true;
                 break;
-            case KeyEvent.VK_D:
-            case KeyEvent.VK_RIGHT:
+            case KEY_D:
+            case KEY_RIGHT:
                 right = true;
                 break;
 
-            case KeyEvent.VK_SPACE:
+            case KEY_SPACE:
                 attackKey = true;
                 updateAttack();
                 break;
 
-            case KeyEvent.VK_ENTER:
+            case KEY_ENTER:
                 if (!enter) enterPressedOnce = true;
                 enter = true;
                 break;
 
-            case KeyEvent.VK_ESCAPE:
+            case KEY_ESCAPE:
                 if (!escape) escapePressedOnce = true;
                 escape = true;
                 break;
-            case KeyEvent.VK_SHIFT:
+            case KEY_SHIFT:
                 shift = true;
                 break;
-            case KeyEvent.VK_M:
+            case KEY_M:
                 if (!mDown) {
                     mute = !mute;
                     mDown = true;
@@ -92,36 +107,36 @@ public class KeyManager implements KeyListener, MouseListener {
     public void keyReleased(KeyEvent e) {
         int code = e.getKeyCode();
         switch (code) {
-            case KeyEvent.VK_W:
-            case KeyEvent.VK_UP:
+            case KEY_W:
+            case KEY_UP:
                 up = false;
                 break;
-            case KeyEvent.VK_S:
-            case KeyEvent.VK_DOWN:
+            case KEY_S:
+            case KEY_DOWN:
                 down = false;
                 break;
-            case KeyEvent.VK_A:
-            case KeyEvent.VK_LEFT:
+            case KEY_A:
+            case KEY_LEFT:
                 left = false;
                 break;
-            case KeyEvent.VK_D:
-            case KeyEvent.VK_RIGHT:
+            case KEY_D:
+            case KEY_RIGHT:
                 right = false;
                 break;
-            case KeyEvent.VK_SPACE:
+            case KEY_SPACE:
                 attackKey = false;
                 updateAttack();
                 break;
-            case KeyEvent.VK_ENTER:
+            case KEY_ENTER:
                 enter = false;
                 break;
-            case KeyEvent.VK_ESCAPE:
+            case KEY_ESCAPE:
                 escape = false;
                 break;
-            case KeyEvent.VK_SHIFT:
+            case KEY_SHIFT:
                 shift = false;
                 break;
-            case KeyEvent.VK_M:
+            case KEY_M:
                 mDown = false;
                 break;
             default:

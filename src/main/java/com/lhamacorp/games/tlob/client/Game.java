@@ -9,19 +9,18 @@ import java.util.Random;
 
 public class Game {
 
+    private static final String APP_NAME = "The Legend of Belga";
+    private static final String DEFAULT_VERSION = "dev";
+    private static final int DIALOG_PADDING = 12;
+    private static final int BUTTON_SPACING = 10;
+    private static final int DEFAULT_PORT = 7777;
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            String appName = "The Legend of Belga";
-            String version = Game.class.getPackage() != null
-                ? Game.class.getPackage().getImplementationVersion()
-                : null;
-            if (version == null || version.isBlank()) version = "dev";
-
-            JFrame window = new JFrame(appName + " v" + version);
-            window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-            window.setResizable(false);
-
+            String version = getVersion();
+            JFrame window = createMainWindow(version);
             BaseGameManager panel = createManagerWithStartFlow(window);
+            
             window.setContentPane(panel);
             window.pack();
             window.setLocationRelativeTo(null);
@@ -29,6 +28,20 @@ public class Game {
 
             panel.startGameThread();
         });
+    }
+
+    private static String getVersion() {
+        String version = Game.class.getPackage() != null
+            ? Game.class.getPackage().getImplementationVersion()
+            : null;
+        return (version == null || version.isBlank()) ? DEFAULT_VERSION : version;
+    }
+
+    private static JFrame createMainWindow(String version) {
+        JFrame window = new JFrame(APP_NAME + " v" + version);
+        window.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        window.setResizable(false);
+        return window;
     }
 
     private static BaseGameManager createManagerWithStartFlow(JFrame owner) {
@@ -39,13 +52,13 @@ public class Game {
         // Build a simple modal dialog that mimics JOptionPane but lets us disable a button
         final JDialog dialog = new JDialog(owner, "Start Game", true);
         dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        dialog.setLayout(new BorderLayout(12, 12));
+        dialog.setLayout(new BorderLayout(DIALOG_PADDING, DIALOG_PADDING));
 
         JLabel msg = new JLabel("Choose a game mode:");
-        msg.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
+        msg.setBorder(BorderFactory.createEmptyBorder(DIALOG_PADDING, DIALOG_PADDING, 0, DIALOG_PADDING));
         dialog.add(msg, BorderLayout.CENTER);
 
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, BUTTON_SPACING, BUTTON_SPACING));
         JButton btnSingle = new JButton("Singleplayer");
         JButton btnMulti  = new JButton("Multiplayer");
         JButton btnCancel = new JButton("Cancel");
@@ -97,7 +110,7 @@ public class Game {
         // NOTE: Multiplayer path intentionally unreachable because the button is disabled.
         // If you re-enable it in the future, reinstate:
         // String hero = prompt(owner, "Hero name:", "Hero"); ...
-        // HostPort hp = parseHostPort(hostPort, 7777);
+        // HostPort hp = parseHostPort(hostPort, DEFAULT_PORT);
         // return new MultiplayerGameManager(hp.host, hp.port, hero);
     }
 
@@ -110,7 +123,7 @@ public class Game {
         return (String) JOptionPane.showInputDialog(
             parent,
             label,
-            "The Legend of Belga",
+            APP_NAME,
             JOptionPane.PLAIN_MESSAGE,
             null,
             null,

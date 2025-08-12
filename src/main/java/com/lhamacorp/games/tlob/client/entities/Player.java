@@ -55,6 +55,15 @@ public class Player extends Entity {
     private static final int AIM_INDICATOR_FADE_TIME = 60; // frames
     private static final int ATTACK_SWING_DURATION = 10; // frames
     private static final int SCREEN_SHAKE_DURATION = 8; // frames
+    
+    // Animation and visual constants
+    private static final double SWING_ARC_RADIANS = Math.PI / 3.0; // 60 degrees
+    private static final double SWING_TRAIL_SPACING = 0.1; // trail effect spacing
+    private static final int MAX_TRAIL_COUNT = 3; // number of trail effects
+    private static final int CROSSHAIR_SIZE = 8;
+    private static final int ENEMY_HIGHLIGHT_SIZE = 12;
+    private static final double ENEMY_HIGHLIGHT_RANGE_MULTIPLIER = 1.5;
+    private static final double SCREEN_SHAKE_INTENSITY = 2.0;
 
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon);
@@ -81,7 +90,15 @@ public class Player extends Entity {
         int o = ((octant % 8) + 8) % 8;      // wrap to [0..7]
         int signed = (o <= 4) ? o : o - 8;   // [-4..4] for the same switch map we use below
         this.facingAngle = signed * (Math.PI / 4.0);
-        switch (signed) {
+        updateFacingFromAngle(signed);
+    }
+    
+    /**
+     * Updates facing direction based on angle octant
+     * @param octant signed octant value [-4..4]
+     */
+    private void updateFacingFromAngle(int octant) {
+        switch (octant) {
             case 0  -> this.facing = Direction.RIGHT;
             case 1  -> this.facing = Direction.DOWN_RIGHT;
             case 2  -> this.facing = Direction.DOWN;
@@ -221,31 +238,13 @@ public class Player extends Entity {
                 double angle = Math.atan2(ay, ax); // -PI..PI
                 facingAngle = angle;
                 int oct = (int) Math.round(angle / (Math.PI / 4.0));
-                switch (oct) {
-                    case 0  -> facing = Direction.RIGHT;
-                    case 1  -> facing = Direction.DOWN_RIGHT;
-                    case 2  -> facing = Direction.DOWN;
-                    case 3  -> facing = Direction.DOWN_LEFT;
-                    case -1 -> facing = Direction.UP_RIGHT;
-                    case -2 -> facing = Direction.UP;
-                    case -3 -> facing = Direction.UP_LEFT;
-                    default -> facing = Direction.LEFT; // 4 or -4
-                }
+                updateFacingFromAngle(oct);
             }
         } else if (dxRaw != 0 || dyRaw != 0) {
             double angle = Math.atan2(dyRaw, dxRaw);
             facingAngle = angle;
             int oct = (int) Math.round(angle / (Math.PI / 4.0));
-            switch (oct) {
-                case 0  -> facing = Direction.RIGHT;
-                case 1  -> facing = Direction.DOWN_RIGHT;
-                case 2  -> facing = Direction.DOWN;
-                case 3  -> facing = Direction.DOWN_LEFT;
-                case -1 -> facing = Direction.UP_RIGHT;
-                case -2 -> facing = Direction.UP;
-                case -3 -> facing = Direction.UP_LEFT;
-                default -> facing = Direction.LEFT;
-            }
+            updateFacingFromAngle(oct);
         }
 
         // --- Movement (normalize diagonals) ---
@@ -416,9 +415,8 @@ public class Player extends Entity {
             
             // Calculate swing animation based on phase
             double swingProgress = 1.0 - (double) attackSwingPhase / ATTACK_SWING_DURATION;
-            double swingArc = Math.PI / 3.0; // 60 degree swing arc
-            double swingOffset = swingArc * swingProgress;
-            double theta = attackSwingAngle - swingArc/2 + swingOffset;
+            double swingOffset = SWING_ARC_RADIANS * swingProgress;
+            double theta = attackSwingAngle - SWING_ARC_RADIANS/2 + swingOffset;
             
             double cos = Math.cos(theta), sin = Math.sin(theta);
             int cx = (int) Math.round(x);
@@ -463,10 +461,10 @@ public class Player extends Entity {
                     g2.setStroke(new BasicStroke(1f));
                     
                     // Draw multiple trail lines
-                    for (int i = 1; i <= 3; i++) {
-                        double trailProgress = swingProgress - (i * 0.1);
+                    for (int i = 1; i <= MAX_TRAIL_COUNT; i++) {
+                        double trailProgress = swingProgress - (i * SWING_TRAIL_SPACING);
                         if (trailProgress > 0) {
-                            double trailAngle = attackSwingAngle - swingArc/2 + (swingArc * trailProgress);
+                            double trailAngle = attackSwingAngle - SWING_ARC_RADIANS/2 + (SWING_ARC_RADIANS * trailProgress);
                             double trailCos = Math.cos(trailAngle), trailSin = Math.sin(trailAngle);
                             double trailAx = cx + trailCos * edge;
                             double trailAy = cy + trailSin * edge;
@@ -514,11 +512,10 @@ public class Player extends Entity {
             g2.drawLine(px, py, ax, ay);
             
             // Draw aim crosshair at mouse position
-            int crosshairSize = 8;
             g2.setColor(new Color(255, 255, 0, (int) (200 * alpha)));
             g2.setStroke(new BasicStroke(2f));
-            g2.drawLine(ax - crosshairSize, ay, ax + crosshairSize, ay);
-            g2.drawLine(ax, ay - crosshairSize, ax, ay + crosshairSize);
+            g2.drawLine(ax - CROSSHAIR_SIZE, ay, ax + CROSSHAIR_SIZE, ay);
+            g2.drawLine(ax, ay - CROSSHAIR_SIZE, ax, ay + CROSSHAIR_SIZE);
             
             // Draw aim circle around player
             int aimRadius = Math.max(width, height) / 2 + 4;
@@ -546,14 +543,15 @@ public class Player extends Entity {
                 for (Enemy enemy : enemies) {
                     if (enemy.isAlive()) {
                         double distance = Math.hypot(enemy.getX() - x, enemy.getY() - y);
-                        if (distance < weapon.getReach() * 1.5) {
+                        if (distance < weapon.getReach() * ENEMY_HIGHLIGHT_RANGE_MULTIPLIER) {
                             int enemyScreenX = (int) Math.round(enemy.getX()) - camX;
                             int enemyScreenY = (int) Math.round(enemy.getY()) - camY;
                             
                             // Draw enemy highlight when in range
                             g2.setColor(new Color(255, 100, 100, (int) (120 * alpha)));
                             g2.setStroke(new BasicStroke(2f));
-                            g2.drawOval(enemyScreenX - 12, enemyScreenY - 12, 24, 24);
+                            g2.drawOval(enemyScreenX - ENEMY_HIGHLIGHT_SIZE, enemyScreenY - ENEMY_HIGHLIGHT_SIZE, 
+                                       ENEMY_HIGHLIGHT_SIZE * 2, ENEMY_HIGHLIGHT_SIZE * 2);
                             
                             // Draw line to enemy if it's the closest one
                             if (distance < weapon.getReach()) {
@@ -598,7 +596,7 @@ public class Player extends Entity {
         if (screenShakeTimer <= 0) return new Point(0, 0);
         
         double intensity = (double) screenShakeTimer / SCREEN_SHAKE_DURATION;
-        double shakeAmount = 2.0 * intensity;
+        double shakeAmount = SCREEN_SHAKE_INTENSITY * intensity;
         
         // Create a subtle random shake pattern
         long seed = (long) (x * 1000 + y * 1000 + screenShakeTimer);

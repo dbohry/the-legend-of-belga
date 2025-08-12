@@ -11,6 +11,20 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+// Build optimizations
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:unchecked', '-Xlint:deprecation']
+}
+
+// Memory settings for better performance
+applicationDefaultJvmArgs = [
+    '-Xms256m',
+    '-Xmx1g',
+    '-XX:+UseG1GC',
+    '-XX:+OptimizeStringConcat'
+]
+
 repositories {
     mavenCentral()
 }
