@@ -145,11 +145,9 @@ public final class TextureManager {
 
         if (playerSheet == null || !looksLikeSheet(playerSheet, PLAYER_W, PLAYER_H)) {
             playerSheet = generatePlayerSheet(PLAYER_W, PLAYER_H, ROWS_PER_SHEET, FRAMES_PER_ROW);
-//            tryWrite(PLAYER_FILE, playerSheet);
         }
         if (enemySheet == null || !looksLikeSheet(enemySheet, ENEMY_W, ENEMY_H)) {
             enemySheet = generateEnemySheet(ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW);
-//            tryWrite(ENEMY_FILE, enemySheet);
         }
 
         playerAnimations = sliceIntoAnimations(playerSheet, PLAYER_W, PLAYER_H);
@@ -320,61 +318,135 @@ public final class TextureManager {
     private static BufferedImage generatePlayerSheet(int fw, int fh, int rows, int cols) {
         BufferedImage sheet = new BufferedImage(fw * cols, fh * rows, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = sheet.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Pixel-art look: disable AA and use nearest neighbor when scaling by the game
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
-        Color tunic = new Color(40, 160, 70);
-        Color hat = new Color(30, 120, 50);
-        Color boots = new Color(80, 60, 30);
+        // A tiny 16-bit-like palette
+        Color tunicMid = new Color(52, 168, 76);
+        Color tunicDark = new Color(34, 120, 52);
+        Color tunicLight = new Color(82, 198, 106);
+        Color hatMid = new Color(36, 132, 58);
+        Color hatDark = new Color(24, 96, 42);
+        Color boots = new Color(84, 64, 40);
+        Color bootsDark = new Color(64, 48, 30);
+        Color gloves = new Color(64, 96, 64);
         Color skin = new Color(238, 205, 180);
-        Color belt = new Color(50, 40, 30);
-        Color line = new Color(0, 0, 0, 120);
+        Color skinDark = new Color(206, 170, 148);
+        Color hair = new Color(140, 100, 60);
+        Color belt = new Color(60, 48, 36);
+        Color buckle = new Color(228, 208, 120);
+        Color line = new Color(0, 0, 0, 160);
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 int x0 = c * fw, y0 = r * fh;
                 BufferedImage frame = new BufferedImage(fw, fh, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D f = frame.createGraphics();
-                f.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                f.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
-                // Simple top-down hero: head, hat, tunic, arms/legs with walking offsets.
+                // Walk cycle phase
                 int step = (c % 4); // 0..3
                 int legSwing = (step == 1 || step == 3) ? 1 : -1;
+                int armSwing = -legSwing;
 
-                // Shadow
-                f.setColor(new Color(0, 0, 0, 70));
+                // Shadow (oval)
+                f.setColor(new Color(0, 0, 0, 80));
                 f.fillOval(3, fh - 6, fw - 6, 4);
 
-                // Body (tunic)
-                f.setColor(tunic);
+                // Body base
+                f.setColor(tunicMid);
                 f.fillRoundRect(4, 7, fw - 8, fh - 12, 4, 4);
+                // Tunic shading: dark at left/bottom, light at top-right
+                f.setColor(tunicDark);
+                f.fillRect(4, 7 + (fh - 12) - 5, fw - 8, 5);
+                f.fillRect(4, 7, 2, fh - 12);
+                f.setColor(tunicLight);
+                f.fillRect(fw - 10, 9, 4, 3);
 
-                // Belt
+                // Belt + buckle
                 f.setColor(belt);
                 f.fillRect(4, 12, fw - 8, 2);
+                f.setColor(buckle);
+                f.fillRect(fw / 2 - 1, 12, 2, 2);
 
-                // Head
+                // Head + hair/ears depend on facing
+                // Base head
                 f.setColor(skin);
                 f.fillOval(6, 1, fw - 12, 10);
-
-                // Hat (direction-aware)
-                f.setColor(hat);
-                switch (r) {
-                    case 0 -> f.fillPolygon(new int[]{5, fw - 5, fw - 7}, new int[]{5, 5, 1}, 3); // DOWN
-                    case 1 -> f.fillPolygon(new int[]{6, 6, 2}, new int[]{5, 1, 6}, 3);            // LEFT
-                    case 2 -> f.fillPolygon(new int[]{fw - 6, fw - 6, fw - 2}, new int[]{5, 1, 6}, 3); // RIGHT
-                    case 3 -> f.fillPolygon(new int[]{5, fw - 5, 7}, new int[]{5, 5, 1}, 3);       // UP
+                // Hair back rim (shows more on UP)
+                int hairY = (r == 3) ? 2 : 3;
+                f.setColor(hair);
+                f.fillRect(7, hairY, fw - 14, 2);
+                // Ears for DOWN/LEFT/RIGHT
+                if (r != 3) {
+                    f.setColor(skinDark);
+                    f.fillRect(5, 5, 2, 2);
+                    f.fillRect(fw - 7, 5, 2, 2);
                 }
 
-                // Arms (simple swing)
-                f.setColor(tunic.darker());
-                int armYOffset = (legSwing > 0) ? -1 : 1;
-                f.fillRect(3, 10 + armYOffset, 3, 6);
-                f.fillRect(fw - 6, 10 - armYOffset, 3, 6);
+                // Face details for DOWN only
+                if (r == 0) {
+                    f.setColor(new Color(20, 20, 20));
+                    f.fillRect(9, 6, 2, 2); // left eye
+                    f.fillRect(fw - 11, 6, 2, 2); // right eye
+                }
+
+                // Hat (direction-aware), 3-tone triangle-ish cap
+                if (r == 0) { // DOWN
+                    f.setColor(hatDark);
+                    f.fillPolygon(new int[]{6, fw - 6, fw - 8}, new int[]{5, 5, 2}, 3);
+                    f.setColor(hatMid);
+                    f.fillPolygon(new int[]{6, fw - 6, fw - 9}, new int[]{5, 5, 3}, 3);
+                } else if (r == 1) { // LEFT
+                    f.setColor(hatDark);
+                    f.fillPolygon(new int[]{6, 6, 2}, new int[]{5, 2, 7}, 3);
+                    f.setColor(hatMid);
+                    f.fillPolygon(new int[]{6, 6, 3}, new int[]{5, 3, 7}, 3);
+                } else if (r == 2) { // RIGHT
+                    f.setColor(hatDark);
+                    f.fillPolygon(new int[]{fw - 6, fw - 6, fw - 2}, new int[]{5, 2, 7}, 3);
+                    f.setColor(hatMid);
+                    f.fillPolygon(new int[]{fw - 6, fw - 6, fw - 3}, new int[]{5, 3, 7}, 3);
+                } else { // UP
+                    f.setColor(hatDark);
+                    f.fillPolygon(new int[]{6, fw - 6, 7}, new int[]{5, 5, 2}, 3);
+                    f.setColor(hatMid);
+                    f.fillPolygon(new int[]{6, fw - 6, 8}, new int[]{5, 5, 3}, 3);
+                }
+
+                // Arms + gloves (simple swing)
+                f.setColor(gloves);
+                int armY = 10 + armSwing;
+                f.fillRect(3, armY, 3, 6);
+                f.fillRect(fw - 6, 10 - armSwing, 3, 6);
+
+                // Add small shield depending on facing (left hand)
+                f.setColor(new Color(96, 120, 144)); // steel
+                if (r == 0) { // DOWN
+                    f.fillRect(2, 11, 3, 5);
+                } else if (r == 1) { // LEFT
+                    f.fillRect(1, 11, 3, 6);
+                } else if (r == 2) { // RIGHT
+                    f.fillRect(fw - 4, 11, 3, 6);
+                } else { // UP
+                    f.fillRect(2, 10, 3, 5);
+                }
 
                 // Legs (walk)
                 f.setColor(boots);
                 f.fillRect(5, fh - 9 + legSwing, 4, 6);
+                f.setColor(bootsDark);
+                f.fillRect(5, fh - 4 + legSwing, 4, 1);
+                f.setColor(boots);
                 f.fillRect(fw - 9, fh - 9 - legSwing, 4, 6);
+                f.setColor(bootsDark);
+                f.fillRect(fw - 9, fh - 4 - legSwing, 4, 1);
+
+                // Simple scabbard on right hip (down/left/right)
+                if (r != 3) {
+                    f.setColor(new Color(120, 84, 48));
+                    f.fillRect(fw - 7, 13, 2, 5);
+                }
 
                 // Outline
                 f.setColor(line);
