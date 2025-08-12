@@ -33,6 +33,31 @@ tasks.register('runCore', JavaExec) {
     args = project.hasProperty('appArgs') ? project.appArgs.split(',') : []
 }
 
+// Run the multiplayer server from Gradle
+tasks.register('runServer', JavaExec) {
+    group = 'application'
+    description = 'Runs the multiplayer game server'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.lhamacorp.games.tlob.server.Server'
+
+    // Support -Pport=7777 and optional -Pseed=123
+    def portProp = project.findProperty('port')
+    def seedProp = project.findProperty('seed')
+
+    if (portProp != null && portProp.toString().trim()) {
+        args portProp.toString().trim()
+        if (seedProp != null && seedProp.toString().trim()) {
+            args seedProp.toString().trim()
+        }
+    } else if (seedProp != null && seedProp.toString().trim()) {
+        // Port not provided, but seed provided -> use default port 7777 and then seed
+        args '7777', seedProp.toString().trim()
+    } else {
+        // No props -> default port only
+        args '7777'
+    }
+}
+
 jar {
     archiveBaseName.set('TheLegendOfBelga')
     archiveVersion.set('')
