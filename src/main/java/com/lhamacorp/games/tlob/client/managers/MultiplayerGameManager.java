@@ -160,8 +160,9 @@ public class MultiplayerGameManager extends BaseGameManager {
                     double prevTotal = (Double.isNaN(oldHp) ? me.hp : oldHp) + (Double.isNaN(oldSh) ? me.sh : oldSh);
                     double newTotal = me.hp + me.sh;
 
-                    // Apply authoritative state
-                    player.setPosition(me.x, me.y);
+                    // Apply authoritative state (position as target for smooth client movement)
+                    meTargetX = me.x;
+                    meTargetY = me.y;
                     player.setStamina(me.st);
                     player.setShield(me.sh);
                     player.setHealth(me.hp);
@@ -568,7 +569,7 @@ public class MultiplayerGameManager extends BaseGameManager {
             // Play slash-hit when HP drops but enemy still alive
             if (wasAlive && this.alive && !Double.isNaN(prevHp) && es.hp < prevHp - 1e-6) {
                 try {
-                    AudioManager.playSound("slash-hit.wav", -15.0f);
+//                    AudioManager.playSound("slash-hit.wav", -15.0f);
                 } catch (Throwable ignored) {
                 }
             }
@@ -576,7 +577,7 @@ public class MultiplayerGameManager extends BaseGameManager {
             // Death sound on transition alive -> dead
             if (wasAlive && !this.alive) {
                 try {
-                    AudioManager.playSound("enemy-death.wav");
+//                    AudioManager.playSound("enemy-death.wav");
                 } catch (Throwable ignored) {
                 }
             }
@@ -595,13 +596,21 @@ public class MultiplayerGameManager extends BaseGameManager {
             int px = (int) Math.round(x - SIZE / 2.0) - camX;
             int py = (int) Math.round(y - SIZE / 2.0) - camY;
 
-            BufferedImage tex = null;
-            try {
-                tex = TextureManager.getEnemyTexture();
-            } catch (Throwable ignored) {
+            // Determine motion and facing from movement towards target
+            boolean moving = (Math.abs(tx - x) + Math.abs(ty - y)) > 0.1;
+            TextureManager.Direction dir;
+            double mdx = tx - x, mdy = ty - y;
+            if (Math.abs(mdx) > Math.abs(mdy)) {
+                dir = (mdx < 0) ? TextureManager.Direction.LEFT : TextureManager.Direction.RIGHT;
+            } else {
+                dir = (mdy < 0) ? TextureManager.Direction.UP : TextureManager.Direction.DOWN;
             }
-            if (tex != null) g2.drawImage(tex, px, py, SIZE, SIZE, null);
-            else {
+            TextureManager.Motion motion = moving ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
+
+            BufferedImage tex = TextureManager.getEnemyFrame(dir, motion, animMs);
+            if (tex != null) {
+                g2.drawImage(tex, px, py, SIZE, SIZE, null);
+            } else {
                 g2.setColor(new Color(200, 70, 70, 220));
                 g2.fillOval(px, py, SIZE, SIZE);
             }
