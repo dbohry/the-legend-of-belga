@@ -23,9 +23,9 @@ public final class HudRenderer {
     private static final Color HP_FILL_COLOR_LOW = new Color(255, 100, 100);
     private static final Color HP_BORDER_COLOR = new Color(80, 40, 40);
     
-    private static final Color SHIELD_OVERLAY_COLOR = new Color(100, 180, 255, 180);
-    private static final Color SHIELD_BORDER_COLOR = new Color(60, 100, 160);
-    private static final Color SHIELD_PATTERN_COLOR = new Color(80, 160, 255, 100);
+    private static final Color SHIELD_OVERLAY_COLOR = new Color(255, 255, 255, 200);
+    private static final Color SHIELD_BORDER_COLOR = new Color(200, 200, 200);
+    private static final Color SHIELD_PATTERN_COLOR = new Color(220, 220, 220, 150);
     
     private static final Color STAMINA_BG_COLOR = new Color(40, 40, 20, 180);
     private static final Color STAMINA_FILL_COLOR = new Color(255, 255, 100);
@@ -103,19 +103,22 @@ public final class HudRenderer {
             int shieldWidth = (int) (shieldRatio * BAR_WIDTH);
             
             if (shieldWidth > 0) {
-                // Draw shield as a visible overlay that extends beyond health
-                // Shield starts from the right side of the health bar and extends rightward
-                int shieldStartX = x + healthWidth;
-                int shieldEndX = x + Math.min(BAR_WIDTH, healthWidth + shieldWidth);
+                // Draw shield as a white overlay that starts from the right and extends leftward
+                // Shield starts from the right side of the HP bar and extends left
+                int shieldEndX = x + BAR_WIDTH; // Right edge of the bar
+                int shieldStartX = shieldEndX - shieldWidth; // Left edge of shield
                 
-                if (shieldStartX < shieldEndX && shieldStartX < x + BAR_WIDTH) {
+                // Ensure shield doesn't go beyond the left edge
+                shieldStartX = Math.max(x, shieldStartX);
+                
+                if (shieldStartX < shieldEndX) {
                     // Create shield overlay rectangle
                     RoundRectangle2D shieldOverlay = new RoundRectangle2D.Double(
                         shieldStartX, y, shieldEndX - shieldStartX, BAR_HEIGHT, 
                         CORNER_RADIUS, CORNER_RADIUS
                     );
                     
-                    // Draw shield overlay with more visible color
+                    // Draw shield overlay with white color
                     g2.setColor(SHIELD_OVERLAY_COLOR);
                     g2.fill(shieldOverlay);
                     
@@ -123,7 +126,7 @@ public final class HudRenderer {
                     g2.setColor(SHIELD_PATTERN_COLOR);
                     g2.setStroke(new BasicStroke(2));
                     
-                    // Draw diagonal lines pattern on shield
+                    // Draw diagonal lines pattern on shield (right to left)
                     int patternSpacing = 8;
                     for (int i = 0; i < shieldEndX - shieldStartX; i += patternSpacing) {
                         int lineX = shieldStartX + i;
@@ -166,8 +169,8 @@ public final class HudRenderer {
             g2.setColor(new Color(0, 0, 0, 100));
             g2.drawString(shieldText, shieldTextX + 1, shieldTextY + 1);
             
-            // Draw shield text in shield color
-            g2.setColor(SHIELD_BORDER_COLOR);
+            // Draw shield text in white color to match the overlay
+            g2.setColor(Color.WHITE);
             g2.drawString(shieldText, shieldTextX, shieldTextY);
         }
         

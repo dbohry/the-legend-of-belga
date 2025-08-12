@@ -218,7 +218,7 @@ public class PerkManager {
             new Perk("Weapon Width +1", "Enlarge your weapon by 1.", Player::increaseWeaponWidth)
         );
 
-        register("SHIELD", Rarity.COMMON, r ->
+        register("SHIELD", Rarity.RARE, r ->
             new Perk("Shield +1", "Adds +1 to HP shield.", Player::increaseShield)
         );
     }

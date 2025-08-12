@@ -31,9 +31,9 @@ The HP and stamina bars have been significantly improved with modern visual desi
 ### 4. Preserved HP Shield Logic
 The original HP shield system remains completely intact:
 - **Shield Absorption**: Damage is first absorbed by shield before affecting health
-- **Visual Integration**: Shield appears as a blue overlay within the HP bar
-- **Seamless Display**: Shield extends the health bar visually without separate positioning
-- **Proper Layering**: Shield overlay appears on top of health fill
+- **Visual Integration**: Shield appears as a white overlay within the HP bar
+- **Right-to-Left Display**: Shield starts from the right edge and extends leftward
+- **Dynamic Depletion**: When shield takes damage, it shrinks from right to left, exposing red HP bar
 
 ### 5. Technical Improvements
 - **Performance**: Efficient rendering with minimal object creation
@@ -60,8 +60,9 @@ HP Bar:
 - Border: Dark red (80, 40, 40)
 
 Shield Overlay (within HP bar):
-- Fill: Semi-transparent blue (100, 180, 255, 120)
-- Border: Dark blue (60, 100, 160)
+- Fill: Semi-transparent white (255, 255, 255, 200)
+- Border: Light gray (200, 200, 200)
+- Pattern: Light gray diagonal lines (220, 220, 220, 150)
 
 Stamina Bar:
 - Background: Dark yellow (40, 40, 20, 180)
