@@ -163,6 +163,9 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
             int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
             camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+            
+            // Apply screen shake from player attacks
+            camera.setShakeOffset(player.getScreenShakeOffset());
 
             simTick++;
             if ((simTick & 1) == 0) animTick30++;
@@ -300,7 +303,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
 
         for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
-        player.draw(g2, camera.offsetX(), camera.offsetY());
+                    player.draw(g2, camera.offsetX(), camera.offsetY(), enemies);
     }
 
     /** SP no-op; MP overrides. */

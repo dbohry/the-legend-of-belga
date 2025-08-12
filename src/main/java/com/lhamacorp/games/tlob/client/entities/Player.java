@@ -14,6 +14,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Random;
 
 public class Player extends Entity {
 
@@ -44,6 +45,16 @@ public class Player extends Entity {
 
     private long animTimeMs = 0L;
     private boolean movingThisTick = false;
+    
+    // Aim direction and attack animation enhancements
+    private Point lastAimPoint = null;
+    private int aimIndicatorAlpha = 0;
+    private int attackSwingPhase = 0;
+    private double attackSwingAngle = 0.0;
+    private int screenShakeTimer = 0;
+    private static final int AIM_INDICATOR_FADE_TIME = 60; // frames
+    private static final int ATTACK_SWING_DURATION = 10; // frames
+    private static final int SCREEN_SHAKE_DURATION = 8; // frames
 
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon);
@@ -186,6 +197,14 @@ public class Player extends Entity {
         // Optional mouse-aim point in WORLD coords
         Point aimPoint = null;
         if (args.length >= 4 && args[3] instanceof Point p) aimPoint = p;
+        
+        // Update aim direction tracking
+        if (aimPoint != null) {
+            lastAimPoint = aimPoint;
+            aimIndicatorAlpha = AIM_INDICATOR_FADE_TIME;
+        } else if (aimIndicatorAlpha > 0) {
+            aimIndicatorAlpha--;
+        }
 
         // --- Input -> movement intent (WASD) ---
         int dxRaw = 0, dyRaw = 0;
@@ -277,11 +296,20 @@ public class Player extends Entity {
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
+        
+        // Update attack swing animation
+        if (attackSwingPhase > 0) attackSwingPhase--;
+        if (screenShakeTimer > 0) screenShakeTimer--;
 
         if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
             attackTimer = scaleFrom60(weapon.getDuration());
             attackCooldown = scaleFrom60(weapon.getCooldown());
+            
+            // Initialize attack swing animation
+            attackSwingPhase = ATTACK_SWING_DURATION;
+            attackSwingAngle = facingAngle;
+            screenShakeTimer = SCREEN_SHAKE_DURATION;
 
             Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
@@ -363,6 +391,10 @@ public class Player extends Entity {
 
     @Override
     public void draw(Graphics2D g2, int camX, int camY) {
+        draw(g2, camX, camY, null);
+    }
+    
+    public void draw(Graphics2D g2, int camX, int camY, List<Enemy> enemies) {
         TextureManager.Direction dir = toCardinal(facing);
         TextureManager.Motion motion = movingThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
 
@@ -378,10 +410,16 @@ public class Player extends Entity {
         }
 
         if (attackTimer > 0) {
-            // Compute swing geometry (same as getSwordSwingShape) for positioning
+            // Enhanced sword attack animation with swing phase
             int r = weapon.getReach();
             int w = weapon.getWidth();
-            double theta = facingAngle;
+            
+            // Calculate swing animation based on phase
+            double swingProgress = 1.0 - (double) attackSwingPhase / ATTACK_SWING_DURATION;
+            double swingArc = Math.PI / 3.0; // 60 degree swing arc
+            double swingOffset = swingArc * swingProgress;
+            double theta = attackSwingAngle - swingArc/2 + swingOffset;
+            
             double cos = Math.cos(theta), sin = Math.sin(theta);
             int cx = (int) Math.round(x);
             int cy = (int) Math.round(y);
@@ -404,11 +442,49 @@ public class Player extends Entity {
                 at.translate(-sword.getWidth() / 2.0, -sword.getHeight() / 2.0);
                 g2.drawImage(sword, at, null);
 
-                // Optional subtle swing highlight over the area
+                // Enhanced swing highlight with animation
                 Shape swingWorld = getSwordSwingShape();
                 Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
-                g2.setColor(new Color(255, 255, 200, 90));
+                
+                // Animated swing trail effect
+                int alpha = (int) (180 * swingProgress);
+                g2.setColor(new Color(255, 255, 200, alpha));
                 g2.fill(swing);
+                
+                // Animated swing outline
+                g2.setColor(new Color(255, 255, 255, alpha + 40));
+                g2.setStroke(new BasicStroke(3f * (float) swingProgress));
+                g2.draw(swing);
+                
+                // Dynamic swing trail effect
+                if (swingProgress > 0.3) {
+                    int trailAlpha = (int) (100 * swingProgress);
+                    g2.setColor(new Color(255, 255, 150, trailAlpha));
+                    g2.setStroke(new BasicStroke(1f));
+                    
+                    // Draw multiple trail lines
+                    for (int i = 1; i <= 3; i++) {
+                        double trailProgress = swingProgress - (i * 0.1);
+                        if (trailProgress > 0) {
+                            double trailAngle = attackSwingAngle - swingArc/2 + (swingArc * trailProgress);
+                            double trailCos = Math.cos(trailAngle), trailSin = Math.sin(trailAngle);
+                            double trailAx = cx + trailCos * edge;
+                            double trailAy = cy + trailSin * edge;
+                            double trailCxBlade = trailAx + trailCos * (r / 2.0);
+                            double trailCyBlade = trailAy + trailSin * (r / 2.0);
+                            
+                            Rectangle2D.Double trailBlade = new Rectangle2D.Double(-r / 2.0, -w / 2.0, r, w);
+                            AffineTransform trailAt = new AffineTransform();
+                            trailAt.translate(trailCxBlade - camX, trailCyBlade - camY);
+                            trailAt.rotate(trailAngle);
+                            Shape trailShape = trailAt.createTransformedShape(trailBlade);
+                            Shape trailScreen = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(trailShape);
+                            
+                            g2.setColor(new Color(255, 255, 150, (int) (trailAlpha * trailProgress)));
+                            g2.draw(trailScreen);
+                        }
+                    }
+                }
             } else {
                 // Fallback to original debug swing visuals
                 Shape swingWorld = getSwordSwingShape();
@@ -419,6 +495,75 @@ public class Player extends Entity {
                 g2.setColor(new Color(255, 255, 255, 220));
                 g2.setStroke(new BasicStroke(2f));
                 g2.draw(swing);
+            }
+        }
+
+        // Aim direction indicator
+        if (aimIndicatorAlpha > 0 && lastAimPoint != null) {
+            int px = (int) Math.round(x) - camX;
+            int py = (int) Math.round(y) - camY;
+            int ax = lastAimPoint.x - camX;
+            int ay = lastAimPoint.y - camY;
+            
+            // Calculate alpha for fade effect
+            float alpha = (float) aimIndicatorAlpha / AIM_INDICATOR_FADE_TIME;
+            
+            // Draw aim line
+            g2.setColor(new Color(255, 255, 0, (int) (180 * alpha)));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawLine(px, py, ax, ay);
+            
+            // Draw aim crosshair at mouse position
+            int crosshairSize = 8;
+            g2.setColor(new Color(255, 255, 0, (int) (200 * alpha)));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawLine(ax - crosshairSize, ay, ax + crosshairSize, ay);
+            g2.drawLine(ax, ay - crosshairSize, ax, ay + crosshairSize);
+            
+            // Draw aim circle around player
+            int aimRadius = Math.max(width, height) / 2 + 4;
+            g2.setColor(new Color(255, 255, 0, (int) (60 * alpha)));
+            g2.setStroke(new BasicStroke(1f));
+            g2.drawOval(px - aimRadius, py - aimRadius, aimRadius * 2, aimRadius * 2);
+            
+            // Draw weapon range indicator
+            int weaponRange = weapon.getReach();
+            g2.setColor(new Color(255, 255, 0, (int) (30 * alpha)));
+            g2.setStroke(new BasicStroke(1f));
+            g2.drawOval(px - weaponRange, py - weaponRange, weaponRange * 2, weaponRange * 2);
+            
+            // Draw range markers at cardinal directions
+            g2.setColor(new Color(255, 255, 0, (int) (80 * alpha)));
+            g2.setStroke(new BasicStroke(1f));
+            int markerSize = 3;
+            g2.drawLine(px - weaponRange, py - markerSize, px - weaponRange, py + markerSize);
+            g2.drawLine(px + weaponRange, py - markerSize, px + weaponRange, py + markerSize);
+            g2.drawLine(px - markerSize, py - weaponRange, px + markerSize, py - weaponRange);
+            g2.drawLine(px - markerSize, py + weaponRange, px + markerSize, py + weaponRange);
+            
+            // Draw aim assist indicator when close to enemies
+            if (enemies != null) {
+                for (Enemy enemy : enemies) {
+                    if (enemy.isAlive()) {
+                        double distance = Math.hypot(enemy.getX() - x, enemy.getY() - y);
+                        if (distance < weapon.getReach() * 1.5) {
+                            int enemyScreenX = (int) Math.round(enemy.getX()) - camX;
+                            int enemyScreenY = (int) Math.round(enemy.getY()) - camY;
+                            
+                            // Draw enemy highlight when in range
+                            g2.setColor(new Color(255, 100, 100, (int) (120 * alpha)));
+                            g2.setStroke(new BasicStroke(2f));
+                            g2.drawOval(enemyScreenX - 12, enemyScreenY - 12, 24, 24);
+                            
+                            // Draw line to enemy if it's the closest one
+                            if (distance < weapon.getReach()) {
+                                g2.setColor(new Color(255, 100, 100, (int) (100 * alpha)));
+                                g2.setStroke(new BasicStroke(1f));
+                                g2.drawLine(px, py, enemyScreenX, enemyScreenY);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -443,8 +588,26 @@ public class Player extends Entity {
     public void tickClientAnimations(boolean moving) {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer   > 0) attackTimer--;
+        if (attackSwingPhase > 0) attackSwingPhase--;
+        if (screenShakeTimer > 0) screenShakeTimer--;
         this.movingThisTick = moving && (knockbackTimer == 0);
         this.animTimeMs += TICK_MS;
+    }
+    
+    public Point getScreenShakeOffset() {
+        if (screenShakeTimer <= 0) return new Point(0, 0);
+        
+        double intensity = (double) screenShakeTimer / SCREEN_SHAKE_DURATION;
+        double shakeAmount = 2.0 * intensity;
+        
+        // Create a subtle random shake pattern
+        long seed = (long) (x * 1000 + y * 1000 + screenShakeTimer);
+        Random shakeRng = new Random(seed);
+        
+        int shakeX = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount/2);
+        int shakeY = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount/2);
+        
+        return new Point(shakeX, shakeY);
     }
 
     @Override

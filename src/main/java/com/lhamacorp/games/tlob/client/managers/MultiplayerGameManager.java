@@ -432,7 +432,7 @@ public class MultiplayerGameManager extends BaseGameManager {
         // Remote entities then local player
         drawRemotePlayers(g2, camX, camY);
         drawRemoteEnemies(g2, camX, camY);
-        player.draw(g2, camX, camY);
+                    player.draw(g2, camX, camY, enemies);
     }
 
 

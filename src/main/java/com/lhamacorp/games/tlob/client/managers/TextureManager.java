@@ -428,13 +428,17 @@ public final class TextureManager {
         g.setColor(new Color(80, 56, 32));
         g.fillRect(Math.max(0, x0 - 2), handleY + handleH / 4, 2, Math.max(2, handleH / 2));
 
-        // Guard (gold)
+        // Guard (gold) with enhanced detail
         g.setColor(new Color(196, 166, 66));
         g.fillRect(xHandleEnd, guardY, guardLen, guardH);
         g.setColor(new Color(140, 110, 40));
         g.drawRect(xHandleEnd, guardY, guardLen, guardH);
+        
+        // Guard center detail
+        g.setColor(new Color(255, 215, 100));
+        g.drawLine(xHandleEnd + guardLen/2, guardY, xHandleEnd + guardLen/2, guardY + guardH);
 
-        // Blade base (light steel)
+        // Blade base (light steel) with enhanced metallic look
         g.setColor(new Color(200, 210, 220));
         g.fillRect(xGuardEnd, bladeY, bladeLen, bladeH);
 
@@ -444,6 +448,10 @@ public final class TextureManager {
         g.setColor(new Color(140, 150, 158));
         g.drawLine(xGuardEnd, bladeY, xBladeEnd - 1, bladeY);
         g.drawLine(xGuardEnd, bladeY + bladeH - 1, xBladeEnd - 1, bladeY + bladeH - 1);
+        
+        // Blade shine effect
+        g.setColor(new Color(255, 255, 255, 100));
+        g.drawLine(xGuardEnd + 1, bladeY + 1, xBladeEnd - 2, bladeY + 1);
 
         // Tip (simple triangle-ish pixel tip)
         g.setColor(new Color(220, 230, 240));
@@ -454,6 +462,11 @@ public final class TextureManager {
             if (hh <= 0) break;
             g.fillRect(xBladeEnd - tipW + i, yy, 1, hh);
         }
+        
+        // Add a subtle glow effect around the blade
+        g.setColor(new Color(255, 255, 200, 30));
+        g.setStroke(new BasicStroke(1f));
+        g.drawRect(xGuardEnd - 1, bladeY - 1, bladeLen + 2, bladeH + 2);
 
         g.dispose();
         return img;

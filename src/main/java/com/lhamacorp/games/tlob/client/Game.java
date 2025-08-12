@@ -1,7 +1,6 @@
 package com.lhamacorp.games.tlob.client;
 
 import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
-import com.lhamacorp.games.tlob.client.managers.MultiplayerGameManager;
 import com.lhamacorp.games.tlob.client.managers.SinglePlayerGameManager;
 
 import javax.swing.*;
