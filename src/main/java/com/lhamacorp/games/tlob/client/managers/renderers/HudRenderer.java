@@ -3,165 +3,305 @@ package com.lhamacorp.games.tlob.client.managers.renderers;
 import com.lhamacorp.games.tlob.client.entities.Player;
 
 import java.awt.*;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.geom.Rectangle2D;
 
 public final class HudRenderer {
 
     private final Font bodyFont;
+    
+    // Animation and visual constants
+    private static final int BAR_HEIGHT = 20;
+    private static final int BAR_WIDTH = 200;
+    private static final int BAR_SPACING = 8;
+    private static final int CORNER_RADIUS = 8;
+    private static final int BORDER_WIDTH = 2;
+    
+    // Color schemes
+    private static final Color HP_BG_COLOR = new Color(40, 20, 20, 180);
+    private static final Color HP_FILL_COLOR = new Color(220, 60, 60);
+    private static final Color HP_FILL_COLOR_LOW = new Color(255, 100, 100);
+    private static final Color HP_BORDER_COLOR = new Color(80, 40, 40);
+    
+    private static final Color SHIELD_OVERLAY_COLOR = new Color(100, 180, 255, 180);
+    private static final Color SHIELD_BORDER_COLOR = new Color(60, 100, 160);
+    private static final Color SHIELD_PATTERN_COLOR = new Color(80, 160, 255, 100);
+    
+    private static final Color STAMINA_BG_COLOR = new Color(40, 40, 20, 180);
+    private static final Color STAMINA_FILL_COLOR = new Color(255, 255, 100);
+    private static final Color STAMINA_FILL_COLOR_LOW = new Color(255, 200, 50);
+    private static final Color STAMINA_BORDER_COLOR = new Color(80, 80, 40);
+    
+    private static final Color MANA_BG_COLOR = new Color(20, 20, 40, 180);
+    private static final Color MANA_FILL_COLOR = new Color(100, 150, 255);
+    private static final Color MANA_BORDER_COLOR = new Color(60, 60, 120);
+    
+    // Animation variables
+    private long lastUpdateTime = System.currentTimeMillis();
+    private double pulsePhase = 0.0;
 
     public HudRenderer(Font bodyFont) {
         this.bodyFont = bodyFont;
     }
 
     public void draw(Graphics2D g2, Player player, int x, int y) {
+        // Update animation time
+        long currentTime = System.currentTimeMillis();
+        double deltaTime = (currentTime - lastUpdateTime) / 1000.0;
+        lastUpdateTime = currentTime;
+        
+        // Update animation phases
+        pulsePhase += deltaTime * 3.0; // 3 Hz pulse
+        
+        // Enable anti-aliasing for smoother bars
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        
         g2.setFont(bodyFont);
-        int nextY = drawHpShield(g2, player, x, y);
-        nextY = drawMana(g2, player, x, nextY);
-        nextY = drawStamina(g2, player, x, nextY);
-        g2.setColor(Color.WHITE);
+        
+        int nextY = drawHpShieldBar(g2, player, x, y);
+        nextY = drawStaminaBar(g2, player, x, nextY);
+        nextY = drawManaBar(g2, player, x, nextY);
+        
+        // Reset rendering hints
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_DEFAULT);
     }
 
-    private int drawHpShield(Graphics2D g2, Player p, int x, int y) {
-        return drawBlocks(
-            g2, x, y,
-            16, 12, 2,
-            clamp01(p.getHealth(), 0, p.getMaxHealth()), p.getMaxHealth(),
-            new Color(50, 10, 10),       // background across total slots
-            new Color(200, 40, 40),      // HP color
-            clamp01(p.getShield(), 0, p.getMaxShield()), p.getMaxShield(),
-            new Color(100, 150, 255)     // Shield color
+    private int drawHpShieldBar(Graphics2D g2, Player player, int x, int y) {
+        double health = player.getHealth();
+        double maxHealth = player.getMaxHealth();
+        double shield = player.getShield();
+        double maxShield = player.getMaxShield();
+        
+        // Draw HP bar background
+        RoundRectangle2D background = new RoundRectangle2D.Double(
+            x, y, BAR_WIDTH, BAR_HEIGHT, CORNER_RADIUS, CORNER_RADIUS
         );
-    }
-
-    private int drawMana(Graphics2D g2, Player p, int x, int y) {
-        if (p.getMaxMana() <= 0) return y;
-        return drawSingleRow(
-            g2, x, y,
-            16, 12, 2,
-            clamp01(p.getMana(), 0, p.getMaxMana()), p.getMaxMana(),
-            new Color(10, 10, 40),
-            new Color(100, 150, 255)
-        );
-    }
-
-    private int drawStamina(Graphics2D g2, Player p, int x, int y) {
-        return drawSingleRow(
-            g2, x, y,
-            16, 12, 2,
-            clamp01(p.getStamina(), 0, p.getMaxStamina()), p.getMaxStamina(),
-            new Color(60, 60, 20),
-            new Color(255, 255, 128)
-        );
-    }
-
-    /**
-     * Draws a combined HP + Shield row:
-     * - Draws 'totalSlots' background blocks where totalSlots = maxHp + maxShield (truncated to int).
-     * - Fills HP from slot 0 with full blocks and an optional half block at 0.5.
-     * - Starts Shield at index ceil(hp) with full blocks and optional half block at 0.5.
-     * Returns the next y position (current y + blockHeight + 6).
-     */
-    private int drawBlocks(
-        Graphics2D g2, int x, int y,
-        int blockWidth, int blockHeight, int spacing,
-        double hp, double maxHp, Color bgColor, Color hpColor,
-        double shield, double maxShield, Color shieldColor
-    ) {
-        // Guard/clamp
-        maxHp = Math.max(0, maxHp);
-        maxShield = Math.max(0, maxShield);
-        hp = Math.max(0, Math.min(maxHp, hp));
-        shield = Math.max(0, Math.min(maxShield, shield));
-
-        int totalSlots = (int) maxHp + (int) maxShield;
-        if (totalSlots <= 0) return y;
-
-        // Background across all slots
-        for (int i = 0; i < totalSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(bgColor);
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
+        g2.setColor(HP_BG_COLOR);
+        g2.fill(background);
+        
+        // Draw border
+        g2.setColor(HP_BORDER_COLOR);
+        g2.setStroke(new BasicStroke(BORDER_WIDTH));
+        g2.draw(background);
+        
+        // Calculate health fill
+        double healthRatio = Math.max(0, Math.min(1, health / maxHealth));
+        int healthWidth = (int) (healthRatio * BAR_WIDTH);
+        
+        // Draw health fill with gradient
+        if (healthWidth > 0) {
+            Color healthColor = healthRatio < 0.3 ? HP_FILL_COLOR_LOW : HP_FILL_COLOR;
+            drawGradientFill(g2, x, y, healthWidth, BAR_HEIGHT, 
+                           healthColor, healthColor.darker(), CORNER_RADIUS);
         }
-
-        // HP fill
-        int fullHp = (int) hp;
-        boolean halfHp = (hp - fullHp) >= 0.5;
-
-        g2.setColor(hpColor);
-        for (int i = 0; i < fullHp && i < totalSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
-        }
-        if (halfHp) {
-            int i = Math.min(fullHp, totalSlots - 1);
-            int blockX = x + i * (blockWidth + spacing);
-            g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
-        }
-
-        // Shield fill starts after ceil(hp)
-        int shieldStart = Math.min((int) Math.ceil(hp), totalSlots);
-        int fullShield = (int) shield;
-        boolean halfShield = (shield - fullShield) >= 0.5;
-
-        g2.setColor(shieldColor);
-        for (int i = 0; i < fullShield; i++) {
-            int idx = shieldStart + i;
-            if (idx >= totalSlots) break;
-            int blockX = x + idx * (blockWidth + spacing);
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
-        }
-        if (halfShield) {
-            int idx = shieldStart + fullShield;
-            if (idx < totalSlots) {
-                int blockX = x + idx * (blockWidth + spacing);
-                g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
+        
+        // Draw shield overlay within the HP bar if shield exists
+        if (maxShield > 0 && shield > 0) {
+            double shieldRatio = Math.max(0, Math.min(1, shield / maxShield));
+            int shieldWidth = (int) (shieldRatio * BAR_WIDTH);
+            
+            if (shieldWidth > 0) {
+                // Draw shield as a visible overlay that extends beyond health
+                // Shield starts from the right side of the health bar and extends rightward
+                int shieldStartX = x + healthWidth;
+                int shieldEndX = x + Math.min(BAR_WIDTH, healthWidth + shieldWidth);
+                
+                if (shieldStartX < shieldEndX && shieldStartX < x + BAR_WIDTH) {
+                    // Create shield overlay rectangle
+                    RoundRectangle2D shieldOverlay = new RoundRectangle2D.Double(
+                        shieldStartX, y, shieldEndX - shieldStartX, BAR_HEIGHT, 
+                        CORNER_RADIUS, CORNER_RADIUS
+                    );
+                    
+                    // Draw shield overlay with more visible color
+                    g2.setColor(SHIELD_OVERLAY_COLOR);
+                    g2.fill(shieldOverlay);
+                    
+                    // Draw shield pattern for better visibility
+                    g2.setColor(SHIELD_PATTERN_COLOR);
+                    g2.setStroke(new BasicStroke(2));
+                    
+                    // Draw diagonal lines pattern on shield
+                    int patternSpacing = 8;
+                    for (int i = 0; i < shieldEndX - shieldStartX; i += patternSpacing) {
+                        int lineX = shieldStartX + i;
+                        if (lineX < shieldEndX) {
+                            g2.drawLine(lineX, y, lineX + 4, y + BAR_HEIGHT);
+                        }
+                    }
+                    
+                    // Draw shield border
+                    g2.setColor(SHIELD_BORDER_COLOR);
+                    g2.setStroke(new BasicStroke(2));
+                    g2.draw(shieldOverlay);
+                }
             }
         }
-
-        return y + blockHeight + 6;
+        
+        // Draw health text
+        g2.setColor(Color.WHITE);
+        g2.setFont(bodyFont.deriveFont(Font.BOLD, 12f));
+        String healthText = String.format("%.1f/%.1f", health, maxHealth);
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = x + (BAR_WIDTH - fm.stringWidth(healthText)) / 2;
+        int textY = y + (BAR_HEIGHT + fm.getAscent()) / 2;
+        
+        // Draw text shadow
+        g2.setColor(new Color(0, 0, 0, 100));
+        g2.drawString(healthText, textX + 1, textY + 1);
+        
+        // Draw main text
+        g2.setColor(Color.WHITE);
+        g2.drawString(healthText, textX, textY);
+        
+        // Draw shield text if shield exists
+        if (maxShield > 0 && shield > 0) {
+            String shieldText = String.format("+%.1f", shield);
+            int shieldTextX = x + BAR_WIDTH - fm.stringWidth(shieldText) - 5;
+            int shieldTextY = y + (BAR_HEIGHT + fm.getAscent()) / 2;
+            
+            // Draw shield text shadow
+            g2.setColor(new Color(0, 0, 0, 100));
+            g2.drawString(shieldText, shieldTextX + 1, shieldTextY + 1);
+            
+            // Draw shield text in shield color
+            g2.setColor(SHIELD_BORDER_COLOR);
+            g2.drawString(shieldText, shieldTextX, shieldTextY);
+        }
+        
+        // Add pulsing effect when health is low
+        if (healthRatio < 0.3) {
+            double pulse = (Math.sin(pulsePhase) + 1) * 0.3 + 0.7;
+            g2.setColor(new Color(255, 255, 255, (int)(50 * pulse)));
+            g2.setStroke(new BasicStroke(3));
+            g2.draw(background);
+        }
+        
+        return y + BAR_HEIGHT + BAR_SPACING;
     }
 
-    /**
-     * Draws a single row (e.g., Mana or Stamina) with background blocks for max,
-     * then fills full blocks plus an optional half block at 0.5.
-     * Returns the next y position (current y + blockHeight + 6).
-     */
-    private int drawSingleRow(
-        Graphics2D g2, int x, int y,
-        int blockWidth, int blockHeight, int spacing,
-        double value, double maxValue, Color bgColor, Color fillColor
-    ) {
-        maxValue = Math.max(0, maxValue);
-        value = Math.max(0, Math.min(maxValue, value));
-
-        int maxSlots = (int) maxValue;
-        if (maxSlots <= 0) return y;
-
-        // Background slots
-        for (int i = 0; i < maxSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.setColor(bgColor);
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
+    private int drawStaminaBar(Graphics2D g2, Player player, int x, int y) {
+        double stamina = player.getStamina();
+        double maxStamina = player.getMaxStamina();
+        
+        if (maxStamina <= 0) return y;
+        
+        // Draw background
+        RoundRectangle2D background = new RoundRectangle2D.Double(
+            x, y, BAR_WIDTH, BAR_HEIGHT, CORNER_RADIUS, CORNER_RADIUS
+        );
+        g2.setColor(STAMINA_BG_COLOR);
+        g2.fill(background);
+        
+        // Draw border
+        g2.setColor(STAMINA_BORDER_COLOR);
+        g2.setStroke(new BasicStroke(BORDER_WIDTH));
+        g2.draw(background);
+        
+        // Calculate stamina fill
+        double staminaRatio = Math.max(0, Math.min(1, stamina / maxStamina));
+        int staminaWidth = (int) (staminaRatio * BAR_WIDTH);
+        
+        // Draw stamina fill with gradient
+        if (staminaWidth > 0) {
+            Color staminaColor = staminaRatio < 0.2 ? STAMINA_FILL_COLOR_LOW : STAMINA_FILL_COLOR;
+            drawGradientFill(g2, x, y, staminaWidth, BAR_HEIGHT,
+                           staminaColor, staminaColor.darker(), CORNER_RADIUS);
         }
-
-        // Fill
-        int full = (int) value;
-        boolean half = (value - full) >= 0.5;
-
-        g2.setColor(fillColor);
-        for (int i = 0; i < full && i < maxSlots; i++) {
-            int blockX = x + i * (blockWidth + spacing);
-            g2.fillRect(blockX, y, blockWidth, blockHeight);
+        
+        // Draw stamina text
+        g2.setColor(Color.WHITE);
+        g2.setFont(bodyFont.deriveFont(Font.BOLD, 12f));
+        String staminaText = String.format("%.1f/%.1f", stamina, maxStamina);
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = x + (BAR_WIDTH - fm.stringWidth(staminaText)) / 2;
+        int textY = y + (BAR_HEIGHT + fm.getAscent()) / 2;
+        
+        // Draw text shadow
+        g2.setColor(new Color(0, 0, 0, 100));
+        g2.drawString(staminaText, textX + 1, textY + 1);
+        
+        // Draw main text
+        g2.setColor(Color.WHITE);
+        g2.drawString(staminaText, textX, textY);
+        
+        // Add energy effect when stamina is low
+        if (staminaRatio < 0.2) {
+            double energy = (Math.sin(pulsePhase * 2) + 1) * 0.4 + 0.6;
+            g2.setColor(new Color(255, 255, 100, (int)(60 * energy)));
+            g2.setStroke(new BasicStroke(2));
+            g2.draw(background);
         }
-        if (half && full < maxSlots) {
-            int blockX = x + full * (blockWidth + spacing);
-            g2.fillRect(blockX, y, blockWidth / 2, blockHeight);
-        }
-
-        return y + blockHeight + 6;
+        
+        return y + BAR_HEIGHT + BAR_SPACING;
     }
 
-    private static double clamp01(double v, double min, double max) {
-        if (max < min) return v; // caller bug; don't alter
-        return Math.max(min, Math.min(max, v));
+    private int drawManaBar(Graphics2D g2, Player player, int x, int y) {
+        double mana = player.getMana();
+        double maxMana = player.getMaxMana();
+        
+        if (maxMana <= 0) return y;
+        
+        // Draw background
+        RoundRectangle2D background = new RoundRectangle2D.Double(
+            x, y, BAR_WIDTH, BAR_HEIGHT, CORNER_RADIUS, CORNER_RADIUS
+        );
+        g2.setColor(MANA_BG_COLOR);
+        g2.fill(background);
+        
+        // Draw border
+        g2.setColor(MANA_BORDER_COLOR);
+        g2.setStroke(new BasicStroke(BORDER_WIDTH));
+        g2.draw(background);
+        
+        // Calculate mana fill
+        double manaRatio = Math.max(0, Math.min(1, mana / maxMana));
+        int manaWidth = (int) (manaRatio * BAR_WIDTH);
+        
+        // Draw mana fill with gradient
+        if (manaWidth > 0) {
+            drawGradientFill(g2, x, y, manaWidth, BAR_HEIGHT,
+                           MANA_FILL_COLOR, MANA_FILL_COLOR.darker(), CORNER_RADIUS);
+        }
+        
+        // Draw mana text
+        g2.setColor(Color.WHITE);
+        g2.setFont(bodyFont.deriveFont(Font.BOLD, 12f));
+        String manaText = String.format("%.1f/%.1f", mana, maxMana);
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = x + (BAR_WIDTH - fm.stringWidth(manaText)) / 2;
+        int textY = y + (BAR_HEIGHT + fm.getAscent()) / 2;
+        
+        // Draw text shadow
+        g2.setColor(new Color(0, 0, 0, 100));
+        g2.drawString(manaText, textX + 1, textY + 1);
+        
+        // Draw main text
+        g2.setColor(Color.WHITE);
+        g2.drawString(manaText, textX, textY);
+        
+        return y + BAR_HEIGHT + BAR_SPACING;
+    }
+
+    private void drawGradientFill(Graphics2D g2, int x, int y, int width, int height, 
+                                 Color startColor, Color endColor, int cornerRadius) {
+        if (width <= 0) return;
+        
+        // Create gradient paint
+        GradientPaint gradient = new GradientPaint(
+            x, y, startColor,
+            x + width, y, endColor
+        );
+        
+        // Create rounded rectangle for the fill
+        RoundRectangle2D fillRect = new RoundRectangle2D.Double(
+            x, y, width, height, cornerRadius, cornerRadius
+        );
+        
+        // Apply gradient and fill
+        g2.setPaint(gradient);
+        g2.fill(fillRect);
     }
 }
