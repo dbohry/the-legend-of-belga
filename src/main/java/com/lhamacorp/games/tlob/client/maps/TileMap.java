@@ -1,7 +1,7 @@
 package com.lhamacorp.games.tlob.client.maps;
 
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
-import com.lhamacorp.games.tlob.common.Constants;
+import com.lhamacorp.games.tlob.core.Constants;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;

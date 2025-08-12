@@ -2,10 +2,10 @@
 package com.lhamacorp.games.tlob.client.managers;
 
 import com.lhamacorp.games.tlob.client.maps.TileMap;
-import com.lhamacorp.games.tlob.common.net.Protocol;
-import com.lhamacorp.games.tlob.common.net.Protocol.EnemySnap;
-import com.lhamacorp.games.tlob.common.net.Protocol.PlayerSnap;
-import com.lhamacorp.games.tlob.common.net.Protocol.Snapshot;
+import com.lhamacorp.games.tlob.core.net.Protocol;
+import com.lhamacorp.games.tlob.core.net.Protocol.EnemySnap;
+import com.lhamacorp.games.tlob.core.net.Protocol.PlayerSnap;
+import com.lhamacorp.games.tlob.core.net.Protocol.Snapshot;
 
 import javax.swing.*;
 import java.awt.*;

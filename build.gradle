@@ -23,6 +23,16 @@ application {
     mainClass = 'com.lhamacorp.games.tlob.client.Game'
 }
 
+// Additional run task for headless core (no UI)
+tasks.register('runCore', JavaExec) {
+    group = 'application'
+    description = 'Runs the headless core game (no UI)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.lhamacorp.games.tlob.core.CoreGame'
+    // forward all command line args to CoreGame
+    args = project.hasProperty('appArgs') ? project.appArgs.split(',') : []
+}
+
 jar {
     archiveBaseName.set('TheLegendOfBelga')
     archiveVersion.set('')

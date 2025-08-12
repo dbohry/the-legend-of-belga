@@ -1,6 +1,6 @@
-package com.lhamacorp.games.tlob.common.world;
+package com.lhamacorp.games.tlob.core.world;
 
-import com.lhamacorp.games.tlob.common.Constants;
+import com.lhamacorp.games.tlob.core.Constants;
 
 import java.util.Random;
 

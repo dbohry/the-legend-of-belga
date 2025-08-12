@@ -1,13 +1,13 @@
 package com.lhamacorp.games.tlob.server;
 
-import com.lhamacorp.games.tlob.common.Constants;
-import com.lhamacorp.games.tlob.common.math.Dir8;
-import com.lhamacorp.games.tlob.common.net.Protocol;
-import com.lhamacorp.games.tlob.common.net.Protocol.EnemySnap;
-import com.lhamacorp.games.tlob.common.net.Protocol.Input;
-import com.lhamacorp.games.tlob.common.net.Protocol.PlayerSnap;
-import com.lhamacorp.games.tlob.common.net.Protocol.Snapshot;
-import com.lhamacorp.games.tlob.common.world.GridMap;
+import com.lhamacorp.games.tlob.core.Constants;
+import com.lhamacorp.games.tlob.core.math.Dir8;
+import com.lhamacorp.games.tlob.core.net.Protocol;
+import com.lhamacorp.games.tlob.core.net.Protocol.EnemySnap;
+import com.lhamacorp.games.tlob.core.net.Protocol.Input;
+import com.lhamacorp.games.tlob.core.net.Protocol.PlayerSnap;
+import com.lhamacorp.games.tlob.core.net.Protocol.Snapshot;
+import com.lhamacorp.games.tlob.core.world.GridMap;
 
 import java.io.*;
 import java.net.Socket;
@@ -31,7 +31,7 @@ import java.util.function.Consumer;
  * - Accepts clients, reads INPUT, simulates players+enemies with tile collisions,
  *   and broadcasts SNAPSHOTs using the shared Protocol.
  */
-final class GameSession implements Runnable {
+public final class GameSession implements Runnable {
 
     // ----- Config -----
     final long seed;
@@ -71,7 +71,7 @@ final class GameSession implements Runnable {
     volatile boolean running = true;
     int tick = 0;
 
-    GameSession(long seed, int tickrate) {
+    public GameSession(long seed, int tickrate) {
         this.seed = seed;
         this.tickrate = (tickrate <= 0) ? 60 : tickrate;
         this.grid = new GridMap(MAP_W, MAP_H, seed);
@@ -128,7 +128,7 @@ final class GameSession implements Runnable {
 
 
     /** Graceful stop and autosave. */
-    void shutdown() {
+    public void shutdown() {
         running = false;
         for (ClientConn c : conns) c.close();
         try {

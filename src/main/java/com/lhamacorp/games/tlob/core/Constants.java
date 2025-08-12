@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob.common;
+package com.lhamacorp.games.tlob.core;
 
 public final class Constants {
     private Constants() {}

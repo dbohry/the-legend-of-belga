@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob.common.net;
+package com.lhamacorp.games.tlob.core.net;
 
 import java.io.BufferedReader;
 import java.io.EOFException;
@@ -107,7 +107,7 @@ public final class Protocol {
                         case "sh" -> ps.sh = parseDouble(v, 0);
                         case "facing" -> ps.facing = parseInt(v, 0);
                         case "alive" -> ps.alive = !"0".equals(v);
-                        case "name" -> ps.name = urlDec(v);
+                        case "name" -> ps.name = urlEnc(v);
                     }
                 });
                 if (ps.id > 0) s.players.put(ps.id, ps);

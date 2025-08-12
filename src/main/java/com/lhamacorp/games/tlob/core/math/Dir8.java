@@ -1,4 +1,4 @@
-package com.lhamacorp.games.tlob.common.math;
+package com.lhamacorp.games.tlob.core.math;
 
 public final class Dir8 {
     private Dir8() {
