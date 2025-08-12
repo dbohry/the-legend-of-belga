@@ -33,6 +33,9 @@ public final class TextureManager {
     private static BufferedImage[] grassFrames;
     private static BufferedImage grassTexture;
     private static BufferedImage stoneTexture;
+    private static BufferedImage dirtTexture;
+    private static BufferedImage plantsTexture;
+    private static BufferedImage swordTexture;
 
     // For legacy compatibility (first frame, idle/down)
     private static BufferedImage playerFirstFrame;
@@ -56,6 +59,21 @@ public final class TextureManager {
     public static BufferedImage getStoneTexture() {
         ensureLoaded();
         return stoneTexture;
+    }
+
+    public static BufferedImage getDirtTexture() {
+        ensureLoaded();
+        return dirtTexture;
+    }
+
+    public static BufferedImage getPlantsTexture() {
+        ensureLoaded();
+        return plantsTexture;
+    }
+
+    public static BufferedImage getSwordTexture() {
+        ensureLoaded();
+        return swordTexture;
     }
 
     // Legacy getters (return idle/down frame)
@@ -138,6 +156,11 @@ public final class TextureManager {
             stoneTexture = generateStoneTexture(32, 32);
             tryWrite(STONE_FILE, stoneTexture);
         }
+
+        // Procedural textures for floor variants (no external files required)
+        dirtTexture = generateDirtTexture(32, 32);
+        plantsTexture = generatePlantsTexture(32, 32);
+        swordTexture = generateSwordTexture(48, 16);
 
         // Player / Enemy: sprite sheets (4x4). Fallback to procedural generation if missing.
         BufferedImage playerSheet = null;
@@ -310,6 +333,128 @@ public final class TextureManager {
         }
         g.setColor(new Color(0, 0, 0, 25));
         g.drawRect(0, 0, w - 1, h - 1);
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generateDirtTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(124, 93, 62)); // base dirt
+        g.fillRect(0, 0, w, h);
+        // speckles
+        for (int i = 0; i < w * h / 8; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            int a = 40 + (int) (Math.random() * 60);
+            int r = 90 + (int) (Math.random() * 40);
+            int gch = 60 + (int) (Math.random() * 30);
+            int b = 40 + (int) (Math.random() * 20);
+            g.setColor(new Color(r, gch, b, a));
+            g.fillRect(x, y, 1, 1);
+        }
+        g.setColor(new Color(0, 0, 0, 25));
+        g.drawRect(0, 0, w - 1, h - 1);
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generatePlantsTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(58, 94, 58)); // darker base
+        g.fillRect(0, 0, w, h);
+        // small leaf clusters
+        for (int i = 0; i < w * h / 20; i++) {
+            int x = (int) (Math.random() * (w - 4));
+            int y = (int) (Math.random() * (h - 4));
+            Color leaf1 = new Color(76, 132, 76);
+            Color leaf2 = new Color(96, 160, 96);
+            g.setColor(leaf1);
+            g.fillOval(x, y + 2, 3, 2);
+            g.fillOval(x + 2, y, 2, 3);
+            g.setColor(leaf2);
+            g.fillOval(x + 1, y + 1, 3, 2);
+        }
+        // subtle stems
+        g.setColor(new Color(40, 70, 40, 120));
+        for (int i = 0; i < 6; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            int len = 2 + (int) (Math.random() * 4);
+            g.drawLine(x, y, x, Math.max(0, y - len));
+        }
+        g.setColor(new Color(0, 0, 0, 25));
+        g.drawRect(0, 0, w - 1, h - 1);
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generateSwordTexture(int w, int h) {
+        // Create a horizontal sword pointing to the right.
+        // Overall canvas w x h, with transparent background.
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+        // Base measurements relative to h
+        int bladeH = Math.max(3, (int) Math.round(h * 0.4));
+        int guardH = Math.max(2, (int) Math.round(h * 0.6));
+        int handleH = Math.max(2, (int) Math.round(h * 0.35));
+
+        int centerY = h / 2;
+        int bladeY = centerY - bladeH / 2;
+        int guardY = centerY - guardH / 2;
+        int handleY = centerY - handleH / 2;
+
+        // Layout along X: [handle | guard | blade tip]
+        int handleLen = Math.max(4, w / 6);
+        int guardLen = Math.max(2, w / 16);
+        int bladeLen = w - handleLen - guardLen - 2;
+
+        int x0 = 1; // left padding
+        int xHandleEnd = x0 + handleLen;
+        int xGuardEnd = xHandleEnd + guardLen;
+        int xBladeEnd = xGuardEnd + bladeLen;
+
+        // Handle (brown) with darker outline
+        g.setColor(new Color(92, 62, 36));
+        g.fillRect(x0, handleY, handleLen, handleH);
+        g.setColor(new Color(60, 40, 24));
+        g.drawRect(x0, handleY, handleLen, handleH);
+
+        // Pommel (small cap)
+        g.setColor(new Color(80, 56, 32));
+        g.fillRect(Math.max(0, x0 - 2), handleY + handleH / 4, 2, Math.max(2, handleH / 2));
+
+        // Guard (gold)
+        g.setColor(new Color(196, 166, 66));
+        g.fillRect(xHandleEnd, guardY, guardLen, guardH);
+        g.setColor(new Color(140, 110, 40));
+        g.drawRect(xHandleEnd, guardY, guardLen, guardH);
+
+        // Blade base (light steel)
+        g.setColor(new Color(200, 210, 220));
+        g.fillRect(xGuardEnd, bladeY, bladeLen, bladeH);
+
+        // Blade center line and edges for pixel look
+        g.setColor(new Color(160, 170, 178));
+        g.drawLine(xGuardEnd, bladeY + bladeH / 2, xBladeEnd - 1, bladeY + bladeH / 2);
+        g.setColor(new Color(140, 150, 158));
+        g.drawLine(xGuardEnd, bladeY, xBladeEnd - 1, bladeY);
+        g.drawLine(xGuardEnd, bladeY + bladeH - 1, xBladeEnd - 1, bladeY + bladeH - 1);
+
+        // Tip (simple triangle-ish pixel tip)
+        g.setColor(new Color(220, 230, 240));
+        int tipW = Math.max(2, bladeH / 2);
+        for (int i = 0; i < tipW; i++) {
+            int yy = bladeY + i;
+            int hh = bladeH - i * 2;
+            if (hh <= 0) break;
+            g.fillRect(xBladeEnd - tipW + i, yy, 1, hh);
+        }
+
         g.dispose();
         return img;
     }

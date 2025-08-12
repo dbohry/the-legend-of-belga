@@ -8,9 +8,15 @@ import java.awt.image.BufferedImage;
 import java.util.Random;
 
 public class TileMap {
+    // Tile types
     public static final int FLOOR = 0;
     public static final int WALL = 1;
     public static final int EDGE_WALL = 2;
+
+    // Floor variants
+    public static final int FLOOR_GRASS = FLOOR;
+    public static final int FLOOR_DIRT = 3;
+    public static final int FLOOR_PLANTS = 4;
 
     private final int width;
     private final int height;
@@ -19,6 +25,11 @@ public class TileMap {
     private static final double WALL_MAX_HP = 4.0;
 
     private final Random rng;
+
+    /** Returns true if the given tile id should hide the player from enemies. */
+    public static boolean isHidingTileId(int tileId) {
+        return tileId == FLOOR_PLANTS;
+    }
 
     // Back-compat (non-deterministic)
     public TileMap(int[][] tiles) {
@@ -97,9 +108,18 @@ public class TileMap {
                 int t = tiles[x][y];
                 boolean isWall = (t == WALL || t == EDGE_WALL);
 
-                BufferedImage tex = isWall
-                    ? TextureManager.getStoneTexture()
-                    : TextureManager.getGrassTextureFrame(tick30);
+                BufferedImage tex;
+                if (isWall) {
+                    tex = TextureManager.getStoneTexture();
+                } else {
+                    if (t == FLOOR_DIRT) {
+                        tex = TextureManager.getDirtTexture();
+                    } else if (t == FLOOR_PLANTS) {
+                        tex = TextureManager.getPlantsTexture();
+                    } else {
+                        tex = TextureManager.getGrassTextureFrame(tick30);
+                    }
+                }
 
                 if (tex != null) {
                     g.drawImage(tex, px, py, tileSize, tileSize, null);
@@ -166,5 +186,19 @@ public class TileMap {
             if (!isWall(x, y)) return new int[]{x, y};
         }
         return findSpawnTile();
+    }
+
+    /** Returns the tile id at tile coordinates; walls/edges as stored. Out of bounds returns EDGE_WALL. */
+    public int getTileAt(int tx, int ty) {
+        if (tx < 0 || ty < 0 || tx >= width || ty >= height) return EDGE_WALL;
+        return tiles[tx][ty];
+    }
+
+    /** Returns true if the world position (pixels) is on a hiding tile (grass/plants). */
+    public boolean isHidingAtWorld(double wx, double wy) {
+        int tx = (int) Math.floor(wx / (double) Constants.TILE_SIZE);
+        int ty = (int) Math.floor(wy / (double) Constants.TILE_SIZE);
+        int t = getTileAt(tx, ty);
+        return isHidingTileId(t);
     }
 }

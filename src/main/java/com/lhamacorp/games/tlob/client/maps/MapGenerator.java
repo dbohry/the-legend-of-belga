@@ -61,7 +61,11 @@ public class MapGenerator {
         }
 
         // Smooth map a bit
-        return smooth(tiles, 2);
+        tiles = smooth(tiles, 2);
+
+        // Decorate floors with variants (dirt roads and plant patches)
+        decorateFloors(tiles);
+        return tiles;
     }
 
     private int[][] smooth(int[][] tiles, int iterations) {
@@ -77,6 +81,49 @@ public class MapGenerator {
             result = next;
         }
         return result;
+    }
+
+    private void decorateFloors(int[][] tiles) {
+        // Defaults: mostly grass; some dirt paths; some plant patches.
+        // 1) Start with everything non-wall as grass
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (tiles[x][y] != TileMap.WALL) tiles[x][y] = TileMap.FLOOR_GRASS;
+            }
+        }
+
+        // 2) Carve a few random dirt paths using short random walks
+        int paths = Math.max(2, (width + height) / 20);
+        for (int p = 0; p < paths; p++) {
+            int x = clamp(rng.nextInt(width - 2) + 1, 1, width - 2);
+            int y = clamp(rng.nextInt(height - 2) + 1, 1, height - 2);
+            int len = 20 + rng.nextInt(Math.max(20, (width + height) / 2));
+            for (int i = 0; i < len; i++) {
+                if (tiles[x][y] != TileMap.WALL) tiles[x][y] = TileMap.FLOOR_DIRT;
+                int dir = rng.nextInt(4);
+                if (dir == 0) x++; else if (dir == 1) x--; else if (dir == 2) y++; else y--;
+                x = clamp(x, 1, width - 2);
+                y = clamp(y, 1, height - 2);
+            }
+        }
+
+        // 3) Scatter small plant patches in open areas
+        int patches = Math.max(3, (width * height) / 600);
+        for (int k = 0; k < patches; k++) {
+            int cx = rng.nextInt(width);
+            int cy = rng.nextInt(height);
+            int radius = 1 + rng.nextInt(2); // small patches
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx <= 0 || ny <= 0 || nx >= width - 1 || ny >= height - 1) continue;
+                    if (tiles[nx][ny] == TileMap.FLOOR_GRASS && (dx * dx + dy * dy) <= radius * radius) {
+                        // Make a few plants, but don't override dirt to keep roads visible
+                        if (rng.nextDouble() < 0.6) tiles[nx][ny] = TileMap.FLOOR_PLANTS;
+                    }
+                }
+            }
+        }
     }
 
     private int countNeighbors(int[][] tiles, int x, int y, int radius) {

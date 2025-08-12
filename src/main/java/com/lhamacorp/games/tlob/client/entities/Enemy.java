@@ -89,7 +89,10 @@ public class Enemy extends Entity {
         double dyToP = player.getY() - y;
         double distToP = Math.hypot(dxToP, dyToP);
 
-        if (distToP <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
+        // Stealth: if player stands on hiding tile (grass/plants), enemies cannot find them
+        boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
+
+        if (!playerHidden && distToP <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
             attackTimer = baseAttackDuration;
             attackCooldown = baseAttackCooldown;
             player.damage(1.0);
@@ -111,7 +114,7 @@ public class Enemy extends Entity {
             double desiredSpeed = speed * speedScale;
 
             // choose wander vs engage
-            boolean wander = (distToP > aggressionRadius) || (attackTimer > 0);
+            boolean wander = (distToP > aggressionRadius) || (attackTimer > 0) || playerHidden;
             if (wander) {
                 if (--wanderTimer <= 0) pickNewWanderDir();
                 dirX = wanderDx;

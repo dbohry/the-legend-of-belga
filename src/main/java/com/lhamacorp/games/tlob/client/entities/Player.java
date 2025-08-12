@@ -378,25 +378,61 @@ public class Player extends Entity {
         }
 
         if (attackTimer > 0) {
-            Shape swingWorld = getSwordSwingShape();
-            Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
+            // Compute swing geometry (same as getSwordSwingShape) for positioning
+            int r = weapon.getReach();
+            int w = weapon.getWidth();
+            double theta = facingAngle;
+            double cos = Math.cos(theta), sin = Math.sin(theta);
+            int cx = (int) Math.round(x);
+            int cy = (int) Math.round(y);
+            double halfW = width / 2.0;
+            double halfH = height / 2.0;
+            double edge = Math.hypot(halfW * cos, halfH * sin);
+            double ax = cx + cos * edge;
+            double ay = cy + sin * edge;
+            double cxBlade = ax + cos * (r / 2.0);
+            double cyBlade = ay + sin * (r / 2.0);
 
-            g2.setColor(new Color(255, 255, 180, 180));
-            g2.fill(swing);
-            g2.setColor(new Color(255, 255, 255, 220));
-            g2.setStroke(new BasicStroke(2f));
-            g2.draw(swing);
+            BufferedImage sword = TextureManager.getSwordTexture();
+            if (sword != null) {
+                AffineTransform at = new AffineTransform();
+                at.translate(cxBlade - camX, cyBlade - camY);
+                at.rotate(theta);
+                double scaleX = r / (double) sword.getWidth();
+                double scaleY = w / (double) sword.getHeight();
+                at.scale(scaleX, scaleY);
+                at.translate(-sword.getWidth() / 2.0, -sword.getHeight() / 2.0);
+                g2.drawImage(sword, at, null);
+
+                // Optional subtle swing highlight over the area
+                Shape swingWorld = getSwordSwingShape();
+                Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
+                g2.setColor(new Color(255, 255, 200, 90));
+                g2.fill(swing);
+            } else {
+                // Fallback to original debug swing visuals
+                Shape swingWorld = getSwordSwingShape();
+                Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
+
+                g2.setColor(new Color(255, 255, 180, 180));
+                g2.fill(swing);
+                g2.setColor(new Color(255, 255, 255, 220));
+                g2.setStroke(new BasicStroke(2f));
+                g2.draw(swing);
+            }
         }
 
-        // tiny facing line
-        g2.setColor(new Color(10, 40, 15));
-        int px = (int) Math.round(x) - camX;
-        int py = (int) Math.round(y) - camY;
-        int len = Math.max(width, height) / 2 + 6;
-        int tx = px + (int) Math.round(Math.cos(facingAngle) * len);
-        int ty = py + (int) Math.round(Math.sin(facingAngle) * len);
-        g2.setStroke(new BasicStroke(2f));
-        g2.drawLine(px, py, tx, ty);
+        // tiny facing line (debug-only; disabled by default)
+        if (Boolean.getBoolean("tlob.showFacingLine")) {
+            g2.setColor(new Color(10, 40, 15));
+            int px = (int) Math.round(x) - camX;
+            int py = (int) Math.round(y) - camY;
+            int len = Math.max(width, height) / 2 + 6;
+            int tx = px + (int) Math.round(Math.cos(facingAngle) * len);
+            int ty = py + (int) Math.round(Math.sin(facingAngle) * len);
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawLine(px, py, tx, ty);
+        }
     }
 
     public void triggerLocalAttackFx() {
