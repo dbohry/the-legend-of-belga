@@ -36,7 +36,7 @@ public abstract class Entity {
     protected double knockbackY = 0;
     protected int knockbackTimer = 0;
     protected static final int KNOCKBACK_DURATION = 8;
-    protected static final double KNOCKBACK_FORCE = 4.0;
+    protected static final double KNOCKBACK_FORCE = 8.0; // Doubled from 4.0 for stronger knockback
 
     public enum Direction {UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT}
 

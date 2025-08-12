@@ -149,53 +149,36 @@ class HudRendererTest {
 
     @Test
     void testDashAbility() {
-        // Test that dash ability works correctly
-        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
-        assertEquals(4.0, player.getMana(), "Player should start with full mana");
+        // Test that dash ability is disabled (mana set to 0)
+        assertEquals(0.0, player.getMaxMana(), "Player should have no mana (dash disabled)");
+        assertEquals(0.0, player.getMana(), "Player should start with no mana");
         
-        // Test dash ability check
-        assertTrue(player.canDash(), "Player should be able to dash with full mana");
-        assertEquals(2.0, player.getDashManaCost(), "Dash should cost 2.0 mana");
+        // Test dash ability check (should be false with no mana)
+        assertFalse(player.canDash(), "Player should not be able to dash with no mana");
+        assertEquals(2.0, player.getDashManaCost(), "Dash should still cost 2.0 mana");
         
-        // Test that player can dash when conditions are met
-        // Note: This would require more complex setup with input simulation
-        // For now, just verify the basic properties
-        assertTrue(player.getMaxMana() >= player.getDashManaCost(), 
-                  "Player should have enough max mana for dash");
+        // Test that player cannot dash when conditions are not met
+        assertFalse(player.getMaxMana() >= player.getDashManaCost(), 
+                  "Player should not have enough max mana for dash");
     }
 
     @Test
     void testHudRendererWithDash() {
-        // Test that HUD renderer can handle dash indicator display
-        assertEquals(4.0, player.getMana(), "Player should have 4.0 mana");
+        // Test that HUD renderer can handle no mana display
+        assertEquals(0.0, player.getMana(), "Player should have 0.0 mana");
         
-        // Test that HUD renderer can draw with dash indicator
+        // Test that HUD renderer can draw without dash indicator
         assertDoesNotThrow(() -> {
             hudRenderer.draw(graphics, player, 10, 10);
-        }, "HUD renderer should handle dash indicator display without errors");
-    }
-
-    @Test
-    void testDashTrailFunctionality() {
-        // Test dash trail functionality
-        assertFalse(player.isDashTrailActive(), "Player should not have active dash trail initially");
-        
-        Point trailOffset = player.getDashTrailOffset();
-        assertEquals(0, trailOffset.x, "Dash trail offset X should be 0 initially");
-        assertEquals(0, trailOffset.y, "Dash trail offset Y should be 0 initially");
-        
-        // Test that dash trail methods don't crash
-        assertNotNull(player.getDashTrailOffset(), "Dash trail offset should not be null");
+        }, "HUD renderer should handle no mana display without errors");
     }
 
     @Test
     void testDashMovementSystem() {
-        // Test that dash movement system is properly initialized
-        // Note: Full dash movement testing would require complex input simulation
-        // For now, just verify the basic properties
-        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
-        assertTrue(player.canDash(), "Player should be able to dash with full mana");
-        assertEquals(2.0, player.getDashManaCost(), "Dash should cost 2.0 mana");
+        // Test that dash movement system is properly initialized but disabled
+        assertEquals(0.0, player.getMaxMana(), "Player should have no mana (dash disabled)");
+        assertFalse(player.canDash(), "Player should not be able to dash with no mana");
+        assertEquals(2.0, player.getDashManaCost(), "Dash should still cost 2.0 mana");
     }
 
     @Test
@@ -231,14 +214,12 @@ class HudRendererTest {
 
     @Test
     void testManaRegeneration() {
-        // Test that mana regeneration is independent
-        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
-        assertEquals(4.0, player.getMana(), "Player should start with full mana");
+        // Test that mana regeneration is disabled (mana set to 0)
+        assertEquals(0.0, player.getMaxMana(), "Player should have no mana (dash disabled)");
+        assertEquals(0.0, player.getMana(), "Player should start with no mana");
         
-        // Test that mana can be consumed and regenerates independently
-        // Note: Full regeneration testing would require time simulation
-        // For now, just verify the basic properties
-        assertTrue(player.getMaxMana() > 0, "Player should have mana capacity");
-        assertTrue(player.getMana() > 0, "Player should have current mana");
+        // Test that mana system is properly disabled
+        assertFalse(player.getMaxMana() > 0, "Player should have no mana capacity");
+        assertFalse(player.getMana() > 0, "Player should have no current mana");
     }
 }
