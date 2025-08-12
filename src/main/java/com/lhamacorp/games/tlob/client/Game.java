@@ -6,6 +6,7 @@ import com.lhamacorp.games.tlob.client.managers.SinglePlayerGameManager;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Random;
 
 public class Game {
 
@@ -54,7 +55,16 @@ public class Game {
 
         if (choice == 0) {
             // Singleplayer
-            return new SinglePlayerGameManager();
+            long defSeed = new Random().nextLong();
+            String seedStr = prompt(owner, "World seed:", Long.toString(defSeed));
+            if (seedStr == null) System.exit(0);
+            long seed;
+            try {
+                seed = Long.parseLong(seedStr.trim());
+            } catch (Exception e) {
+                seed = defSeed;
+            }
+            return new SinglePlayerGameManager(seed);
         }
 
         // Multiplayer

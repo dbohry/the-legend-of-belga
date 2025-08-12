@@ -5,8 +5,12 @@ import java.awt.*;
 public class SinglePlayerGameManager extends BaseGameManager {
 
     public SinglePlayerGameManager() {
+        this(readSeed());
+    }
+
+    public SinglePlayerGameManager(long seed) {
         super();
-        initWorld(readSeed()); // builds map & player
+        initWorld(seed); // builds map & player
         // now populate SP enemies
         enemySpawner.spawn(levelManager.map(), player, enemies, levelManager.completed(), TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
