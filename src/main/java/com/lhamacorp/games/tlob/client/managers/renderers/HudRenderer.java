@@ -10,8 +10,8 @@ public final class HudRenderer {
     private final Font bodyFont;
     
     // Animation and visual constants
-    private static final int BAR_HEIGHT = 20;
-    private static final int BAR_WIDTH = 200;
+    private static final int BAR_HEIGHT = 15;
+    private static final int BAR_WIDTH = 150;
     private static final int BAR_SPACING = 8;
     private static final int CORNER_RADIUS = 8;
     private static final int BORDER_WIDTH = 2;

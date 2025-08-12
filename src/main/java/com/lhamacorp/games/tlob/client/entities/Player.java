@@ -96,7 +96,7 @@ public class Player extends Entity {
     private static final int SCREEN_SHAKE_DURATION = 8; // frames
     
     // Animation and visual constants
-    private static final double SWING_ARC_RADIANS = Math.PI / 3.0; // 60 degrees
+    private static final double SWING_ARC_RADIANS = Math.PI / 2.0; // 60 degrees
     private static final double SWING_TRAIL_SPACING = 0.1; // trail effect spacing
     private static final int MAX_TRAIL_COUNT = 3; // number of trail effects
     private static final int CROSSHAIR_SIZE = 8;
