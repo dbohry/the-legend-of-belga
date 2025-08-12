@@ -37,45 +37,69 @@ public class Game {
             return new SinglePlayerGameManager();
         }
 
-        String[] choices = {"Singleplayer", "Multiplayer", "Cancel"};
-        int choice = JOptionPane.showOptionDialog(
-            owner,
-            "Choose a game mode:",
-            "Start Game",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.PLAIN_MESSAGE,
-            null,
-            choices,
-            choices[0]
-        );
+        // Build a simple modal dialog that mimics JOptionPane but lets us disable a button
+        final JDialog dialog = new JDialog(owner, "Start Game", true);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.setLayout(new BorderLayout(12, 12));
 
-        if (choice == 2 || choice == JOptionPane.CLOSED_OPTION) {
+        JLabel msg = new JLabel("Choose a game mode:");
+        msg.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
+        dialog.add(msg, BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        JButton btnSingle = new JButton("Singleplayer");
+        JButton btnMulti  = new JButton("Multiplayer");
+        JButton btnCancel = new JButton("Cancel");
+
+        // Disable Multiplayer
+        btnMulti.setEnabled(false);
+
+        buttons.add(btnSingle);
+        buttons.add(btnMulti);
+        buttons.add(btnCancel);
+        dialog.add(buttons, BorderLayout.SOUTH);
+
+        // Make Singleplayer the default button (Enter key)
+        dialog.getRootPane().setDefaultButton(btnSingle);
+
+        // Result holder: 0 = Singleplayer, 2 = Cancel/Close
+        final int[] result = {-1};
+
+        btnSingle.addActionListener(e -> { result[0] = 0; dialog.dispose(); });
+        btnCancel.addActionListener(e -> { result[0] = 2; dialog.dispose(); });
+
+        // If user closes the window (X), treat as cancel
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosing(java.awt.event.WindowEvent e) { result[0] = 2; }
+        });
+
+        dialog.pack();
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(owner);
+        dialog.setVisible(true);
+
+        int choice = result[0];
+        if (choice == 2 || choice == -1) {
             System.exit(0);
         }
 
-        if (choice == 0) {
-            // Singleplayer
-            long defSeed = new Random().nextLong();
-            String seedStr = prompt(owner, "World seed:", Long.toString(defSeed));
-            if (seedStr == null) System.exit(0);
-            long seed;
-            try {
-                seed = Long.parseLong(seedStr.trim());
-            } catch (Exception e) {
-                seed = defSeed;
-            }
-            return new SinglePlayerGameManager(seed);
+        // Singleplayer flow
+        long defSeed = new Random().nextLong();
+        String seedStr = prompt(owner, "World seed:", Long.toString(defSeed));
+        if (seedStr == null) System.exit(0);
+        long seed;
+        try {
+            seed = Long.parseLong(seedStr.trim());
+        } catch (Exception e) {
+            seed = defSeed;
         }
+        return new SinglePlayerGameManager(seed);
 
-        // Multiplayer
-        String hero = prompt(owner, "Hero name:", "Hero");
-        if (hero == null) System.exit(0);
-
-        String hostPort = prompt(owner, "Server (host:port):", "localhost:7777");
-        if (hostPort == null) System.exit(0);
-
-        HostPort hp = parseHostPort(hostPort, 7777);
-        return new MultiplayerGameManager(hp.host, hp.port, hero);
+        // NOTE: Multiplayer path intentionally unreachable because the button is disabled.
+        // If you re-enable it in the future, reinstate:
+        // String hero = prompt(owner, "Hero name:", "Hero"); ...
+        // HostPort hp = parseHostPort(hostPort, 7777);
+        // return new MultiplayerGameManager(hp.host, hp.port, hero);
     }
 
     private static boolean isStartScreenEnabled() {
