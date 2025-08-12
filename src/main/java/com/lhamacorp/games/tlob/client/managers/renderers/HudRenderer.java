@@ -4,7 +4,6 @@ import com.lhamacorp.games.tlob.client.entities.Player;
 
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.geom.Rectangle2D;
 
 public final class HudRenderer {
 
@@ -284,6 +283,19 @@ public final class HudRenderer {
         // Draw main text
         g2.setColor(Color.WHITE);
         g2.drawString(manaText, textX, textY);
+        
+        // Add dash indicator when mana is sufficient
+        if (mana >= 2.0) {
+            // Draw a small dash icon or indicator
+            g2.setColor(new Color(255, 255, 255, 150));
+            g2.setStroke(new BasicStroke(2));
+            
+            // Draw a simple dash symbol (two horizontal lines)
+            int dashX = x + BAR_WIDTH - 25;
+            int dashY = y + BAR_HEIGHT / 2;
+            g2.drawLine(dashX, dashY - 3, dashX + 8, dashY - 3);
+            g2.drawLine(dashX, dashY + 3, dashX + 8, dashY + 3);
+        }
         
         return y + BAR_HEIGHT + BAR_SPACING;
     }

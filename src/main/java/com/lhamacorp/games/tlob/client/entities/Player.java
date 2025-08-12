@@ -22,7 +22,7 @@ public class Player extends Entity {
     private static final double PLAYER_SPEED = 3;
     private static final double PLAYER_MAX_HP = 6.0;
     private static final double PLAYER_MAX_STAMINA = 6.0;
-    private static final double PLAYER_MAX_MANA = 0;
+    private static final double PLAYER_MAX_MANA = 0.0;
     private static final double PLAYER_MAX_SHIELD = 0;
     private static final double PLAYER_SPEED_PPS = 90.0;
 
@@ -31,12 +31,51 @@ public class Player extends Entity {
 
     private static final int STAMINA_DRAIN_INTERVAL = TICKS_PER_SECOND;
     private static final int STAMINA_REGEN_INTERVAL = TICKS_PER_SECOND * 3;
+    private static final int MANA_REGEN_INTERVAL = TICKS_PER_SECOND * 2;
+
+    // Dash ability constants
+    private static final double DASH_MANA_COST = 2.0;
+    private static final double DASH_DISTANCE = 100.0; // blocks - increased for visibility
+    private static final int DASH_COOLDOWN_TICKS = TICKS_PER_SECOND * 2; // 2 seconds
+    private static final int DASH_MOVEMENT_TICKS = 5; // frames to complete dash movement
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
     private double staminaRegenRateMult = 1.0;
+    private int manaRegenCounter = 0;
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
+
+    // Dash ability variables
+    private boolean wasShiftPressed = false;
+    private boolean dashTriggered = false;
+    private int dashCooldownTimer = 0;
+    private boolean canDash = true;
+    
+    // Dash trail effect variables
+    private int dashTrailTimer = 0;
+    private double dashStartX = 0;
+    private double dashStartY = 0;
+    private static final int DASH_TRAIL_DURATION = 10; // frames
+    
+    // Dash movement variables
+    private int dashMovementTimer = 0;
+    private double dashTargetX = 0;
+    private double dashTargetY = 0;
+    private double dashDirectionX = 0;
+    private double dashDirectionY = 0;
+    
+    // Dash shadow trail system
+    private static final int MAX_SHADOW_TRAILS = 8;
+    private static final int SHADOW_TRAIL_INTERVAL = 1; // frames between shadows
+    private int shadowTrailCounter = 0;
+    private final double[] shadowTrailX = new double[MAX_SHADOW_TRAILS];
+    private final double[] shadowTrailY = new double[MAX_SHADOW_TRAILS];
+    private final int[] shadowTrailTimer = new int[MAX_SHADOW_TRAILS];
+    private static final int SHADOW_TRAIL_DURATION = 20; // frames shadows last (increased for visibility)
+    
+    // Dash invulnerability
+    private boolean isInvulnerable = false;
 
     private int attackTimer = 0;
     private int attackCooldown = 0;
@@ -172,6 +211,86 @@ public class Player extends Entity {
         weapon.setWidth(weapon.getWidth() + 1);
     }
 
+    public boolean canDash() {
+        return canDash && mana >= DASH_MANA_COST;
+    }
+
+    public double getDashManaCost() {
+        return DASH_MANA_COST;
+    }
+
+    public boolean isDashTrailActive() {
+        return dashTrailTimer > 0;
+    }
+
+    public Point getDashTrailOffset() {
+        if (dashTrailTimer <= 0) return new Point(0, 0);
+        
+        double progress = (double) dashTrailTimer / DASH_TRAIL_DURATION;
+        int offsetX = (int) ((dashStartX - x) * progress);
+        int offsetY = (int) ((dashStartY - y) * progress);
+        
+        return new Point(offsetX, offsetY);
+    }
+
+    public boolean isDashing() {
+        return dashMovementTimer > 0;
+    }
+
+    public double getDashProgress() {
+        if (dashMovementTimer <= 0) return 0.0;
+        return 1.0 - ((double) dashMovementTimer / DASH_MOVEMENT_TICKS);
+    }
+
+    private void addShadowTrail(double x, double y) {
+        // Find an available slot for the shadow trail
+        for (int i = 0; i < MAX_SHADOW_TRAILS; i++) {
+            if (shadowTrailTimer[i] <= 0) {
+                shadowTrailX[i] = x;
+                shadowTrailY[i] = y;
+                shadowTrailTimer[i] = SHADOW_TRAIL_DURATION;
+                break;
+            }
+        }
+    }
+
+    public int getShadowTrailCount() {
+        int count = 0;
+        for (int i = 0; i < MAX_SHADOW_TRAILS; i++) {
+            if (shadowTrailTimer[i] > 0) count++;
+        }
+        return count;
+    }
+
+    public double getShadowTrailX(int index) {
+        if (index >= 0 && index < MAX_SHADOW_TRAILS) {
+            return shadowTrailX[index];
+        }
+        return 0.0;
+    }
+
+    public double getShadowTrailY(int index) {
+        if (index >= 0 && index < MAX_SHADOW_TRAILS) {
+            return shadowTrailY[index];
+        }
+        return 0.0;
+    }
+
+    public int getShadowTrailTimer(int index) {
+        if (index >= 0 && index < MAX_SHADOW_TRAILS) {
+            return shadowTrailTimer[index];
+        }
+        return 0;
+    }
+
+    public int getMaxShadowTrails() {
+        return MAX_SHADOW_TRAILS;
+    }
+
+    public boolean isInvulnerable() {
+        return isInvulnerable;
+    }
+
     @Override
     public void update(Object... args) {
         final PlayerInputView input;
@@ -256,10 +375,74 @@ public class Player extends Entity {
 
         movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
 
-        // --- Sprint / stamina ---
-        boolean sprinting = input.sprint() && stamina >= 1.0;
+        // --- Dash ability and Sprint / stamina ---
+        boolean shiftPressed = input.sprint();
+        boolean sprinting = false;
         double speedBase = effectiveBaseSpeed();
-        if (sprinting) {
+        
+        // Update dash cooldown
+        if (dashCooldownTimer > 0) {
+            dashCooldownTimer--;
+            if (dashCooldownTimer == 0) {
+                canDash = true;
+            }
+        }
+        
+        // Handle dash ability
+        if (shiftPressed && !wasShiftPressed && canDash && mana >= DASH_MANA_COST && (dxRaw != 0 || dyRaw != 0)) {
+            // Dash triggered - consume mana and set up dash movement
+            mana -= DASH_MANA_COST;
+            dashTriggered = true;
+            canDash = false;
+            dashCooldownTimer = DASH_COOLDOWN_TICKS;
+            
+            // Record dash start position for trail effect
+            dashStartX = x;
+            dashStartY = y;
+            dashTrailTimer = DASH_TRAIL_DURATION;
+            
+            // Calculate dash target position
+            double dashX = x + dxRaw * DASH_DISTANCE;
+            double dashY = y + dyRaw * DASH_DISTANCE;
+            
+            // Check if dash destination is valid (no collision)
+            if (!collidesWithMap(dashX, dashY, map)) {
+                dashTargetX = dashX;
+                dashTargetY = dashY;
+            } else {
+                // Try shorter dash if full distance is blocked
+                double shorterDash = DASH_DISTANCE * 0.5;
+                dashX = x + dxRaw * shorterDash;
+                dashY = y + dyRaw * shorterDash;
+                if (!collidesWithMap(dashX, dashY, map)) {
+                    dashTargetX = dashX;
+                    dashTargetY = dashY;
+                } else {
+                    // Dash completely blocked, cancel it
+                    dashTriggered = false;
+                    canDash = true;
+                    dashCooldownTimer = 0;
+                    mana += DASH_MANA_COST; // Refund mana
+                }
+            }
+            
+            // Set up dash movement if target is valid
+            if (dashTriggered) {
+                dashMovementTimer = DASH_MOVEMENT_TICKS;
+                dashDirectionX = (dashTargetX - x) / DASH_MOVEMENT_TICKS;
+                dashDirectionY = (dashTargetY - y) / DASH_MOVEMENT_TICKS;
+                
+                // Start invulnerability during dash
+                isInvulnerable = true;
+                
+                // Add dash screen shake effect
+                screenShakeTimer = SCREEN_SHAKE_DURATION;
+            }
+        }
+        
+        // Handle sprinting (only if not dashing and has stamina)
+        if (shiftPressed && stamina >= 1.0 && !dashTriggered && dashMovementTimer == 0) {
+            sprinting = true;
             speed = speedBase * 2.0;
             if (++staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
                 stamina = Math.max(0, stamina - 1.0);
@@ -286,11 +469,26 @@ public class Player extends Entity {
             }
             staminaDrainCounter = 0;
         }
+        
+        // Independent mana regeneration (separate from stamina)
+        if (++manaRegenCounter >= MANA_REGEN_INTERVAL) {
+            if (mana < maxMana) {
+                mana = Math.min(maxMana, mana + 0.5);
+            }
+            manaRegenCounter = 0;
+        }
+        
+        // Reset dash trigger when shift is released and dash movement is complete
+        if (!shiftPressed && dashMovementTimer == 0) {
+            dashTriggered = false;
+        }
+        
+        wasShiftPressed = shiftPressed;
         wasSprinting = sprinting;
 
         // --- Knockback & movement ---
         updateKnockbackWithMap(map);
-        if (knockbackTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
+        if (knockbackTimer == 0 && dashMovementTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
 
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
@@ -299,6 +497,44 @@ public class Player extends Entity {
         // Update attack swing animation
         if (attackSwingPhase > 0) attackSwingPhase--;
         if (screenShakeTimer > 0) screenShakeTimer--;
+        
+        // Update dash trail effect
+        if (dashTrailTimer > 0) dashTrailTimer--;
+        
+        // Update shadow trail timers
+        for (int i = 0; i < MAX_SHADOW_TRAILS; i++) {
+            if (shadowTrailTimer[i] > 0) {
+                shadowTrailTimer[i]--;
+            }
+        }
+        
+        // Handle dash movement
+        if (dashMovementTimer > 0) {
+            dashMovementTimer--;
+            
+            // Move towards dash target
+            double newX = x + dashDirectionX;
+            double newY = y + dashDirectionY;
+            
+            // Check collision for this movement step
+            if (!collidesWithMap(newX, newY, map)) {
+                x = newX;
+                y = newY;
+                
+                // Create shadow trail at every frame for maximum visibility
+                addShadowTrail(x, y);
+                shadowTrailCounter++;
+            } else {
+                // Hit something during dash, stop movement
+                dashMovementTimer = 0;
+            }
+            
+            // Dash movement complete
+            if (dashMovementTimer == 0) {
+                dashTriggered = false;
+                isInvulnerable = false; // End invulnerability
+            }
+        }
 
         if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
             stamina -= 0.5;
@@ -610,7 +846,15 @@ public class Player extends Entity {
 
     @Override
     public void damage(double amount) {
+        // Check if player is invulnerable (e.g., during dash)
+        if (isInvulnerable) {
+            return; // No damage taken while invulnerable
+        }
+        
+        // Call parent damage method
         super.damage(amount);
+        
+        // Play audio effects
         if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
         else AudioManager.playSound("hero-death.wav");
     }

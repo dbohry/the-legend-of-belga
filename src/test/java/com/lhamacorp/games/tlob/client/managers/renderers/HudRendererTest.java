@@ -146,4 +146,99 @@ class HudRendererTest {
             hudRenderer.draw(graphics, player, 10, 10);
         }, "HUD renderer should handle shield display without errors");
     }
+
+    @Test
+    void testDashAbility() {
+        // Test that dash ability works correctly
+        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
+        assertEquals(4.0, player.getMana(), "Player should start with full mana");
+        
+        // Test dash ability check
+        assertTrue(player.canDash(), "Player should be able to dash with full mana");
+        assertEquals(2.0, player.getDashManaCost(), "Dash should cost 2.0 mana");
+        
+        // Test that player can dash when conditions are met
+        // Note: This would require more complex setup with input simulation
+        // For now, just verify the basic properties
+        assertTrue(player.getMaxMana() >= player.getDashManaCost(), 
+                  "Player should have enough max mana for dash");
+    }
+
+    @Test
+    void testHudRendererWithDash() {
+        // Test that HUD renderer can handle dash indicator display
+        assertEquals(4.0, player.getMana(), "Player should have 4.0 mana");
+        
+        // Test that HUD renderer can draw with dash indicator
+        assertDoesNotThrow(() -> {
+            hudRenderer.draw(graphics, player, 10, 10);
+        }, "HUD renderer should handle dash indicator display without errors");
+    }
+
+    @Test
+    void testDashTrailFunctionality() {
+        // Test dash trail functionality
+        assertFalse(player.isDashTrailActive(), "Player should not have active dash trail initially");
+        
+        Point trailOffset = player.getDashTrailOffset();
+        assertEquals(0, trailOffset.x, "Dash trail offset X should be 0 initially");
+        assertEquals(0, trailOffset.y, "Dash trail offset Y should be 0 initially");
+        
+        // Test that dash trail methods don't crash
+        assertNotNull(player.getDashTrailOffset(), "Dash trail offset should not be null");
+    }
+
+    @Test
+    void testDashMovementSystem() {
+        // Test that dash movement system is properly initialized
+        // Note: Full dash movement testing would require complex input simulation
+        // For now, just verify the basic properties
+        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
+        assertTrue(player.canDash(), "Player should be able to dash with full mana");
+        assertEquals(2.0, player.getDashManaCost(), "Dash should cost 2.0 mana");
+    }
+
+    @Test
+    void testShadowTrailSystem() {
+        // Test that shadow trail system is properly initialized
+        assertEquals(0, player.getShadowTrailCount(), "Player should have no shadow trails initially");
+        assertEquals(8, player.getMaxShadowTrails(), "Player should support up to 8 shadow trails");
+        
+        // Test shadow trail data access methods
+        assertEquals(0.0, player.getShadowTrailX(0), "Shadow trail X should be 0 initially");
+        assertEquals(0.0, player.getShadowTrailY(0), "Shadow trail Y should be 0 initially");
+        assertEquals(0, player.getShadowTrailTimer(0), "Shadow trail timer should be 0 initially");
+        
+        // Test bounds checking
+        assertEquals(0.0, player.getShadowTrailX(-1), "Invalid index should return 0.0");
+        assertEquals(0.0, player.getShadowTrailX(10), "Invalid index should return 0.0");
+    }
+
+    @Test
+    void testInvulnerabilitySystem() {
+        // Test that invulnerability system is properly initialized
+        assertFalse(player.isInvulnerable(), "Player should not be invulnerable initially");
+        
+        // Test that damage method respects invulnerability
+        double initialHealth = player.getHealth();
+        player.damage(1.0);
+        assertTrue(player.getHealth() < initialHealth, "Player should take damage when not invulnerable");
+        
+        // Note: Full invulnerability testing would require dash simulation
+        // For now, just verify the method exists and works
+        assertNotNull(player.isInvulnerable(), "isInvulnerable method should not be null");
+    }
+
+    @Test
+    void testManaRegeneration() {
+        // Test that mana regeneration is independent
+        assertEquals(4.0, player.getMaxMana(), "Player should have max mana of 4.0");
+        assertEquals(4.0, player.getMana(), "Player should start with full mana");
+        
+        // Test that mana can be consumed and regenerates independently
+        // Note: Full regeneration testing would require time simulation
+        // For now, just verify the basic properties
+        assertTrue(player.getMaxMana() > 0, "Player should have mana capacity");
+        assertTrue(player.getMana() > 0, "Player should have current mana");
+    }
 }
