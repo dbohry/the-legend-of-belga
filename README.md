@@ -39,6 +39,7 @@ The player can block incoming attacks by holding **Left Ctrl**:
 - **Damage Reduction:** Blocked attacks deal only 20% of their normal damage
 - **Visual Feedback:** Blue shield effect appears when blocking
 - **Limitation:** Cannot block when stamina is below 0.5
+- **Attack Restriction:** Cannot attack while blocking
 - **Audio:** Blocked hits play a quieter sound effect than normal hits
 
 ### Perk System

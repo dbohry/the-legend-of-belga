@@ -643,7 +643,7 @@ public class Player extends Entity {
             }
         }
 
-        if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0) {
+        if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0 && !isBlocking) {
             stamina -= 0.5;
             attackTimer = scaleFrom60(weapon.getDuration());
             attackCooldown = scaleFrom60(weapon.getCooldown());
