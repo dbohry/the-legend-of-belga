@@ -1,6 +1,7 @@
 package com.lhamacorp.games.tlob.client.managers.renderers;
 
 import com.lhamacorp.games.tlob.client.perks.Perk;
+import com.lhamacorp.games.tlob.client.perks.PerkManager.Rarity;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -19,6 +20,13 @@ public class VictoryScreenRenderer {
     private final Font subtitleFont = new Font("Arial", Font.PLAIN, 18);
     private final Font cardTitleFont = new Font("Arial", Font.BOLD, 16);
     private final Font cardBodyFont = new Font("Arial", Font.PLAIN, 14);
+
+    // Rarity color scheme
+    private static final Color COMMON_COLOR = new Color(100, 150, 255);      // Blue
+    private static final Color UNCOMMON_COLOR = new Color(150, 200, 255);    // Light Blue
+    private static final Color RARE_COLOR = new Color(255, 255, 100);        // Yellow
+    private static final Color EPIC_COLOR = new Color(255, 150, 100);        // Orange
+    private static final Color LEGENDARY_COLOR = new Color(255, 100, 100);   // Red
 
     // Cached layout
     private int screenW, screenH;
@@ -71,10 +79,14 @@ public class VictoryScreenRenderer {
             if (r == null) continue;
             Perk p = choices.get(i);
 
-            // Card
+            // Card background
             g2.setColor(new Color(30, 30, 30, 230));
             g2.fillRect(r.x, r.y, r.width, r.height);
-            g2.setColor(Color.WHITE);
+            
+            // Rarity border
+            Color rarityColor = getRarityColor(p.rarity);
+            g2.setColor(rarityColor);
+            g2.setStroke(new BasicStroke(3)); // Thicker border for rarity
             g2.drawRect(r.x, r.y, r.width, r.height);
 
             // Title
@@ -123,5 +135,21 @@ public class VictoryScreenRenderer {
             }
         }
         if (!line.isEmpty()) g2.drawString(line, x, yy);
+    }
+
+    /**
+     * Returns the color associated with a perk rarity.
+     */
+    private Color getRarityColor(Rarity rarity) {
+        if (rarity == null) return Color.GRAY;
+        
+        switch (rarity) {
+            case COMMON: return COMMON_COLOR;
+            case UNCOMMON: return UNCOMMON_COLOR;
+            case RARE: return RARE_COLOR;
+            case EPIC: return EPIC_COLOR;
+            case LEGENDARY: return LEGENDARY_COLOR;
+            default: return Color.GRAY;
+        }
     }
 }
