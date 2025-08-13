@@ -765,15 +765,6 @@ public class Player extends Entity {
             g2.setColor(new Color(150, 200, 255, 80));
             g2.setStroke(new BasicStroke(2f));
             g2.drawOval(px - width/2 - 2, py - height/2 - 2, width + 4, height + 4);
-            
-            // Draw block text above player
-            g2.setColor(new Color(100, 150, 255, 200));
-            g2.setFont(new Font("Arial", Font.BOLD, 12));
-            String blockText = "BLOCK";
-            FontMetrics fm = g2.getFontMetrics();
-            int textX = px - fm.stringWidth(blockText) / 2;
-            int textY = py - height/2 - 10;
-            g2.drawString(blockText, textX, textY);
         }
 
         if (attackTimer > 0) {
