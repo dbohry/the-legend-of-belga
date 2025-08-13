@@ -15,6 +15,12 @@ public class SpawnManager {
     private final Weapon enemyWeapon;
     private Random rng;
 
+    // Enemy perk system constants
+    private static final double PERK_CHANCE_BASE = 0.0; // 0% chance at map 0
+    private static final double PERK_CHANCE_SCALING = 0.15; // +15% per map completed
+    private static final double MAX_PERK_CHANCE = 0.8; // Cap at 80% chance
+    private static final int MAX_PERKS_PER_ENEMY = 3; // Maximum perks per enemy
+
     /**
      * Creates a spawn manager with non-deterministic random number generation.
      */
@@ -30,7 +36,7 @@ public class SpawnManager {
         this.rng = (rng != null) ? rng : new Random();
     }
 
-    /** Reseed this spawner’s RNG (used on restart / next-level for deterministic runs). */
+    /** Reseed this spawner's RNG (used on restart / next-level for deterministic runs). */
     public void reseed(Random rng) {
         this.rng = (rng != null) ? rng : new Random();
     }
@@ -51,13 +57,96 @@ public class SpawnManager {
                 double x = pos[0] * tileSize + tileSize / 2.0;
                 double y = pos[1] * tileSize + tileSize / 2.0;
                 
+                Entity enemy;
                 // 20% chance to spawn an Archer, 80% chance for Soldier
                 if (rng.nextDouble() < 0.20) {
-                    out.add(new Archer(x, y, enemyWeapon));
+                    enemy = new Archer(x, y, enemyWeapon);
                 } else {
-                    out.add(new Soldier(x, y, enemyWeapon));
+                    enemy = new Soldier(x, y, enemyWeapon);
                 }
+                
+                // Apply perks based on map completion
+                applyEnemyPerks(enemy, completedMaps);
+                
+                out.add(enemy);
             }
         }
+    }
+
+    /**
+     * Applies perks to an enemy based on map completion level.
+     * Higher map completion = more perks and stronger perks.
+     */
+    private void applyEnemyPerks(Entity enemy, int completedMaps) {
+        if (completedMaps <= 0) return; // No perks for first map
+        
+        // Calculate perk chance based on map completion
+        double perkChance = Math.min(MAX_PERK_CHANCE, 
+            PERK_CHANCE_BASE + (PERK_CHANCE_SCALING * completedMaps));
+        
+        // Determine how many perks this enemy gets
+        int perkCount = 0;
+        if (rng.nextDouble() < perkChance) {
+            // Base perk count increases with map completion
+            perkCount = 1 + (completedMaps / 3); // +1 perk every 3 maps
+            perkCount = Math.min(perkCount, MAX_PERKS_PER_ENEMY);
+        }
+        
+        // Apply the perks
+        for (int i = 0; i < perkCount; i++) {
+            applyRandomEnemyPerk(enemy, completedMaps);
+        }
+    }
+
+    /**
+     * Applies a random perk to an enemy, with perk strength scaling with map completion.
+     */
+    private void applyRandomEnemyPerk(Entity enemy, int completedMaps) {
+        // Perk strength increases with map completion
+        double perkStrength = 0.05 + (0.02 * completedMaps); // 5% base + 2% per map
+        perkStrength = Math.min(perkStrength, 0.5); // Cap at 50%
+        
+        // Choose perk type based on enemy type and random chance
+        int perkType = rng.nextInt(6); // 6 different perk types
+        
+        switch (perkType) {
+            case 0: // Health boost
+                enemy.increaseMaxHealthByPercent(perkStrength);
+                break;
+            case 1: // Speed boost
+                enemy.increaseMoveSpeedByPercent(perkStrength);
+                break;
+            case 2: // Damage boost
+                enemy.increaseAttackDamageByPercent(perkStrength);
+                break;
+            case 3: // Stamina boost (if enemy has stamina)
+                if (enemy.getMaxStamina() > 0) {
+                    enemy.increaseMaxStaminaByPercent(perkStrength);
+                }
+                break;
+            case 4: // Weapon range boost
+                enemy.increaseWeaponRangeByPercent(perkStrength);
+                break;
+            case 5: // Weapon width boost
+                enemy.increaseWeaponWidth(1);
+                break;
+        }
+    }
+
+    /**
+     * Gets the current perk chance for enemies based on map completion.
+     * Useful for UI display or debugging.
+     */
+    public double getCurrentPerkChance(int completedMaps) {
+        return Math.min(MAX_PERK_CHANCE, 
+            PERK_CHANCE_BASE + (PERK_CHANCE_SCALING * completedMaps));
+    }
+
+    /**
+     * Gets the maximum number of perks an enemy can have at the given map completion.
+     */
+    public int getMaxPerksPerEnemy(int completedMaps) {
+        if (completedMaps <= 0) return 0;
+        return Math.min(MAX_PERKS_PER_ENEMY, 1 + (completedMaps / 3));
     }
 }

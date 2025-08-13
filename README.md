@@ -24,45 +24,86 @@ Simple top-down 2D "Zelda-like" made with plain Java2D.
 - **Stats:** I key to view character statistics
 - **Mouse:** Aim for ranged abilities (when available)
 
-## Gameplay
+## Gameplay Mechanics
 
-### Core Mechanics
-- Explore procedurally generated maps
-- Defeat enemies to progress to the next level
-- Collect perks to enhance your character
-- Manage health, stamina, and mana resources
-- Block incoming attacks to reduce damage
+### Core Systems
+- **Health & Stamina Management**: Players must manage health, stamina, and mana resources
+- **Combat System**: Melee combat with weapons, blocking, and dash mechanics
+- **Perk System**: Collectible upgrades that permanently enhance player abilities
+- **Enemy Perk System**: Enemies get progressively stronger based on map completion
+- **Save System**: Automatic progress saving with perk persistence
+
+### Player Abilities
+- **Movement**: WASD keys for movement with sprint capability (Shift)
+- **Attack**: Left-click to swing weapon with cooldown system
+- **Block**: Hold Left Ctrl to block incoming damage (consumes stamina)
+- **Dash**: Double-tap Shift to dash (consumes mana)
+- **Blocking Restriction**: Cannot attack while blocking
 
 ### Block System
-The player can block incoming attacks by holding **Left Ctrl**:
-- **Stamina Cost:** Each successful block consumes 0.5 stamina
-- **Damage Reduction:** Blocked attacks deal only 20% of their normal damage
-- **Visual Feedback:** Blue shield effect appears when blocking
-- **Limitation:** Cannot block when stamina is below 0.5
-- **Attack Restriction:** Cannot attack while blocking
-- **Audio:** Blocked hits play a quieter sound effect than normal hits
+- **Activation**: Hold Left Ctrl to activate blocking
+- **Stamina Cost**: 0.5 stamina consumed per hit blocked
+- **Damage Reduction**: 80% damage reduction when blocking
+- **Restriction**: Blocking prevents attacking while active
+- **Visual**: Clean interface without "BLOCK" text overlay
+
+### Attack Restriction
+- **Blocking State**: Players cannot attack while holding the block key
+- **Stamina Check**: Blocking requires sufficient stamina (≥0.5)
+- **Combat Balance**: Forces players to choose between offense and defense
 
 ### Perk System
-After completing each level, you'll be presented with 3 perk choices to enhance your character:
+The game features a comprehensive perk system that enhances player abilities:
 
-**Common Perks:**
-- Max Life (+10-20%)
-- Max Stamina (+10-20%)
-- Max Mana (+10-20%)
+#### Perk Types
+- **Health Perks**: Increase maximum health by percentage
+- **Stamina Perks**: Increase maximum stamina and regeneration rate
+- **Mana Perks**: Increase maximum mana and regeneration rate
+- **Speed Perks**: Increase movement speed
+- **Damage Perks**: Increase attack damage
+- **Weapon Perks**: Increase weapon range and width
+- **Shield Perks**: Increase maximum shield capacity
 
-**Uncommon Perks:**
-- Movement Speed (+5-10%)
-- Weapon Damage (+10-20%)
-- Mana Regeneration (+10-20%)
+#### Perk Rarity
+- **Common**: Health, Stamina, Mana (10-20% increases)
+- **Uncommon**: Speed, Damage (5-10% increases)
+- **Rare**: Regeneration, Weapon Range (5-10% increases)
+- **Epic**: Weapon Width, Shield (fixed amounts)
+- **Legendary**: Special combinations
 
-**Rare Perks:**
-- Stamina Regeneration (+5-10%)
-- Weapon Range (+5-10%)
-- Shield (+1 HP shield)
+#### Perk Application
+- Perks are applied immediately upon selection
+- Effects stack multiplicatively
+- Some perks have eligibility requirements
+- Perks persist across game sessions
 
-**Epic/Legendary Perks:**
-- Weapon Width (+1 tile)
-- Special abilities
+### Enemy Perk System
+Enemies now receive perks based on map completion, creating natural difficulty progression:
+
+#### Difficulty Scaling
+- **Map 0-2**: Basic enemies with no perks
+- **Map 3-5**: Some enemies have 1-2 perks
+- **Map 6-8**: Most enemies have 2-3 perks
+- **Map 9+**: All enemies have maximum perks
+
+#### Perk Distribution
+- **Perk Chance**: Increases from 0% to 80% (capped)
+- **Perk Count**: Maximum of 3 perks per enemy
+- **Perk Strength**: Scales with map completion (5% base + 2% per map)
+
+#### Enemy Perk Types
+- **Health Boost**: Increases enemy maximum health
+- **Speed Boost**: Increases enemy movement speed
+- **Damage Boost**: Increases enemy attack damage
+- **Stamina Boost**: Increases enemy stamina (if applicable)
+- **Range Boost**: Increases enemy weapon range
+- **Width Boost**: Increases enemy weapon width
+
+#### Visual Indicators
+- **Perk Count Display**: Shows total perks on each enemy
+- **Color Coding**: White (0), Yellow (1), Orange (2), Red (3+ perks)
+- **Size Scaling**: Larger indicators for more dangerous enemies
+- **Perk Summary**: Text display of active perk types
 
 ### Enemy Types
 - **Soldiers:** Melee fighters with various AI patterns (Random, Patrol, Circular, Linear, Idle)

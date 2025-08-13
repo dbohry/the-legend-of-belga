@@ -253,6 +253,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         perkManager.rollChoicesFor(player);
         victoryRenderer.setChoices(perkManager.getChoices());
         victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+        AudioManager.stopMusic();
         AudioManager.playSound("map-complete.wav");
     }
 
@@ -305,6 +306,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         
         // Auto-save when advancing to next level
         autoSave();
+        AudioManager.playRandomMusic(musicVolumeDb);
     }
 
     protected void applyPerkAndContinue(int index) {

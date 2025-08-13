@@ -35,6 +35,15 @@ public abstract class Entity {
     protected double speedMultiplier = 1.0;
     protected double staminaRegenRateMult = 1.0;
     protected double manaRegenRateMult = 1.0;
+    
+    // Perk tracking for visual indicators
+    protected int perkCount = 0;
+    protected boolean hasHealthPerk = false;
+    protected boolean hasSpeedPerk = false;
+    protected boolean hasDamagePerk = false;
+    protected boolean hasStaminaPerk = false;
+    protected boolean hasRangePerk = false;
+    protected boolean hasWidthPerk = false;
 
     protected Direction facing = Direction.DOWN;
 
@@ -122,6 +131,11 @@ public abstract class Entity {
         if (this.health > this.maxHealth) {
             this.health = this.maxHealth;
         }
+        // Track perk application
+        if (!hasHealthPerk) {
+            hasHealthPerk = true;
+            perkCount++;
+        }
     }
 
     /**
@@ -132,6 +146,11 @@ public abstract class Entity {
         // Ensure current stamina doesn't exceed new max
         if (this.stamina > this.maxStamina) {
             this.stamina = this.maxStamina;
+        }
+        // Track perk application
+        if (!hasStaminaPerk) {
+            hasStaminaPerk = true;
+            perkCount++;
         }
     }
 
@@ -145,6 +164,8 @@ public abstract class Entity {
         if (this.mana > this.maxMana) {
             this.mana = this.maxMana;
         }
+        // Note: Mana perks don't have a specific tracker, but perkCount is still incremented
+        perkCount++;
     }
 
     /**
@@ -156,6 +177,8 @@ public abstract class Entity {
         if (this.shield > this.maxShield) {
             this.shield = this.maxShield;
         }
+        // Note: Shield perks don't have a specific tracker, but perkCount is still incremented
+        perkCount++;
     }
 
     /**
@@ -163,6 +186,11 @@ public abstract class Entity {
      */
     public void increaseStaminaRegenByPercent(double pct) {
         staminaRegenRateMult *= (1.0 + pct);
+        // Track perk application
+        if (!hasStaminaPerk) {
+            hasStaminaPerk = true;
+            perkCount++;
+        }
     }
 
     /**
@@ -170,6 +198,8 @@ public abstract class Entity {
      */
     public void increaseManaRegenByPercent(double pct) {
         manaRegenRateMult *= (1.0 + pct);
+        // Note: Mana regen perks don't have a specific tracker, but perkCount is still incremented
+        perkCount++;
     }
 
     /**
@@ -177,6 +207,11 @@ public abstract class Entity {
      */
     public void increaseMoveSpeedByPercent(double pct) {
         speedMultiplier *= (1.0 + pct);
+        // Track perk application
+        if (!hasSpeedPerk) {
+            hasSpeedPerk = true;
+            perkCount++;
+        }
     }
 
     /**
@@ -184,6 +219,11 @@ public abstract class Entity {
      */
     public void increaseAttackDamageByPercent(double pct) {
         damageMultiplier *= (1.0 + pct);
+        // Track perk application
+        if (!hasDamagePerk) {
+            hasDamagePerk = true;
+            perkCount++;
+        }
     }
 
     /**
@@ -192,6 +232,11 @@ public abstract class Entity {
     public void increaseWeaponRangeByPercent(double pct) {
         if (weapon != null) {
             weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
+            // Track perk application
+            if (!hasRangePerk) {
+                hasRangePerk = true;
+                perkCount++;
+            }
         }
     }
 
@@ -201,6 +246,11 @@ public abstract class Entity {
     public void increaseWeaponWidth(int amount) {
         if (weapon != null) {
             weapon.setWidth(weapon.getWidth() + amount);
+            // Track perk application
+            if (!hasWidthPerk) {
+                hasWidthPerk = true;
+                perkCount++;
+            }
         }
     }
 
@@ -247,6 +297,96 @@ public abstract class Entity {
             return weapon.getDamage() * damageMultiplier;
         }
         return 0.0;
+    }
+
+    // ===== Perk Information Getters =====
+
+    /**
+     * Gets the total number of perks applied to this entity.
+     */
+    public int getPerkCount() {
+        return perkCount;
+    }
+
+    /**
+     * Checks if this entity has a health perk.
+     */
+    public boolean hasHealthPerk() {
+        return hasHealthPerk;
+    }
+
+    /**
+     * Checks if this entity has a speed perk.
+     */
+    public boolean hasSpeedPerk() {
+        return hasSpeedPerk;
+    }
+
+    /**
+     * Checks if this entity has a damage perk.
+     */
+    public boolean hasDamagePerk() {
+        return hasDamagePerk;
+    }
+
+    /**
+     * Checks if this entity has a stamina perk.
+     */
+    public boolean hasStaminaPerk() {
+        return hasStaminaPerk;
+    }
+
+    /**
+     * Checks if this entity has a range perk.
+     */
+    public boolean hasRangePerk() {
+        return hasRangePerk;
+    }
+
+    /**
+     * Checks if this entity has a width perk.
+     */
+    public boolean hasWidthPerk() {
+        return hasWidthPerk;
+    }
+
+    /**
+     * Gets a summary of all perks applied to this entity.
+     */
+    public String getPerkSummary() {
+        if (perkCount == 0) return "No perks";
+        
+        StringBuilder summary = new StringBuilder();
+        if (hasHealthPerk) summary.append("HP+ ");
+        if (hasSpeedPerk) summary.append("SPD+ ");
+        if (hasDamagePerk) summary.append("DMG+ ");
+        if (hasStaminaPerk) summary.append("STM+ ");
+        if (hasRangePerk) summary.append("RNG+ ");
+        if (hasWidthPerk) summary.append("WID+ ");
+        
+        return summary.toString().trim();
+    }
+
+    /**
+     * Gets the color for perk indicators based on perk count.
+     * More perks = more dangerous color.
+     */
+    public java.awt.Color getPerkIndicatorColor() {
+        if (perkCount == 0) return java.awt.Color.WHITE;
+        if (perkCount == 1) return java.awt.Color.YELLOW;
+        if (perkCount == 2) return java.awt.Color.ORANGE;
+        return java.awt.Color.RED; // 3+ perks = very dangerous
+    }
+
+    /**
+     * Gets the size multiplier for perk indicators.
+     * More perks = larger indicator.
+     */
+    public float getPerkIndicatorSize() {
+        if (perkCount == 0) return 1.0f;
+        if (perkCount == 1) return 1.2f;
+        if (perkCount == 2) return 1.4f;
+        return 1.6f; // 3+ perks = very large indicator
     }
 
     /**
