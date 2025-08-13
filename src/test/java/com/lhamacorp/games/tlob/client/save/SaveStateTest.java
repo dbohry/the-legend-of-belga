@@ -163,4 +163,35 @@ public class SaveStateTest {
         assertEquals(0.20, perk2.getValue(), 0.001, "Second perk should have 20% value");
         assertNotEquals(perk1.getValue(), perk2.getValue(), "Perks should have different values");
     }
+    
+    @Test
+    void testMultiplePerksOfSameType() {
+        // Test that multiple perks of the same type are handled correctly
+        ActivePerks perks = new ActivePerks();
+        
+        // Add multiple health perks with different values
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.18));
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.12));
+        
+        // Add some other perks
+        perks.addPerk(new AppliedPerk("SHIELD", 1.0));
+        perks.addPerk(new AppliedPerk("SHIELD", 1.0));
+        
+        assertEquals(5, perks.getPerkCount(), "Should have 5 total perks");
+        assertEquals(3, perks.getPerkTypeCount("MAX_HEALTH"), "Should have 3 health perks");
+        assertEquals(2, perks.getPerkTypeCount("SHIELD"), "Should have 2 shield perks");
+        assertEquals(0, perks.getPerkTypeCount("MAX_STAMINA"), "Should have 0 stamina perks");
+        
+        // Test getting perks of specific type
+        List<AppliedPerk> healthPerks = perks.getPerksOfType("MAX_HEALTH");
+        assertEquals(3, healthPerks.size(), "Should get 3 health perks");
+        
+        // Test total value calculation
+        double totalHealth = perks.getTotalValueForType("MAX_HEALTH");
+        assertEquals(0.45, totalHealth, 0.001, "Total health should be 45% (15% + 18% + 12%)");
+        
+        double totalShield = perks.getTotalValueForType("SHIELD");
+        assertEquals(2.0, totalShield, 0.001, "Total shield should be 2.0 (1.0 + 1.0)");
+    }
 }

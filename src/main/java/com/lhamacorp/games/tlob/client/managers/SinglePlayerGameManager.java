@@ -4,6 +4,7 @@ import com.lhamacorp.games.tlob.client.save.SaveManager;
 import com.lhamacorp.games.tlob.client.save.SaveState;
 import com.lhamacorp.games.tlob.client.save.ActivePerks;
 import com.lhamacorp.games.tlob.client.save.AppliedPerk;
+import com.lhamacorp.games.tlob.client.perks.Perk;
 
 import java.awt.*;
 
@@ -100,27 +101,14 @@ public class SinglePlayerGameManager extends BaseGameManager {
         return success;
     }
 
-    /**
-     * Gets the save manager instance.
-     * @return the save manager
-     */
-    public SaveManager getSaveManager() {
-        return saveManager;
-    }
+
 
     @Override
     protected void autoSave() {
         saveGameState();
     }
 
-    @Override
-    protected void saveGame() {
-        if (saveGameState()) {
-            // Visual feedback is handled by saveIndicatorTicks
-        } else {
-            System.err.println("Failed to save game!");
-        }
-    }
+
 
     @Override
     protected void applyPerkAndContinue(int index) {
@@ -148,7 +136,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
      * @param perk the perk that was applied
      * @return the perk type identifier, or null if unknown
      */
-    private String getPerkType(com.lhamacorp.games.tlob.client.perks.Perk perk) {
+    private String getPerkType(Perk perk) {
         String name = perk.name;
         if (name.contains("Max Life")) return "MAX_HEALTH";
         if (name.contains("Max Stamina")) return "MAX_STAMINA";
@@ -169,7 +157,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
      * @param perk the perk that was applied
      * @return the actual value that was applied, or null if cannot be determined
      */
-    private Double extractPerkValue(com.lhamacorp.games.tlob.client.perks.Perk perk) {
+    private Double extractPerkValue(Perk perk) {
         String desc = perk.description;
         
         // Handle percentage-based perks
@@ -187,15 +175,18 @@ public class SinglePlayerGameManager extends BaseGameManager {
             }
         }
         
-        // Handle fixed value perks
+        // Handle fixed value perks by checking both name and description
+        String name = perk.name;
+        if (name.contains("Shield")) return 1.0;
+        if (name.contains("Weapon Width")) return 1.0;
+        
+        // Also check description for +1 perks
         if (desc.contains("+1")) {
-            if (desc.contains("Shield")) return 1.0;
-            if (desc.contains("Weapon Width")) return 1.0;
+            if (desc.contains("shield") || desc.contains("Shield")) return 1.0;
         }
         
         // Default values for perks where we can't extract the exact value
         // These should match the default values used in PerkManager
-        String name = perk.name;
         if (name.contains("Max Life")) return 0.15; // Default 15%
         if (name.contains("Max Stamina")) return 0.15; // Default 15%
         if (name.contains("Max Mana")) return 0.15; // Default 15%
@@ -205,7 +196,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (name.contains("Weapon Damage")) return 0.15; // Default 15%
         if (name.contains("Weapon Range")) return 0.075; // Default 7.5%
         
-                return null;
+        return null;
     }
     
     /**

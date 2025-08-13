@@ -50,6 +50,40 @@ public class ActivePerks implements Serializable {
     }
     
     /**
+     * Gets the number of perks of a specific type.
+     * @param perkType the perk type to count
+     * @return the count of perks of that type
+     */
+    public int getPerkTypeCount(String perkType) {
+        return (int) appliedPerks.stream()
+            .filter(p -> p.getPerkType().equals(perkType))
+            .count();
+    }
+    
+    /**
+     * Gets all perks of a specific type.
+     * @param perkType the perk type to get
+     * @return a list of perks of that type
+     */
+    public List<AppliedPerk> getPerksOfType(String perkType) {
+        return appliedPerks.stream()
+            .filter(p -> p.getPerkType().equals(perkType))
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+    
+    /**
+     * Gets the total value for a specific perk type (useful for cumulative effects).
+     * @param perkType the perk type to sum
+     * @return the sum of all values for that perk type
+     */
+    public double getTotalValueForType(String perkType) {
+        return appliedPerks.stream()
+            .filter(p -> p.getPerkType().equals(perkType))
+            .mapToDouble(AppliedPerk::getValue)
+            .sum();
+    }
+    
+    /**
      * Gets the number of active perks.
      * @return the count of active perks
      */

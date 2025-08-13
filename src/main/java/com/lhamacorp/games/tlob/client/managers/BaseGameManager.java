@@ -88,8 +88,6 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         addMouseListener(keyManager);
         setFocusable(true);
 
-
-
         UIMouseHandler mouseHandler = new UIMouseHandler();
         addMouseMotionListener(mouseHandler);
         addMouseListener(mouseHandler);
