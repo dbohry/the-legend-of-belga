@@ -112,19 +112,11 @@ public class StatsRenderer {
         g.setFont(statFont);
         g.setColor(STAT_COLOR);
         
-        // Health
+        // Max Health
         g.drawString("Max Health:", x + 30, currentY);
         g.setFont(valueFont);
         g.setColor(VALUE_COLOR);
         g.drawString(String.format("%.1f", player.getMaxHealth()), x + 200, currentY);
-        
-        currentY += 22;
-        g.setFont(statFont);
-        g.setColor(STAT_COLOR);
-        g.drawString("Current Health:", x + 30, currentY);
-        g.setFont(valueFont);
-        g.setColor(VALUE_COLOR);
-        g.drawString(String.format("%.1f", player.getHealth()), x + 200, currentY);
         
         currentY += 22;
         g.setFont(statFont);
@@ -198,19 +190,12 @@ public class StatsRenderer {
         g.setFont(statFont);
         g.setColor(STAT_COLOR);
         
-        // Movement speed
-        g.drawString("Base Speed:", x + 30, currentY);
+        // Effective Speed
+        g.drawString("Effective Speed:", x + 30, currentY);
         g.setFont(valueFont);
         g.setColor(VALUE_COLOR);
-        g.drawString(String.format("%.1f", player.getSpeed()), x + 200, currentY);
-        
-        currentY += 22;
-        g.setFont(statFont);
-        g.setColor(STAT_COLOR);
-        g.drawString("Speed Multiplier:", x + 30, currentY);
-        g.setFont(valueFont);
-        g.setColor(VALUE_COLOR);
-        g.drawString(String.format("%.1fx", player.getSpeedMultiplier()), x + 200, currentY);
+        double effectiveSpeed = player.getSpeed() * player.getSpeedMultiplier();
+        g.drawString(String.format("%.1f", effectiveSpeed), x + 200, currentY);
         
         currentY += 22;
         g.setFont(statFont);
