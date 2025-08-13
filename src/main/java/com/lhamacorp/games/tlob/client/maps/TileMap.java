@@ -31,11 +31,16 @@ public class TileMap {
         return tileId == FLOOR_PLANTS;
     }
 
-    // Back-compat (non-deterministic)
+    /**
+     * Creates a tile map with non-deterministic random number generation.
+     */
     public TileMap(int[][] tiles) {
         this(tiles, new Random());
     }
 
+    /**
+     * Creates a tile map with the specified random number generator.
+     */
     public TileMap(int[][] tiles, Random rng) {
         this.tiles = tiles;
         this.width = tiles.length;
@@ -59,20 +64,32 @@ public class TileMap {
         }
     }
 
+    /**
+     * Gets the map width in tiles.
+     */
     public int getWidth() {
         return width;
     }
 
+    /**
+     * Gets the map height in tiles.
+     */
     public int getHeight() {
         return height;
     }
 
+    /**
+     * Checks if the specified tile is a wall.
+     */
     public boolean isWall(int x, int y) {
         if (x < 0 || y < 0 || x >= width || y >= height) return true;
         int t = tiles[x][y];
         return t == WALL || t == EDGE_WALL;
     }
 
+    /**
+     * Applies damage to a wall tile, destroying it if health reaches zero.
+     */
     public boolean damageWall(int x, int y, double damage) {
         if (x < 0 || y < 0 || x >= width || y >= height) return false;
         if (tiles[x][y] != WALL || wallHealth[x][y] <= 0) return false;
@@ -86,12 +103,16 @@ public class TileMap {
         return false;
     }
 
-    // Back-compat
+    /**
+     * Draws the tile map (backward compatibility method).
+     */
     public void draw(Graphics2D g, int camX, int camY, int viewW, int viewH) {
         draw(g, camX, camY, viewW, viewH, 0);
     }
 
-    /** Animated draw; tick30 is a 30 Hz counter (see GameManager). */
+    /**
+     * Draws the tile map with animation support.
+     */
     public void draw(Graphics2D g, int camX, int camY, int viewW, int viewH, int tick30) {
         final int tileSize = Constants.TILE_SIZE;
 
@@ -154,6 +175,9 @@ public class TileMap {
         }
     }
 
+    /**
+     * Finds a suitable spawn tile near the center of the map.
+     */
     public int[] findSpawnTile() {
         for (int y = height / 2 - 1; y <= height / 2 + 1; y++)
             for (int x = width / 2 - 1; x <= width / 2 + 1; x++)
@@ -166,6 +190,9 @@ public class TileMap {
         return new int[]{1, 1};
     }
 
+    /**
+     * Finds a random floor tile at least the specified distance from the given position.
+     */
     public int[] randomFloorTileFarFrom(double px, double py, int minDistance) {
         for (int attempts = 0; attempts < 5000; attempts++) {
             int x = rng.nextInt(width);
@@ -179,6 +206,9 @@ public class TileMap {
         return null;
     }
 
+    /**
+     * Gets a random floor tile from the map.
+     */
     public int[] getRandomFloorTile() {
         for (int attempts = 0; attempts < 1000; attempts++) {
             int x = rng.nextInt(width);
@@ -188,13 +218,17 @@ public class TileMap {
         return findSpawnTile();
     }
 
-    /** Returns the tile id at tile coordinates; walls/edges as stored. Out of bounds returns EDGE_WALL. */
+    /**
+     * Gets the tile ID at the specified tile coordinates.
+     */
     public int getTileAt(int tx, int ty) {
         if (tx < 0 || ty < 0 || tx >= width || ty >= height) return EDGE_WALL;
         return tiles[tx][ty];
     }
 
-    /** Returns true if the world position (pixels) is on a hiding tile (grass/plants). */
+    /**
+     * Checks if the world position is on a hiding tile.
+     */
     public boolean isHidingAtWorld(double wx, double wy) {
         int tx = (int) Math.floor(wx / (double) Constants.TILE_SIZE);
         int ty = (int) Math.floor(wy / (double) Constants.TILE_SIZE);

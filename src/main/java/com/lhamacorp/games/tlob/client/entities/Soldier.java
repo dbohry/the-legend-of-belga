@@ -22,12 +22,10 @@ public class Soldier extends Entity {
     private static final int TICKS_PER_SECOND = 30;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
-    // defaults (per-enemy jitter is applied on top)
-    private static final int ATTACK_COOLDOWN_TICKS = 60; // 2.0s @30Hz
-    private static final int ATTACK_DURATION_TICKS = 3;  // ~0.1s
-    private static final int POST_ATTACK_SLOWDOWN_TICKS = 60; // 2.0s @30Hz - speed reduction period
-
-    private static final int HURT_FLASH_TICKS = 6;       // ~0.2s
+    private static final int ATTACK_COOLDOWN_TICKS = 60;
+    private static final int ATTACK_DURATION_TICKS = 3;
+    private static final int POST_ATTACK_SLOWDOWN_TICKS = 60;
+    private static final int HURT_FLASH_TICKS = 6;
 
     // state
     private int hurtTimer = 0;
@@ -42,38 +40,38 @@ public class Soldier extends Entity {
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
 
-    // per-enemy RNG (tiny LCG) + personalization
     private int lcg;
-    private final double speedScale;        // ~0.9 .. 1.2
-    private final double aimNoiseRad;       // small fixed offset on approach
-    private final double strafeStrength;    // 0 (most) or up to ~0.4
-    private final double strafeFreqHz;      // ~0.6 .. 1.4 Hz
-    private final double strafePhase;       // 0..2π
-    private final double aggressionRadius;  // when to stop wandering and engage
-    private final int baseAttackCooldown;   // +/- jittered cooldown
-    private final int baseAttackDuration;   // usually 3, can jitter small
+    private final double speedScale;
+    private final double aimNoiseRad;
+    private final double strafeStrength;
+    private final double strafeFreqHz;
+    private final double strafePhase;
+    private final double aggressionRadius;
+    private final int baseAttackCooldown;
+    private final int baseAttackDuration;
     private int ageTicks = 0;
 
+    /**
+     * Creates a soldier enemy at the specified position.
+     */
     public Soldier(double x, double y, Weapon weapon) {
         super(x, y, SOLDIER_SIZE, SOLDIER_SIZE, SOLDIER_BASE_SPEED, SOLDIER_MAX_HP, SOLDIER_MAX_STAMINA, SOLDIER_MAX_MANA, 0, weapon, "Soldier", Alignment.FOE);
 
-        // seed LCG from position so it's deterministic per spawn
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
 
-        // personalize
-        speedScale = 0.50 + 0.30 * rand01(); // 0.90..1.20
-        aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0); // ~±7°
-        boolean willStrafe = rand01() < 0.45; // ~45% strafe
-        strafeStrength = willStrafe ? 0.20 + 0.25 * rand01() : 0.0; // 0.20..0.45
-        strafeFreqHz = 0.6 + 0.8 * rand01(); // 0.6..1.4 Hz
+        speedScale = 0.50 + 0.30 * rand01();
+        aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0);
+        boolean willStrafe = rand01() < 0.45;
+        strafeStrength = willStrafe ? 0.20 + 0.25 * rand01() : 0.0;
+        strafeFreqHz = 0.6 + 0.8 * rand01();
         strafePhase = rand01() * Math.PI * 2.0;
-        aggressionRadius = 220 + 140 * rand01(); // 220..360 px
+        aggressionRadius = 220 + 140 * rand01();
 
-        baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01())); // 0.85x..1.35x
-        baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));     // 3 or sometimes 4
+        baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01()));
+        baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));
 
-        pickNewWanderDir(); // initial wander vector
+        pickNewWanderDir();
     }
 
     @Override
@@ -87,12 +85,10 @@ public class Soldier extends Entity {
         if (attackTimer > 0) attackTimer--;
         if (postAttackSlowdownTimer > 0) postAttackSlowdownTimer--;
 
-        // Try melee attack
         double dxToP = player.getX() - x;
         double dyToP = player.getY() - y;
         double distToP = Math.hypot(dxToP, dyToP);
 
-        // Stealth: if player stands on hiding tile (grass/plants), enemies cannot find them
         boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
 
         if (!playerHidden && distToP <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
@@ -103,22 +99,15 @@ public class Soldier extends Entity {
             player.applyKnockback(x, y);
         }
 
-        // Movement logic
         if (attackTimer > 0) {
-            // Attack in progress - stand still
             movedThisTick = false;
         } else if (!playerHidden && distToP <= aggressionRadius) {
-            // Player in range - approach
             approachPlayer(player, map);
         } else {
-            // Wander around
             wander(map);
         }
 
-        // Update facing direction
         updateFacing();
-
-        // Advance animation
         animTimeMs += TICK_MS;
         ageTicks++;
     }
@@ -148,7 +137,6 @@ public class Soldier extends Entity {
                 noisyDy += strafeDy;
             }
 
-            // Normalize and apply movement
             double totalDist = Math.hypot(noisyDx, noisyDy);
             if (totalDist > 0) {
                 noisyDx /= totalDist;
@@ -156,7 +144,6 @@ public class Soldier extends Entity {
                 
                 double moveSpeed = speed * speedScale;
                 
-                // Apply post-attack slowdown (half speed for 2 seconds)
                 if (postAttackSlowdownTimer > 0) {
                     moveSpeed *= 0.5;
                 }
@@ -170,14 +157,13 @@ public class Soldier extends Entity {
     private void wander(TileMap map) {
         if (wanderTimer <= 0) {
             pickNewWanderDir();
-            wanderTimer = 30 + (int) (rand01() * 60); // 1-3 seconds
+            wanderTimer = 30 + (int) (rand01() * 60);
         }
 
         if (wanderTimer > 0) {
             wanderTimer--;
-            double moveSpeed = speed * speedScale * 0.3; // Slower when wandering
+            double moveSpeed = speed * speedScale * 0.3;
             
-            // Apply post-attack slowdown (half speed for 2 seconds)
             if (postAttackSlowdownTimer > 0) {
                 moveSpeed *= 0.5;
             }
@@ -195,7 +181,6 @@ public class Soldier extends Entity {
 
     private void updateFacing() {
         if (movedThisTick) {
-            // Determine facing based on movement direction
             if (Math.abs(wanderDx) > Math.abs(wanderDy)) {
                 facing = wanderDx > 0 ? Direction.RIGHT : Direction.LEFT;
             } else {
@@ -225,32 +210,27 @@ public class Soldier extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        // Get enemy texture
         BufferedImage tex = TextureManager.getEnemyTexture();
         if (tex != null) {
             int px = (int) Math.round(x - width / 2.0) - camX;
             int py = (int) Math.round(y - height / 2.0) - camY;
             g2.drawImage(tex, px, py, null);
         } else {
-            // Fallback: draw colored rectangle
             drawCenteredRect(g2, camX, camY, width, height, Color.RED);
         }
 
-        // Draw hurt flash effect
         if (hurtTimer > 0) {
             int alpha = (int) (255 * (double) hurtTimer / HURT_FLASH_TICKS);
             g2.setColor(new Color(255, 255, 255, alpha));
             drawCenteredRect(g2, camX, camY, width, height, new Color(255, 255, 255, alpha));
         }
 
-        // Draw attack indicator
         if (attackTimer > 0) {
             g2.setColor(new Color(255, 0, 0, 150));
             int indicatorSize = width + 10;
             drawCenteredRect(g2, camX, camY, indicatorSize, indicatorSize, new Color(255, 0, 0, 150));
         }
 
-        // Draw slowdown indicator (blue tint when in post-attack slowdown)
         if (postAttackSlowdownTimer > 0) {
             g2.setColor(new Color(0, 0, 255, 80));
             drawCenteredRect(g2, camX, camY, width, height, new Color(0, 0, 255, 80));

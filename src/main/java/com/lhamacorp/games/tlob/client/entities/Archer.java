@@ -18,11 +18,10 @@ public class Archer extends Entity {
     private static final int ATTACK_RANGE = 120;
     private static final int MIN_ATTACK_RANGE = 60;
     private static final double ARROW_DAMAGE = 0.5;
-    private static final int ATTACK_COOLDOWN_TICKS = 90; // 3 seconds @30Hz
-    private static final int ATTACK_DURATION_TICKS = 8;  // ~0.27s
+    private static final int ATTACK_COOLDOWN_TICKS = 90;
+    private static final int ATTACK_DURATION_TICKS = 8;
     private static final int ARROW_TRAVEL_TICKS = 30;
 
-    // --- timing base (keep 30Hz for anim feel, independent from sim Hz) ---
     private static final int TICKS_PER_SECOND = 30;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
@@ -47,7 +46,6 @@ public class Archer extends Entity {
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
 
-    // per-archer RNG (tiny LCG) + personalization
     private int lcg;
     private final double speedScale;
     private final double aimNoiseRad;
@@ -59,14 +57,15 @@ public class Archer extends Entity {
     private final int baseAttackDuration;
     private int ageTicks = 0;
 
+    /**
+     * Creates an archer enemy at the specified position.
+     */
     public Archer(double x, double y, Weapon weapon) {
         super(x, y, ARCHER_SIZE, ARCHER_SIZE, ARCHER_BASE_SPEED, ARCHER_MAX_HP, ARCHER_MAX_STAMINA, ARCHER_MAX_MANA, 0, weapon, "Archer", Alignment.FOE);
 
-        // seed LCG from position so it's deterministic per spawn
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
 
-        // personalize
         speedScale = 0.50 + 0.30 * rand01();
         aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0);
         boolean willStrafe = rand01() < 0.45;
@@ -91,35 +90,26 @@ public class Archer extends Entity {
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
-        // Handle arrow travel and damage
         if (arrowTimer > 0) {
             arrowTimer--;
             
-            // Calculate current arrow position based on progress
             double progress = 1.0 - (double) arrowTimer / ARROW_TRAVEL_TICKS;
             double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
             double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
             
-            // Check if arrow hits the player during its flight
             double arrowToPlayerDist = Math.hypot(currentArrowX - player.getX(), currentArrowY - player.getY());
             
-            // If arrow is close enough to player during flight, it's a hit
-            if (arrowToPlayerDist <= 25) { // 25 pixel hit radius
-                // Arrow hit the player - apply damage and knockback
+            if (arrowToPlayerDist <= 25) {
                 player.damage(ARROW_DAMAGE);
                 player.applyKnockback(arrowX, arrowY);
-                
-                // Reset arrow timer to stop the arrow
                 arrowTimer = 0;
             }
         }
 
-        // Try ranged attack
         double dxToP = player.getX() - x;
         double dyToP = player.getY() - y;
         double distToP = Math.hypot(dxToP, dyToP);
 
-        // Stealth: if player stands on hiding tile (grass/plants), enemies cannot find them
         boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
 
         if (!playerHidden && distToP <= ATTACK_RANGE && distToP >= MIN_ATTACK_RANGE && 
@@ -128,7 +118,6 @@ public class Archer extends Entity {
             attackTimer = baseAttackDuration;
             attackCooldown = baseAttackCooldown;
             
-            // Set arrow target and start arrow travel
             arrowX = x;
             arrowY = y;
             arrowTargetX = player.getX();
@@ -136,28 +125,19 @@ public class Archer extends Entity {
             arrowTimer = ARROW_TRAVEL_TICKS;
         }
 
-        // Movement logic
         if (attackTimer > 0) {
-            // Attack in progress - stand still
             movedThisTick = false;
         } else if (!playerHidden && distToP <= aggressionRadius) {
-            // Player in range - approach or back away
             if (distToP < MIN_ATTACK_RANGE) {
-                // Too close - back away
                 backAwayFromPlayer(player, map);
             } else {
-                // Good range - approach slowly
                 approachPlayer(player, map);
             }
         } else {
-            // Wander around
             wander(map);
         }
 
-        // Update facing direction
         updateFacing();
-
-        // Advance animation
         animTimeMs += TICK_MS;
         ageTicks++;
     }
@@ -172,13 +152,11 @@ public class Archer extends Entity {
             double approachDx = dxToP / distToP;
             double approachDy = dyToP / distToP;
 
-            // Add aim noise for more natural movement
             double noiseAngle = aimNoiseRad;
             double cos = Math.cos(noiseAngle), sin = Math.sin(noiseAngle);
             double noisyDx = approachDx * cos - approachDy * sin;
             double noisyDy = approachDx * sin + approachDy * cos;
 
-            // Add strafing movement
             if (strafeStrength > 0) {
                 double strafeAngle = strafePhase + ageTicks * strafeFreqHz * 2 * Math.PI / TICKS_PER_SECOND;
                 double strafeDx = Math.cos(strafeAngle) * strafeStrength;
@@ -187,13 +165,12 @@ public class Archer extends Entity {
                 noisyDy += strafeDy;
             }
 
-            // Normalize and apply movement
             double totalDist = Math.hypot(noisyDx, noisyDy);
             if (totalDist > 0) {
                 noisyDx /= totalDist;
                 noisyDy /= totalDist;
                 
-                double moveSpeed = speed * speedScale * 0.5; // Slower approach
+                double moveSpeed = speed * speedScale * 0.5;
                 moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map);
                 movedThisTick = true;
             }
@@ -206,11 +183,9 @@ public class Archer extends Entity {
         double distToP = Math.hypot(dxToP, dyToP);
 
         if (distToP > 0) {
-            // Move away from player
             double awayDx = -dxToP / distToP;
             double awayDy = -dyToP / distToP;
 
-            // Add strafing movement
             if (strafeStrength > 0) {
                 double strafeAngle = strafePhase + ageTicks * strafeFreqHz * 2 * Math.PI / TICKS_PER_SECOND;
                 double strafeDx = Math.cos(strafeAngle) * strafeStrength;
@@ -219,13 +194,12 @@ public class Archer extends Entity {
                 awayDy += strafeDy;
             }
 
-            // Normalize and apply movement
             double totalDist = Math.hypot(awayDx, awayDy);
             if (totalDist > 0) {
                 awayDx /= totalDist;
                 awayDy /= totalDist;
                 
-                double moveSpeed = speed * speedScale * 0.7; // Faster retreat
+                double moveSpeed = speed * speedScale * 0.7;
                 moveWithCollision(awayDx * moveSpeed, awayDy * moveSpeed, map);
                 movedThisTick = true;
             }
@@ -235,12 +209,12 @@ public class Archer extends Entity {
     private void wander(TileMap map) {
         if (wanderTimer <= 0) {
             pickNewWanderDir();
-            wanderTimer = 30 + (int) (rand01() * 60); // 1-3 seconds
+            wanderTimer = 30 + (int) (rand01() * 60);
         }
 
         if (wanderTimer > 0) {
             wanderTimer--;
-            double moveSpeed = speed * speedScale * 0.3; // Slower when wandering
+            double moveSpeed = speed * speedScale * 0.3;
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map);
             movedThisTick = true;
         }
@@ -254,7 +228,6 @@ public class Archer extends Entity {
 
     private void updateFacing() {
         if (movedThisTick) {
-            // Determine facing based on movement direction
             if (Math.abs(wanderDx) > Math.abs(wanderDy)) {
                 facing = wanderDx > 0 ? Direction.RIGHT : Direction.LEFT;
             } else {
@@ -284,42 +257,34 @@ public class Archer extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        // Get enemy texture and apply green color filter for archer
         BufferedImage tex = TextureManager.getEnemyTexture();
         if (tex != null) {
             int px = (int) Math.round(x - width / 2.0) - camX;
             int py = (int) Math.round(y - height / 2.0) - camY;
             
-            // Draw with green color filter to distinguish from regular enemies
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
             g2.drawImage(tex, px, py, null);
             
-            // Apply green tint
             g2.setColor(new Color(0, 200, 0, 80));
             g2.fillRect(px, py, width, height);
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
         } else {
-            // Fallback: draw colored rectangle
             drawCenteredRect(g2, camX, camY, width, height, Color.GREEN);
         }
 
-        // Draw hurt flash effect
         if (hurtTimer > 0) {
             int alpha = (int) (255 * (double) hurtTimer / HURT_FLASH_TICKS);
             g2.setColor(new Color(255, 255, 255, alpha));
             drawCenteredRect(g2, camX, camY, width, height, new Color(255, 255, 255, alpha));
         }
 
-        // Draw attack indicator
         if (attackTimer > 0) {
             g2.setColor(new Color(255, 255, 0, 150));
             int indicatorSize = width + 10;
             drawCenteredRect(g2, camX, camY, indicatorSize, indicatorSize, new Color(255, 255, 0, 150));
         }
 
-        // Draw arrow if one is in flight
         if (arrowTimer > 0) {
-            // Calculate current arrow position
             double progress = 1.0 - (double) arrowTimer / ARROW_TRAVEL_TICKS;
             double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
             double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
@@ -327,7 +292,6 @@ public class Archer extends Entity {
             int arrowScreenX = (int) Math.round(currentArrowX) - camX;
             int arrowScreenY = (int) Math.round(currentArrowY) - camY;
             
-            // Draw arrow as a yellow cross
             g2.setColor(Color.YELLOW);
             g2.setStroke(new BasicStroke(2f));
             int arrowSize = 5;

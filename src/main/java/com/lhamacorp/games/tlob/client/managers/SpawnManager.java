@@ -15,11 +15,16 @@ public class SpawnManager {
     private final Weapon enemyWeapon;
     private Random rng;
 
-    // Back-compat ctor (non-deterministic)
+    /**
+     * Creates a spawn manager with non-deterministic random number generation.
+     */
     public SpawnManager(Weapon enemyWeapon) {
         this(enemyWeapon, new Random());
     }
 
+    /**
+     * Creates a spawn manager with the specified random number generator.
+     */
     public SpawnManager(Weapon enemyWeapon, Random rng) {
         this.enemyWeapon = enemyWeapon;
         this.rng = (rng != null) ? rng : new Random();
@@ -30,6 +35,9 @@ public class SpawnManager {
         this.rng = (rng != null) ? rng : new Random();
     }
 
+    /**
+     * Spawns enemies on the map based on completion level.
+     */
     public void spawn(TileMap map, Player player, List<Entity> out, int completedMaps, int tileSize) {
         out.clear();
         int base = 3 + rng.nextInt(6); // 3..8

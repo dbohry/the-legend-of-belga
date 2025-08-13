@@ -33,11 +33,10 @@ public class Player extends Entity {
     private static final int STAMINA_REGEN_INTERVAL = TICKS_PER_SECOND * 3;
     private static final int MANA_REGEN_INTERVAL = TICKS_PER_SECOND * 2;
 
-    // Dash ability constants
     private static final double DASH_MANA_COST = 2.0;
-    private static final double DASH_DISTANCE = 100.0; // blocks - increased for visibility
-    private static final int DASH_COOLDOWN_TICKS = TICKS_PER_SECOND * 2; // 2 seconds
-    private static final int DASH_MOVEMENT_TICKS = 5; // frames to complete dash movement
+    private static final double DASH_DISTANCE = 100.0;
+    private static final int DASH_COOLDOWN_TICKS = TICKS_PER_SECOND * 2;
+    private static final int DASH_MOVEMENT_TICKS = 5;
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
@@ -46,35 +45,30 @@ public class Player extends Entity {
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
 
-    // Dash ability variables
     private boolean wasShiftPressed = false;
     private boolean dashTriggered = false;
     private int dashCooldownTimer = 0;
     private boolean canDash = true;
     
-    // Dash trail effect variables
     private int dashTrailTimer = 0;
     private double dashStartX = 0;
     private double dashStartY = 0;
-    private static final int DASH_TRAIL_DURATION = 10; // frames
+    private static final int DASH_TRAIL_DURATION = 10;
     
-    // Dash movement variables
     private int dashMovementTimer = 0;
     private double dashTargetX = 0;
     private double dashTargetY = 0;
     private double dashDirectionX = 0;
     private double dashDirectionY = 0;
     
-    // Dash shadow trail system
     private static final int MAX_SHADOW_TRAILS = 8;
-    private static final int SHADOW_TRAIL_INTERVAL = 1; // frames between shadows
+    private static final int SHADOW_TRAIL_INTERVAL = 1;
     private int shadowTrailCounter = 0;
     private final double[] shadowTrailX = new double[MAX_SHADOW_TRAILS];
     private final double[] shadowTrailY = new double[MAX_SHADOW_TRAILS];
     private final int[] shadowTrailTimer = new int[MAX_SHADOW_TRAILS];
-    private static final int SHADOW_TRAIL_DURATION = 20; // frames shadows last (increased for visibility)
+    private static final int SHADOW_TRAIL_DURATION = 20;
     
-    // Dash invulnerability
     private boolean isInvulnerable = false;
 
     private int attackTimer = 0;
@@ -85,41 +79,53 @@ public class Player extends Entity {
     private long animTimeMs = 0L;
     private boolean movingThisTick = false;
     
-    // Aim direction and attack animation enhancements
     private Point lastAimPoint = null;
     private int aimIndicatorAlpha = 0;
     private int attackSwingPhase = 0;
     private double attackSwingAngle = 0.0;
     private int screenShakeTimer = 0;
-    private static final int AIM_INDICATOR_FADE_TIME = 60; // frames
-    private static final int ATTACK_SWING_DURATION = 10; // frames
-    private static final int SCREEN_SHAKE_DURATION = 8; // frames
+    private static final int AIM_INDICATOR_FADE_TIME = 60;
+    private static final int ATTACK_SWING_DURATION = 10;
+    private static final int SCREEN_SHAKE_DURATION = 8;
     
-    // Animation and visual constants
-    private static final double SWING_ARC_RADIANS = Math.PI / 2.0; // 60 degrees
-    private static final double SWING_TRAIL_SPACING = 0.1; // trail effect spacing
-    private static final int MAX_TRAIL_COUNT = 3; // number of trail effects
+    private static final double SWING_ARC_RADIANS = Math.PI / 2.0;
+    private static final double SWING_TRAIL_SPACING = 0.1;
+    private static final int MAX_TRAIL_COUNT = 3;
     private static final int CROSSHAIR_SIZE = 8;
     private static final int ENEMY_HIGHLIGHT_SIZE = 12;
     private static final double ENEMY_HIGHLIGHT_RANGE_MULTIPLIER = 1.5;
     private static final double SCREEN_SHAKE_INTENSITY = 2.0;
 
+    /**
+     * Creates a player at the specified position with the given weapon.
+     */
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon, "Player", Alignment.NEUTRAL);
     }
 
-    // --- Authoritative snapshot helpers (silent setters; no sounds/effects) ---
+    /**
+     * Sets the player's position without triggering effects.
+     */
     public void setPosition(double x, double y) { this.x = x; this.y = y; }
 
+    /**
+     * Sets the player's health, clamping to valid range.
+     */
     public void setHealth(double h) {
         this.health = Math.max(0.0, Math.min(h, maxHealth));
         this.alive = (this.health > 0.0);
     }
 
+    /**
+     * Sets the player's stamina, clamping to valid range.
+     */
     public void setStamina(double s) {
         this.stamina = Math.max(0.0, Math.min(s, maxStamina));
     }
 
+    /**
+     * Sets the player's shield, clamping to valid range.
+     */
     public void setShield(double sh) {
         this.shield = Math.max(0.0, Math.min(sh, maxShield));
     }
@@ -149,11 +155,17 @@ public class Player extends Entity {
         }
     }
 
+    /**
+     * Restores the player's health to maximum.
+     */
     public void heal() {
         this.health = maxHealth;
         this.alive = true;
     }
 
+    /**
+     * Restores all player stats to maximum values.
+     */
     public void restoreAll() {
         this.health = this.maxHealth;
         this.mana = this.maxMana;
@@ -161,19 +173,31 @@ public class Player extends Entity {
         this.shield = this.maxShield;
     }
 
+    /**
+     * Increases maximum health by the specified percentage.
+     */
     public void increaseMaxHealthByPercent(double pct) {
         this.maxHealth = Math.ceil(getMaxHealth() * (1.0 + pct));
     }
 
+    /**
+     * Increases maximum stamina by the specified percentage.
+     */
     public void increaseMaxStaminaByPercent(double pct) {
         this.maxStamina = Math.ceil(getMaxStamina() * (1.0 + pct));
     }
 
+    /**
+     * Increases maximum mana by the specified percentage.
+     */
     public void increaseMaxManaByPercent(double pct) {
         if (getMaxMana() == 0) this.maxMana = 1.0;
         this.maxMana = Math.ceil(getMaxMana() * (1.0 + pct));
     }
 
+    /**
+     * Increases stamina regeneration rate by the specified percentage.
+     */
     public void increaseStaminaRegenByPercent(double pct) {
         staminaRegenRateMult *= (1.0 + pct);
     }
@@ -191,18 +215,30 @@ public class Player extends Entity {
         return weapon.getDamage() * damageMultiplier;
     }
 
+    /**
+     * Increases movement speed by the specified percentage.
+     */
     public void increaseMoveSpeedByPercent(double pct) {
         speedMultiplier *= (1.0 + pct);
     }
 
+    /**
+     * Increases attack damage by the specified percentage.
+     */
     public void increaseAttackDamageByPercent(double pct) {
         weapon.setDamage((int) Math.ceil(weapon.getDamage() * (1.0 + pct)));
     }
 
+    /**
+     * Increases weapon range by the specified percentage.
+     */
     public void increaseWeaponRangeByPercent(double pct) {
         weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
     }
 
+    /**
+     * Increases maximum shield by 1.0.
+     */
     public void increaseShield() {
         this.maxShield += 1.0;
     }
