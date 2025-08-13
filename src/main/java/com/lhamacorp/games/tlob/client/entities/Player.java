@@ -38,6 +38,10 @@ public class Player extends Entity {
     private static final int DASH_COOLDOWN_TICKS = TICKS_PER_SECOND * 2;
     private static final int DASH_MOVEMENT_TICKS = 5;
 
+    // Block mechanism constants
+    private static final double BLOCK_STAMINA_COST = 0.5;
+    private static final double BLOCK_DAMAGE_REDUCTION = 0.8; // 80% damage reduction when blocking
+
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
     private double staminaRegenRateMult = 1.0;
@@ -71,6 +75,7 @@ public class Player extends Entity {
     private static final int SHADOW_TRAIL_DURATION = 20;
     
     private boolean isInvulnerable = false;
+    private boolean isBlocking = false;
 
     private int attackTimer = 0;
     private int attackCooldown = 0;
@@ -370,6 +375,22 @@ public class Player extends Entity {
         return isInvulnerable;
     }
 
+    /**
+     * Checks if the player is currently blocking.
+     * @return true if the player is blocking, false otherwise
+     */
+    public boolean isBlocking() {
+        return isBlocking;
+    }
+
+    /**
+     * Checks if the player can currently block (has enough stamina).
+     * @return true if the player can block, false otherwise
+     */
+    public boolean canBlock() {
+        return stamina >= BLOCK_STAMINA_COST;
+    }
+
     @Override
     public void update(Object... args) {
         final PlayerInputView input;
@@ -385,6 +406,7 @@ public class Player extends Entity {
                 public boolean down()   { return is.down; }
                 public boolean sprint() { return is.shift; }
                 public boolean attack() { return is.attack; }
+                public boolean block()  { return is.block; }
             };
         } else if (k0 instanceof KeyManager km) {
             input = new PlayerInputView() {
@@ -394,6 +416,7 @@ public class Player extends Entity {
                 public boolean down()   { return km.down; }
                 public boolean sprint() { return km.shift; }
                 public boolean attack() { return km.attack; }
+                public boolean block()  { return km.block; }
             };
         } else {
             input = new PlayerInputView() {
@@ -403,6 +426,7 @@ public class Player extends Entity {
                 public boolean down()   { return false; }
                 public boolean sprint() { return false; }
                 public boolean attack() { return false; }
+                public boolean block()  { return false; }
             };
         }
 
@@ -569,6 +593,10 @@ public class Player extends Entity {
         updateKnockbackWithMap(map);
         if (knockbackTimer == 0 && dashMovementTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
 
+        // --- Block mechanism ---
+        boolean blockPressed = input.block();
+        isBlocking = blockPressed && stamina >= BLOCK_STAMINA_COST;
+        
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
@@ -721,6 +749,31 @@ public class Player extends Entity {
             g2.drawImage(tex, pxImg, pyImg, width, height, null);
         } else {
             drawCenteredRect(g2, camX, camY, width, height, new Color(40, 160, 70));
+        }
+
+        // Draw block indicator when blocking
+        if (isBlocking) {
+            int px = (int) Math.round(x) - camX;
+            int py = (int) Math.round(y) - camY;
+            
+            // Draw shield-like effect around the player
+            g2.setColor(new Color(100, 150, 255, 120)); // Blue shield with transparency
+            g2.setStroke(new BasicStroke(3f));
+            g2.drawOval(px - width/2 - 4, py - height/2 - 4, width + 8, height + 8);
+            
+            // Draw inner shield ring
+            g2.setColor(new Color(150, 200, 255, 80));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawOval(px - width/2 - 2, py - height/2 - 2, width + 4, height + 4);
+            
+            // Draw block text above player
+            g2.setColor(new Color(100, 150, 255, 200));
+            g2.setFont(new Font("Arial", Font.BOLD, 12));
+            String blockText = "BLOCK";
+            FontMetrics fm = g2.getFontMetrics();
+            int textX = px - fm.stringWidth(blockText) / 2;
+            int textY = py - height/2 - 10;
+            g2.drawString(blockText, textX, textY);
         }
 
         if (attackTimer > 0) {
@@ -930,12 +983,30 @@ public class Player extends Entity {
             return; // No damage taken while invulnerable
         }
         
-        // Call parent damage method
-        super.damage(amount);
-        
-        // Play audio effects
-        if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
-        else AudioManager.playSound("hero-death.wav");
+        // Handle blocking
+        if (isBlocking && stamina >= BLOCK_STAMINA_COST) {
+            // Consume stamina for blocking
+            stamina -= BLOCK_STAMINA_COST;
+            
+            // Reduce damage by block reduction percentage
+            double reducedDamage = amount * (1.0 - BLOCK_DAMAGE_REDUCTION);
+            
+            // Call parent damage method with reduced damage
+            super.damage(reducedDamage);
+            
+            // Play block sound effect (if available)
+            AudioManager.playSound("slash-hit.wav", -20.0f); // Quieter than normal hit
+            
+            // Add visual feedback for successful block
+            screenShakeTimer = SCREEN_SHAKE_DURATION / 2; // Reduced screen shake for blocks
+        } else {
+            // Normal damage handling
+            super.damage(amount);
+            
+            // Play audio effects
+            if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
+            else AudioManager.playSound("hero-death.wav");
+        }
     }
 
     @Override

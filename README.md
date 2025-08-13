@@ -19,6 +19,7 @@ Simple top-down 2D "Zelda-like" made with plain Java2D.
 
 - **Movement:** Arrow keys or WASD
 - **Attack:** Space to slash in the facing direction
+- **Block:** Left Ctrl to block incoming attacks (consumes stamina)
 - **Pause:** ESC to pause/unpause
 - **Stats:** I key to view character statistics
 - **Mouse:** Aim for ranged abilities (when available)
@@ -30,6 +31,15 @@ Simple top-down 2D "Zelda-like" made with plain Java2D.
 - Defeat enemies to progress to the next level
 - Collect perks to enhance your character
 - Manage health, stamina, and mana resources
+- Block incoming attacks to reduce damage
+
+### Block System
+The player can block incoming attacks by holding **Left Ctrl**:
+- **Stamina Cost:** Each successful block consumes 0.5 stamina
+- **Damage Reduction:** Blocked attacks deal only 20% of their normal damage
+- **Visual Feedback:** Blue shield effect appears when blocking
+- **Limitation:** Cannot block when stamina is below 0.5
+- **Audio:** Blocked hits play a quieter sound effect than normal hits
 
 ### Perk System
 After completing each level, you'll be presented with 3 perk choices to enhance your character:

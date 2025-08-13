@@ -12,4 +12,6 @@ public interface PlayerInputView {
     boolean sprint();
 
     boolean attack();
+    
+    boolean block();
 }

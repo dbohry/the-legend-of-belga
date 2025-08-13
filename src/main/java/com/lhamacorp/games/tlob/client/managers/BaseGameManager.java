@@ -170,6 +170,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             input.right = keyManager.right;
             input.attack = keyManager.attack;
             input.shift = keyManager.shift;
+            input.block = keyManager.block;
 
             // Handle I key for stats page
             if (keyManager.i && !statsPageOpen) {

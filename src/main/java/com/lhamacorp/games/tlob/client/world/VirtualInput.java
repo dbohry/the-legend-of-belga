@@ -59,4 +59,9 @@ final class VirtualInput implements PlayerInputView {
     public boolean attack() {
         return attack;
     }
+
+    @Override
+    public boolean block() {
+        return false; // Virtual input doesn't support blocking
+    }
 }
