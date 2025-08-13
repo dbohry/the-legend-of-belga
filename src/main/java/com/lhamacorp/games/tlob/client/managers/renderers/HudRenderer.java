@@ -4,6 +4,7 @@ import com.lhamacorp.games.tlob.client.entities.Player;
 
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
+import java.awt.AlphaComposite;
 
 public final class HudRenderer {
 
@@ -64,6 +65,50 @@ public final class HudRenderer {
         
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_DEFAULT);
+    }
+
+    /**
+     * Draws a save indicator in the top-right corner of the screen.
+     * @param g2 the graphics context
+     * @param screenWidth the screen width
+     * @param screenHeight the screen height
+     * @param alpha the alpha value for the indicator (0.0 to 1.0)
+     */
+    public void drawSaveIndicator(Graphics2D g2, int screenWidth, int screenHeight, float alpha) {
+        if (alpha <= 0.0f) return;
+        
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        // Set composite for transparency
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        
+        // Draw save indicator in top-right corner
+        int indicatorSize = 24;
+        int margin = 20;
+        int x = screenWidth - margin - indicatorSize;
+        int y = margin;
+        
+        // Background circle
+        g2.setColor(new Color(60, 120, 60, 200));
+        g2.fillOval(x, y, indicatorSize, indicatorSize);
+        
+        // Border
+        g2.setColor(new Color(100, 200, 100));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawOval(x, y, indicatorSize, indicatorSize);
+        
+        // Checkmark
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(3));
+        int checkX = x + 6;
+        int checkY = y + 12;
+        g2.drawLine(checkX, checkY, checkX + 4, checkY + 4);
+        g2.drawLine(checkX + 4, checkY + 4, checkX + 10, checkY - 2);
+        
+        // Restore composite
+        g2.setComposite(oldComposite);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
     }
 
     private int drawHpShieldBar(Graphics2D g2, Player player, int x, int y) {

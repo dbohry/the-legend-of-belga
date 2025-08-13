@@ -165,6 +165,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             if (!keyManager.i && statsPageOpen) {
                 statsPageOpen = false;
             }
+            
+
 
             Point aimWorld = null;
             if (mouseInside) {
@@ -228,6 +230,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     protected void enterGameOver() {
         state = GameState.GAME_OVER;
         gameOverRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+        // Auto-save when game ends
+        autoSave();
     }
 
     protected void enterVictory() {
@@ -276,11 +280,35 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
         requestFocusInWindow();
+        
+        // Auto-save when advancing to next level
+        autoSave();
     }
 
     protected void applyPerkAndContinue(int index) {
         var applied = perkManager.applyChoice(index, player);
-        if (applied != null) startNextLevel();
+        if (applied != null) {
+            // Auto-save immediately after applying perk (before starting next level)
+            // This ensures the enhanced stats are captured in the save
+            autoSave();
+            startNextLevel();
+        }
+    }
+
+    /**
+     * Auto-saves the game state. This is a no-op in the base class.
+     * Subclasses can override to implement actual saving.
+     */
+    protected void autoSave() {
+        // Default implementation does nothing
+    }
+
+    /**
+     * Saves the game state. This is a no-op in the base class.
+     * Subclasses can override to implement actual saving.
+     */
+    protected void saveGame() {
+        // Default implementation does nothing
     }
 
     @Override
@@ -295,6 +323,14 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
 
         if (player != null) {
             hudRenderer.draw(g2, player, 8, 8);
+            
+            // Draw save indicator if this is a SinglePlayerGameManager
+            if (this instanceof SinglePlayerGameManager) {
+                SinglePlayerGameManager spManager = (SinglePlayerGameManager) this;
+                if (spManager.isSaveIndicatorVisible()) {
+                    hudRenderer.drawSaveIndicator(g2, getWidth(), getHeight(), spManager.getSaveIndicatorAlpha());
+                }
+            }
         } else {
             g2.setFont(new Font("Arial", Font.PLAIN, 12));
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
@@ -520,9 +556,9 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
                         if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
                         return;
                     }
-                    if (pauseMenuRenderer.hitResume(e.getPoint())) resumeGame();
-                    else if (pauseMenuRenderer.hitRestart(e.getPoint())) restartGame();
-                    else if (pauseMenuRenderer.hitExit(e.getPoint())) System.exit(0);
+                            if (pauseMenuRenderer.hitResume(e.getPoint())) resumeGame();
+        else if (pauseMenuRenderer.hitRestart(e.getPoint())) restartGame();
+        else if (pauseMenuRenderer.hitExit(e.getPoint())) System.exit(0);
                 }
                 case VICTORY -> {
                     int idx = victoryRenderer.handleClick(e.getPoint());
