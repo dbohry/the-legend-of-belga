@@ -288,9 +288,10 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     protected void applyPerkAndContinue(int index) {
         var applied = perkManager.applyChoice(index, player);
         if (applied != null) {
-            startNextLevel();
-            // Auto-save after applying perk and starting next level
+            // Auto-save immediately after applying perk (before starting next level)
+            // This ensures the enhanced stats are captured in the save
             autoSave();
+            startNextLevel();
         }
     }
 

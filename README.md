@@ -25,11 +25,12 @@ Simple top-down 2D "Zelda-like" made with plain Java2D.
 ## Save System
 The game automatically saves your progress when:
 - Completing a level
-- Selecting a perk and advancing to the next level
+- Selecting a perk (saves the enhanced stats before advancing to next level)
 - Game over or victory
 
 Save files are stored in your home directory under `.tlob/save.dat` and contain:
 - World seed (for consistent map generation)
 - Number of completed maps
+- Active perks (list of selected perks that will be re-applied)
 
 When starting a new game, the system will check for existing saves and ask if you want to continue your previous game or start fresh.
