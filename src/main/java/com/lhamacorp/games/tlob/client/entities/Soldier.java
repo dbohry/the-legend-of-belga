@@ -10,7 +10,7 @@ import java.awt.image.BufferedImage;
 public class Soldier extends Entity {
 
     private static final int SOLDIER_SIZE = 20;
-    private static final double SOLDIER_BASE_SPEED = 2.5;
+    private static final double SOLDIER_BASE_SPEED = 3;
 
     private static final double SOLDIER_MAX_HP = 1.0;
     private static final double SOLDIER_MAX_STAMINA = 1.0;
