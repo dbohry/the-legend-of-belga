@@ -168,49 +168,56 @@ public class PerkManager {
         register("MAX_HEALTH", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Life";
-            String desc = String.format("Increases maximum life permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases maximum life (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMaxHealthByPercent(p));
         });
 
         register("MAX_STAMINA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Stamina";
-            String desc = String.format("Increases maximum stamina permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases maximum stamina (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMaxStaminaByPercent(p));
         });
 
         register("MAX_MANA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Mana";
-            String desc = String.format("Increases maximum mana permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases maximum mana (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMaxManaByPercent(p));
         });
 
         register("MOVE_SPEED", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.05, 0.10);
             String label = "Movement Speed";
-            String desc = String.format("Increases movement speed permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases movement speed (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseMoveSpeedByPercent(p));
         });
 
         register("STAMINA_REGEN", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Stamina Regeneration";
-            String desc = String.format("Stamina regenerates faster permanently (+%d%%).", (int)Math.round(p * 100));
+            String desc = String.format("Stamina regenerates faster (+%d%%).", (int)Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseStaminaRegenByPercent(p));
+        });
+
+        register("MANA_REGEN", Rarity.UNCOMMON, r -> {
+            double p = pct(r, 0.10, 0.20); // 10%..20%
+            String label = "Mana Regeneration";
+            String desc = String.format("Mana regenerates faster (+%d%%).", (int)Math.round(p * 100));
+            return new Perk(label, desc, pl -> pl.increaseManaRegenByPercent(p));
         });
 
         register("WEAPON_DAMAGE", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Weapon Damage";
-            String desc = String.format("Increases melee damage permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases melee damage (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseAttackDamageByPercent(p));
         });
 
         register("WEAPON_RANGE", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10);
             String label = "Weapon Range";
-            String desc = String.format("Increases weapon range permanently (+%d%%).", (int) Math.round(p * 100));
+            String desc = String.format("Increases weapon range (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, pl -> pl.increaseWeaponRangeByPercent(p));
         });
 

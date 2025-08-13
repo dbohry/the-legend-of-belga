@@ -42,6 +42,7 @@ public class Player extends Entity {
     private int staminaRegenCounter = 0;
     private double staminaRegenRateMult = 1.0;
     private int manaRegenCounter = 0;
+    private double manaRegenRateMult = 1.0;
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
 
@@ -202,8 +203,20 @@ public class Player extends Entity {
         staminaRegenRateMult *= (1.0 + pct);
     }
 
+    /**
+     * Increases mana regeneration rate by the specified percentage.
+     */
+    public void increaseManaRegenByPercent(double pct) {
+        manaRegenRateMult *= (1.0 + pct);
+    }
+
     private int effectiveStaminaRegenInterval() {
         double interval = STAMINA_REGEN_INTERVAL / Math.max(0.0001, staminaRegenRateMult);
+        return Math.max(1, (int) Math.round(interval));
+    }
+
+    private int effectiveManaRegenInterval() {
+        double interval = MANA_REGEN_INTERVAL / Math.max(0.0001, manaRegenRateMult);
         return Math.max(1, (int) Math.round(interval));
     }
 
@@ -507,7 +520,7 @@ public class Player extends Entity {
         }
         
         // Independent mana regeneration (separate from stamina)
-        if (++manaRegenCounter >= MANA_REGEN_INTERVAL) {
+        if (++manaRegenCounter >= effectiveManaRegenInterval()) {
             if (mana < maxMana) {
                 mana = Math.min(maxMana, mana + 0.5);
             }
