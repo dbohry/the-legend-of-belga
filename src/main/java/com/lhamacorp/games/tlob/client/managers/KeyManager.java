@@ -45,13 +45,7 @@ public class KeyManager implements KeyListener, MouseListener {
         attack = attackKey || attackMouse;
     }
 
-    public boolean consumeEscapePressed() {
-        if (escapePressedOnce) {
-            escapePressedOnce = false;
-            return true;
-        }
-        return false;
-    }
+
 
     @Override
     public void keyTyped(KeyEvent e) {

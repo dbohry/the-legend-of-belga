@@ -262,4 +262,44 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (saveIndicatorTicks > SAVE_INDICATOR_DURATION * 0.8f) return 1.0f;
         return (float) saveIndicatorTicks / (SAVE_INDICATOR_DURATION * 0.8f);
     }
+
+    @Override
+    protected void reloadSaveGame() {
+        // Reload the save game to restore player progress and perks
+        SaveManager saveManager = new SaveManager();
+        SaveState saveState = saveManager.loadGame();
+        
+        if (saveState != null) {
+            // The perks are already applied from the save, so we just need to restore current stats
+            player.heal(); // Restore health
+            player.restoreAll(); // Restore stamina, mana, shield
+            
+            // Now handle the level progression
+            // We need to advance to the correct level based on completed maps
+            int targetCompletedMaps = saveState.getCompletedMaps();
+            
+            // Start from level 0 and advance to the target
+            levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
+            
+            // Advance through all completed maps to reach the target level
+            for (int i = 0; i < targetCompletedMaps; i++) {
+                levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
+            }
+            
+            // Reset game state
+            state = GameState.PLAYING;
+            enemiesAtLevelStart = enemies.size();
+            animTick30 = 0;
+            simTick = 0;
+            
+            // Update camera
+            int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+            int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+            camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+            requestFocusInWindow();
+        } else {
+            // If no save exists, fall back to regular restart
+            super.restartGame();
+        }
+    }
 }

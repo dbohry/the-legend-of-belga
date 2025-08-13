@@ -30,7 +30,7 @@ class SoldierTest {
     void testSoldierStats() {
         assertEquals(20, soldier.getWidth());
         assertEquals(20, soldier.getHeight());
-        assertEquals(2.5, soldier.getSpeed(), 0.01);
+        assertEquals(3.0, soldier.getSpeed(), 0.01);
         assertEquals(1.0, soldier.getMaxHealth(), 0.01);
         assertEquals(1.0, soldier.getMaxStamina(), 0.01);
         assertEquals(0.0, soldier.getMaxMana(), 0.01);

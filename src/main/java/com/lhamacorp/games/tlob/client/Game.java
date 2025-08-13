@@ -4,7 +4,6 @@ import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
 import com.lhamacorp.games.tlob.client.managers.SinglePlayerGameManager;
 import com.lhamacorp.games.tlob.client.save.SaveManager;
 import com.lhamacorp.games.tlob.client.save.SaveState;
-import com.lhamacorp.games.tlob.client.save.ActivePerks;
 
 import javax.swing.*;
 import java.awt.*;

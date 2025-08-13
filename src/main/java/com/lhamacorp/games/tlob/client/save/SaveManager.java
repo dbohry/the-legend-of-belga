@@ -85,11 +85,5 @@ public class SaveManager {
         }
     }
     
-    /**
-     * Gets the path to the save file for display purposes.
-     * @return the save file path as a string
-     */
-    public String getSavePath() {
-        return savePath.toString();
-    }
+
 }

@@ -87,18 +87,6 @@ public class AudioManager {
         }
     }
 
-    public static float getMusicVolumeRangeMin() {
-        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-            return ((FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN)).getMinimum();
-        }
-        return -80.0f; // sensible default
-    }
 
-    public static float getMusicVolumeRangeMax() {
-        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-            return ((FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN)).getMaximum();
-        }
-        return 0.0f;
-    }
 
 }

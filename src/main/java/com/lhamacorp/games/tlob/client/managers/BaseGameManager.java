@@ -265,6 +265,14 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         requestFocusInWindow();
     }
 
+    /**
+     * Reloads the save game. This is a no-op in the base class.
+     * Subclasses can override to implement actual save loading.
+     */
+    protected void reloadSaveGame() {
+        // Default implementation does nothing
+    }
+
     protected void startNextLevel() {
         enemySpawner.reseed(new Random(new Random(worldSeed).nextLong()));
         levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
@@ -545,7 +553,14 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         public void mouseClicked(MouseEvent e) {
             switch (state) {
                 case GAME_OVER -> {
-                    if (gameOverRenderer.hitTryAgain(e.getPoint())) restartGame();
+                    if (gameOverRenderer.hitTryAgain(e.getPoint())) {
+            // For single player, reload the save game; for multiplayer, restart the level
+            if (BaseGameManager.this instanceof SinglePlayerGameManager) {
+                reloadSaveGame();
+            } else {
+                restartGame();
+            }
+        }
                 }
                 case PAUSED -> {
                     float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
