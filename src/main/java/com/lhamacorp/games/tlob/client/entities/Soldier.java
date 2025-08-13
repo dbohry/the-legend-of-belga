@@ -104,7 +104,7 @@ public class Soldier extends Entity {
         } else if (!playerHidden && distToP <= aggressionRadius) {
             approachPlayer(player, map);
         } else {
-            wander(map);
+            wander(map, player);
         }
 
         updateFacing();
@@ -148,13 +148,13 @@ public class Soldier extends Entity {
                     moveSpeed *= 0.5;
                 }
                 
-                moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map);
+                moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map, player);
                 movedThisTick = true;
             }
         }
     }
 
-    private void wander(TileMap map) {
+    private void wander(TileMap map, Player player) {
         if (wanderTimer <= 0) {
             pickNewWanderDir();
             wanderTimer = 30 + (int) (rand01() * 60);
@@ -168,7 +168,7 @@ public class Soldier extends Entity {
                 moveSpeed *= 0.5;
             }
             
-            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map);
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
     }
@@ -189,14 +189,17 @@ public class Soldier extends Entity {
         }
     }
 
-    private void moveWithCollision(double dx, double dy, TileMap map) {
+    private void moveWithCollision(double dx, double dy, TileMap map, Player player) {
         double newX = x + dx;
         double newY = y + dy;
 
-        if (!collidesWithMap(newX, y, map)) {
+        // Check map collision for X movement
+        if (!collidesWithMap(newX, y, map) && !collidesWithPlayer(newX, y, player)) {
             x = newX;
         }
-        if (!collidesWithMap(x, newY, map)) {
+        
+        // Check map collision for Y movement
+        if (!collidesWithMap(x, newY, map) && !collidesWithPlayer(x, newY, player)) {
             y = newY;
         }
     }

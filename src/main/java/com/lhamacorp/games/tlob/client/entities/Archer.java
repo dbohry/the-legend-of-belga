@@ -134,7 +134,7 @@ public class Archer extends Entity {
                 approachPlayer(player, map);
             }
         } else {
-            wander(map);
+            wander(map, player);
         }
 
         updateFacing();
@@ -171,7 +171,7 @@ public class Archer extends Entity {
                 noisyDy /= totalDist;
                 
                 double moveSpeed = speed * speedScale * 0.5;
-                moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map);
+                moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map, player);
                 movedThisTick = true;
             }
         }
@@ -200,13 +200,13 @@ public class Archer extends Entity {
                 awayDy /= totalDist;
                 
                 double moveSpeed = speed * speedScale * 0.7;
-                moveWithCollision(awayDx * moveSpeed, awayDy * moveSpeed, map);
+                moveWithCollision(awayDx * moveSpeed, awayDy * moveSpeed, map, player);
                 movedThisTick = true;
             }
         }
     }
 
-    private void wander(TileMap map) {
+    private void wander(TileMap map, Player player) {
         if (wanderTimer <= 0) {
             pickNewWanderDir();
             wanderTimer = 30 + (int) (rand01() * 60);
@@ -215,7 +215,7 @@ public class Archer extends Entity {
         if (wanderTimer > 0) {
             wanderTimer--;
             double moveSpeed = speed * speedScale * 0.3;
-            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map);
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
     }
@@ -236,14 +236,17 @@ public class Archer extends Entity {
         }
     }
 
-    private void moveWithCollision(double dx, double dy, TileMap map) {
+    private void moveWithCollision(double dx, double dy, TileMap map, Player player) {
         double newX = x + dx;
         double newY = y + dy;
 
-        if (!collidesWithMap(newX, y, map)) {
+        // Check map collision for X movement
+        if (!collidesWithMap(newX, y, map) && !collidesWithPlayer(newX, y, player)) {
             x = newX;
         }
-        if (!collidesWithMap(x, newY, map)) {
+        
+        // Check map collision for Y movement
+        if (!collidesWithMap(x, newY, map) && !collidesWithPlayer(x, newY, player)) {
             y = newY;
         }
     }

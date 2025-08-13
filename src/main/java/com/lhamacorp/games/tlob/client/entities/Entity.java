@@ -294,6 +294,15 @@ public abstract class Entity {
         return false;
     }
 
+    protected boolean collidesWithPlayer(double cx, double cy, Player player) {
+        if (player == null || !player.isAlive()) return false;
+        
+        Rectangle entityBounds = getBoundsAt(cx, cy);
+        Rectangle playerBounds = player.getBounds();
+        
+        return entityBounds.intersects(playerBounds);
+    }
+
     protected void applyKnockbackMovement() {
         x += knockbackX;
         y += knockbackY;
