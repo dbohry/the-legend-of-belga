@@ -105,7 +105,7 @@ public class Player extends Entity {
     private static final double SCREEN_SHAKE_INTENSITY = 2.0;
 
     public Player(double x, double y, Weapon weapon) {
-        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon);
+        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon, "Player", Alignment.NEUTRAL);
     }
 
     // --- Authoritative snapshot helpers (silent setters; no sounds/effects) ---
@@ -328,7 +328,7 @@ public class Player extends Entity {
         }
 
         TileMap map = (TileMap) args[1];
-        @SuppressWarnings("unchecked") List<Enemy> enemies = (List<Enemy>) args[2];
+        @SuppressWarnings("unchecked") List<Entity> enemies = (List<Entity>) args[2];
 
         // Optional mouse-aim point in WORLD coords
         Point aimPoint = null;
@@ -550,7 +550,7 @@ public class Player extends Entity {
             boolean hitSomething = false;
 
             double dmg = effectiveAttackDamage();
-            for (Enemy e : enemies) {
+            for (Entity e : enemies) {
                 if (e.isAlive() && swing.intersects(e.getBounds())) {
                     e.damage(dmg);
                     e.applyKnockback(x, y);
@@ -571,7 +571,7 @@ public class Player extends Entity {
         return (int) Math.round(ticksAt60 * (TICKS_PER_SECOND / 60.0));
     }
 
-    private void moveWithCollision(double dx, double dy, TileMap map, List<Enemy> enemies) {
+    private void moveWithCollision(double dx, double dy, TileMap map, List<Entity> enemies) {
         double newX = x + dx, newY = y + dy;
 
         if (!collidesWithMap(newX, y, map) && !collidesWithEnemies(newX, y, enemies)) x = newX;
@@ -589,9 +589,9 @@ public class Player extends Entity {
         }
     }
 
-    private boolean collidesWithEnemies(double cx, double cy, List<Enemy> enemies) {
+    private boolean collidesWithEnemies(double cx, double cy, List<Entity> enemies) {
         Rectangle playerBounds = getBoundsAt(cx, cy);
-        for (Enemy enemy : enemies) {
+        for (Entity enemy : enemies) {
             if (enemy.isAlive() && playerBounds.intersects(enemy.getBounds())) return true;
         }
         return false;
@@ -629,7 +629,7 @@ public class Player extends Entity {
         draw(g2, camX, camY, null);
     }
     
-    public void draw(Graphics2D g2, int camX, int camY, List<Enemy> enemies) {
+    public void draw(Graphics2D g2, int camX, int camY, List<Entity> enemies) {
         TextureManager.Direction dir = toCardinal(facing);
         TextureManager.Motion motion = movingThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
 
@@ -776,7 +776,7 @@ public class Player extends Entity {
             
             // Draw aim assist indicator when close to enemies
             if (enemies != null) {
-                for (Enemy enemy : enemies) {
+                for (Entity enemy : enemies) {
                     if (enemy.isAlive()) {
                         double distance = Math.hypot(enemy.getX() - x, enemy.getY() - y);
                         if (distance < weapon.getReach() * ENEMY_HIGHLIGHT_RANGE_MULTIPLIER) {

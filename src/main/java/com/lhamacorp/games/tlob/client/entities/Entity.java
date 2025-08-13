@@ -28,6 +28,7 @@ public abstract class Entity {
     protected boolean alive = true;
     protected Weapon weapon;
     protected String name;
+    protected Alignment alignment;
 
     protected Direction facing = Direction.DOWN;
 
@@ -41,23 +42,10 @@ public abstract class Entity {
     public enum Direction {UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT}
 
     public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        this.speed = speed;
-        this.maxHealth = maxHealth;
-        this.health = maxHealth;
-        this.maxStamina = maxStamina;
-        this.stamina = maxStamina;
-        this.maxMana = maxMana;
-        this.mana = maxMana;
-        this.weapon = weapon;
-        this.maxShield = maxShield;
-        this.shield = maxShield;
+        this(x, y, width, height, speed, maxHealth, maxStamina, maxMana, maxShield, weapon, "Entity", Alignment.NEUTRAL);
     }
 
-    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon, String name) {
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon, String name, Alignment alignment) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -73,6 +61,7 @@ public abstract class Entity {
         this.maxShield = maxShield;
         this.shield = maxShield;
         this.name = name;
+        this.alignment = alignment;
     }
 
     public void setName(String n) {
@@ -125,6 +114,22 @@ public abstract class Entity {
 
     public double getMaxHealth() {
         return maxHealth;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public double getSpeed() {
+        return speed;
+    }
+
+    public Weapon getWeapon() {
+        return weapon;
     }
 
     public Rectangle getBoundsAt(double cx, double cy) {
@@ -242,5 +247,22 @@ public abstract class Entity {
         int drawX = (int) Math.round(x - w / 2.0) - camX;
         int drawY = (int) Math.round(y - h / 2.0) - camY;
         g2.fillRect(drawX, drawY, w, h);
+    }
+
+    // Alignment helper methods
+    public boolean isFoe() {
+        return alignment == Alignment.FOE;
+    }
+
+    public boolean isAlly() {
+        return alignment == Alignment.ALLY;
+    }
+
+    public boolean isNeutral() {
+        return alignment == Alignment.NEUTRAL;
+    }
+
+    public Alignment getAlignment() {
+        return alignment;
     }
 }

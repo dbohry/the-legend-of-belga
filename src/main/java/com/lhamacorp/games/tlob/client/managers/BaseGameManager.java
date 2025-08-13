@@ -1,6 +1,6 @@
 package com.lhamacorp.games.tlob.client.managers;
 
-import com.lhamacorp.games.tlob.client.entities.Enemy;
+import com.lhamacorp.games.tlob.client.entities.Entity;
 import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.managers.renderers.GameOverRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.HudRenderer;
@@ -69,7 +69,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     protected SpawnManager enemySpawner;
 
     protected Player player;
-    protected final List<Enemy> enemies = new ArrayList<>();
+    protected final List<Entity> enemies = new ArrayList<>();
     protected int enemiesAtLevelStart = 0;
 
     protected boolean musicMuted = false;
@@ -302,7 +302,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         drawRemotePlayers(g2, camera.offsetX(), camera.offsetY());
         drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
 
-        for (Enemy e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
+        for (Entity e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
                     player.draw(g2, camera.offsetX(), camera.offsetY(), enemies);
     }
 
@@ -421,7 +421,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         h = mix(h, Double.doubleToLongBits(player.getX()));
         h = mix(h, Double.doubleToLongBits(player.getY()));
         for (int i = 0; i < enemies.size(); i++) {
-            Enemy e = enemies.get(i);
+            Entity e = enemies.get(i);
             h = mix(h, i);
             h = mix(h, Double.doubleToLongBits(e.getX()));
             h = mix(h, Double.doubleToLongBits(e.getY()));

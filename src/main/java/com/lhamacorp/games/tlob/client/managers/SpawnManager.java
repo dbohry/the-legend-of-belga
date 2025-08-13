@@ -1,6 +1,8 @@
 package com.lhamacorp.games.tlob.client.managers;
 
-import com.lhamacorp.games.tlob.client.entities.Enemy;
+import com.lhamacorp.games.tlob.client.entities.Entity;
+import com.lhamacorp.games.tlob.client.entities.Soldier;
+import com.lhamacorp.games.tlob.client.entities.Archer;
 import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
@@ -28,7 +30,7 @@ public class SpawnManager {
         this.rng = (rng != null) ? rng : new Random();
     }
 
-    public void spawn(TileMap map, Player player, List<Enemy> out, int completedMaps, int tileSize) {
+    public void spawn(TileMap map, Player player, List<Entity> out, int completedMaps, int tileSize) {
         out.clear();
         int base = 3 + rng.nextInt(6); // 3..8
         double mult = Math.pow(1.4, completedMaps);
@@ -38,11 +40,15 @@ public class SpawnManager {
             int[] pos = map.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * tileSize);
             if (pos == null) pos = map.getRandomFloorTile();
             if (pos != null && !map.isWall(pos[0], pos[1])) {
-                out.add(new Enemy(
-                    pos[0] * tileSize + tileSize / 2.0,
-                    pos[1] * tileSize + tileSize / 2.0,
-                    enemyWeapon
-                ));
+                double x = pos[0] * tileSize + tileSize / 2.0;
+                double y = pos[1] * tileSize + tileSize / 2.0;
+                
+                // 20% chance to spawn an Archer, 80% chance for Soldier
+                if (rng.nextDouble() < 0.20) {
+                    out.add(new Archer(x, y, enemyWeapon));
+                } else {
+                    out.add(new Soldier(x, y, enemyWeapon));
+                }
             }
         }
     }

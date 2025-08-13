@@ -1,6 +1,6 @@
 package com.lhamacorp.games.tlob.client.managers;
 
-import com.lhamacorp.games.tlob.client.entities.Enemy;
+import com.lhamacorp.games.tlob.client.entities.Entity;
 import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.maps.MapGenerator;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
@@ -49,7 +49,7 @@ public final class LevelManager {
         return completed;
     }
 
-    public void restart(Player player, SpawnManager spawner, List<Enemy> enemies, int tileSize) {
+    public void restart(Player player, SpawnManager spawner, List<Entity> enemies, int tileSize) {
         this.completed = 0;
         this.current = buildNewMap();
         placePlayer(player, tileSize);
@@ -57,7 +57,7 @@ public final class LevelManager {
         spawner.spawn(current, player, enemies, completed, tileSize);
     }
 
-    public void nextLevel(Player player, SpawnManager spawner, List<Enemy> enemies, int tileSize) {
+    public void nextLevel(Player player, SpawnManager spawner, List<Entity> enemies, int tileSize) {
         this.completed++;
         this.current = buildNewMap();
         placePlayer(player, tileSize);

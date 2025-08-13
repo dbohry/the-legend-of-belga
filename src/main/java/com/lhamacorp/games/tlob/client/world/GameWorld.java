@@ -1,6 +1,6 @@
 package com.lhamacorp.games.tlob.client.world;
 
-import com.lhamacorp.games.tlob.client.entities.Enemy;
+import com.lhamacorp.games.tlob.client.entities.Entity;
 import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 
@@ -15,7 +15,7 @@ public final class GameWorld {
 
     private final TileMap map;
     private final Player player;
-    private final List<Enemy> enemies;
+    private final List<Entity> enemies;
     private final Random rng;
     private final IdAllocator ids = new IdAllocator();
     private int tick;
@@ -30,7 +30,7 @@ public final class GameWorld {
 
         // Enemies
         for (int i = enemies.size() - 1; i >= 0; i--) {
-            Enemy e = enemies.get(i);
+            Entity e = enemies.get(i);
             e.update(player, map);
             if (!e.isAlive()) enemies.remove(i);
         }
@@ -40,7 +40,7 @@ public final class GameWorld {
     public Snapshot snapshot() {
         List<EntityState> states = new ArrayList<>(1 + enemies.size());
         states.add(EntityState.of(ids.id(player), EntityState.PLAYER, player));
-        for (Enemy e : enemies) states.add(EntityState.of(ids.id(e), EntityState.ENEMY, e));
+        for (Entity e : enemies) states.add(EntityState.of(ids.id(e), EntityState.ENEMY, e));
         return new Snapshot(tick, states);
     }
 
@@ -53,7 +53,7 @@ public final class GameWorld {
         return player;
     }
 
-    public List<Enemy> enemies() {
+    public List<Entity> enemies() {
         return enemies;
     }
 
@@ -65,7 +65,7 @@ public final class GameWorld {
         return rng;
     }
 
-    public GameWorld(TileMap map, Player player, List<Enemy> enemies, long seed) {
+    public GameWorld(TileMap map, Player player, List<Entity> enemies, long seed) {
         this.map = Objects.requireNonNull(map);
         this.player = Objects.requireNonNull(player);
         this.enemies = Objects.requireNonNull(enemies);
