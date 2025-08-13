@@ -3,6 +3,7 @@ package com.lhamacorp.games.tlob.client.managers;
 import com.lhamacorp.games.tlob.client.save.SaveManager;
 import com.lhamacorp.games.tlob.client.save.SaveState;
 import com.lhamacorp.games.tlob.client.save.ActivePerks;
+import com.lhamacorp.games.tlob.client.save.AppliedPerk;
 
 import java.awt.*;
 
@@ -45,8 +46,8 @@ public class SinglePlayerGameManager extends BaseGameManager {
         // Restore active perks from save and apply them to the player
         if (saveState.getActivePerks() != null) {
             this.activePerks.clear();
-            for (String perkId : saveState.getActivePerks().getPerkIds()) {
-                this.activePerks.addPerk(perkId);
+            for (AppliedPerk appliedPerk : saveState.getActivePerks().getAppliedPerks()) {
+                this.activePerks.addPerk(appliedPerk);
             }
             applyActivePerksToPlayer();
         }
@@ -58,41 +59,15 @@ public class SinglePlayerGameManager extends BaseGameManager {
 
     /**
      * Applies all active perks to the player.
-     * This method recreates the perk effects by applying them in sequence.
+     * This method recreates the perk effects by applying them in sequence with their exact values.
      */
     private void applyActivePerksToPlayer() {
-        for (String perkId : activePerks.getPerkIds()) {
-            applyPerkById(perkId);
+        for (AppliedPerk appliedPerk : activePerks.getAppliedPerks()) {
+            applyPerkByTypeAndValue(appliedPerk.getPerkType(), appliedPerk.getValue());
         }
     }
 
-    /**
-     * Applies a specific perk by its ID.
-     * @param perkId the identifier of the perk to apply
-     */
-    private void applyPerkById(String perkId) {
-        switch (perkId) {
-            case "MAX_HEALTH":
-                player.increaseMaxHealthByPercent(0.15); // Default 15% increase
-                break;
-            case "MAX_STAMINA":
-                player.increaseMaxStaminaByPercent(0.15); // Default 15% increase
-                break;
-            case "MAX_MANA":
-                player.increaseMaxManaByPercent(0.15); // Default 15% increase
-                break;
-            case "SHIELD":
-                player.increaseShield();
-                break;
-            case "WEAPON_WIDTH":
-                player.increaseWeaponWidth();
-                break;
-            // Add more perk types as needed
-            default:
-                System.out.println("Unknown perk ID: " + perkId);
-                break;
-        }
-    }
+
 
     @Override
     protected void updatePlaying(Point aimWorld) {
@@ -151,10 +126,14 @@ public class SinglePlayerGameManager extends BaseGameManager {
     protected void applyPerkAndContinue(int index) {
         var applied = perkManager.applyChoice(index, player);
         if (applied != null) {
-            // Add the perk to active perks list
-            String perkId = getPerkId(applied);
-            if (perkId != null) {
-                activePerks.addPerk(perkId);
+            // Get the perk type and extract the actual value that was applied
+            String perkType = getPerkType(applied);
+            Double perkValue = extractPerkValue(applied);
+            
+            if (perkType != null && perkValue != null) {
+                // Create an AppliedPerk with the exact value that was applied
+                AppliedPerk appliedPerk = new AppliedPerk(perkType, perkValue);
+                activePerks.addPerk(appliedPerk);
             }
             
             // Auto-save immediately after applying perk (before starting next level)
@@ -165,11 +144,11 @@ public class SinglePlayerGameManager extends BaseGameManager {
     }
 
     /**
-     * Determines the perk ID based on the applied perk.
+     * Determines the perk type based on the applied perk.
      * @param perk the perk that was applied
-     * @return the perk identifier, or null if unknown
+     * @return the perk type identifier, or null if unknown
      */
-    private String getPerkId(com.lhamacorp.games.tlob.client.perks.Perk perk) {
+    private String getPerkType(com.lhamacorp.games.tlob.client.perks.Perk perk) {
         String name = perk.name;
         if (name.contains("Max Life")) return "MAX_HEALTH";
         if (name.contains("Max Stamina")) return "MAX_STAMINA";
@@ -177,13 +156,104 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (name.contains("Shield")) return "SHIELD";
         if (name.contains("Weapon Width")) return "WEAPON_WIDTH";
         if (name.contains("Movement Speed")) return "MOVE_SPEED";
-        if (name.contains("Stamina Regeneration")) return "STAMINA_REGEN";
-        if (name.contains("Mana Regeneration")) return "MANA_REGEN";
+        if (name.contains("Stamina Regen")) return "STAMINA_REGEN";
+        if (name.contains("Mana Regen")) return "MANA_REGEN";
         if (name.contains("Weapon Damage")) return "WEAPON_DAMAGE";
         if (name.contains("Weapon Range")) return "WEAPON_RANGE";
         return null;
     }
-
+    
+    /**
+     * Extracts the actual value that was applied by the perk.
+     * This method parses the perk description to find the percentage or value.
+     * @param perk the perk that was applied
+     * @return the actual value that was applied, or null if cannot be determined
+     */
+    private Double extractPerkValue(com.lhamacorp.games.tlob.client.perks.Perk perk) {
+        String desc = perk.description;
+        
+        // Handle percentage-based perks
+        if (desc.contains("%")) {
+            // Extract percentage from description like "Increases maximum life (+15%)"
+            int start = desc.indexOf("(+");
+            int end = desc.indexOf("%");
+            if (start != -1 && end != -1) {
+                try {
+                    String percentStr = desc.substring(start + 2, end);
+                    return Double.parseDouble(percentStr) / 100.0; // Convert to decimal
+                } catch (NumberFormatException e) {
+                    System.err.println("Failed to parse percentage from: " + desc);
+                }
+            }
+        }
+        
+        // Handle fixed value perks
+        if (desc.contains("+1")) {
+            if (desc.contains("Shield")) return 1.0;
+            if (desc.contains("Weapon Width")) return 1.0;
+        }
+        
+        // Default values for perks where we can't extract the exact value
+        // These should match the default values used in PerkManager
+        String name = perk.name;
+        if (name.contains("Max Life")) return 0.15; // Default 15%
+        if (name.contains("Max Stamina")) return 0.15; // Default 15%
+        if (name.contains("Max Mana")) return 0.15; // Default 15%
+        if (name.contains("Movement Speed")) return 0.075; // Default 7.5%
+        if (name.contains("Stamina Regen")) return 0.075; // Default 7.5%
+        if (name.contains("Mana Regen")) return 0.15; // Default 15%
+        if (name.contains("Weapon Damage")) return 0.15; // Default 15%
+        if (name.contains("Weapon Range")) return 0.075; // Default 7.5%
+        
+                return null;
+    }
+    
+    /**
+     * Applies a specific perk by its type and value.
+     * This method applies the exact value that was originally applied.
+     * @param perkType the type of perk to apply
+     * @param value the exact value to apply
+     */
+    private void applyPerkByTypeAndValue(String perkType, double value) {
+        switch (perkType) {
+            case "MAX_HEALTH":
+                player.increaseMaxHealthByPercent(value);
+                break;
+            case "MAX_STAMINA":
+                player.increaseMaxStaminaByPercent(value);
+                break;
+            case "MAX_MANA":
+                player.increaseMaxManaByPercent(value);
+                break;
+            case "SHIELD":
+                // Shield is always +1, so we can ignore the value
+                player.increaseShield();
+                break;
+            case "WEAPON_WIDTH":
+                // Weapon width is always +1, so we can ignore the value
+                player.increaseWeaponWidth();
+                break;
+            case "STAMINA_REGEN":
+                player.increaseStaminaRegenByPercent(value);
+                break;
+            case "MANA_REGEN":
+                player.increaseManaRegenByPercent(value);
+                break;
+            case "MOVE_SPEED":
+                player.increaseMoveSpeedByPercent(value);
+                break;
+            case "WEAPON_DAMAGE":
+                player.increaseAttackDamageByPercent(value);
+                break;
+            case "WEAPON_RANGE":
+                player.increaseWeaponRangeByPercent(value);
+                break;
+            default:
+                System.out.println("Unknown perk type: " + perkType);
+                break;
+        }
+    }
+    
     /**
      * Checks if the save indicator should be shown.
      * @return true if the save indicator should be visible

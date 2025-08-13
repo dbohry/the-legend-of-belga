@@ -6,46 +6,47 @@ import java.util.List;
 
 /**
  * Represents the active perks that have been selected by the player.
- * This class stores the perk identifiers so they can be re-applied when loading a save.
+ * This class stores the applied perks with their specific values so they can be 
+ * re-applied exactly when loading a save.
  */
 public class ActivePerks implements Serializable {
     private static final long serialVersionUID = 1L;
     
-    private final List<String> perkIds;
+    private final List<AppliedPerk> appliedPerks;
     
     public ActivePerks() {
-        this.perkIds = new ArrayList<>();
+        this.appliedPerks = new ArrayList<>();
     }
     
-    public ActivePerks(List<String> perkIds) {
-        this.perkIds = new ArrayList<>(perkIds);
+    public ActivePerks(List<AppliedPerk> appliedPerks) {
+        this.appliedPerks = new ArrayList<>(appliedPerks);
     }
     
     /**
-     * Adds a perk ID to the active perks list.
-     * @param perkId the identifier of the perk to add
+     * Adds an applied perk to the active perks list.
+     * @param appliedPerk the applied perk to add
      */
-    public void addPerk(String perkId) {
-        if (!perkIds.contains(perkId)) {
-            perkIds.add(perkId);
+    public void addPerk(AppliedPerk appliedPerk) {
+        if (appliedPerk != null) {
+            appliedPerks.add(appliedPerk);
         }
     }
     
     /**
-     * Gets the list of active perk IDs.
-     * @return the list of perk identifiers
+     * Gets the list of applied perks.
+     * @return the list of applied perks
      */
-    public List<String> getPerkIds() {
-        return new ArrayList<>(perkIds);
+    public List<AppliedPerk> getAppliedPerks() {
+        return new ArrayList<>(appliedPerks);
     }
     
     /**
-     * Checks if a specific perk is active.
-     * @param perkId the perk identifier to check
-     * @return true if the perk is active, false otherwise
+     * Checks if a specific perk type is active.
+     * @param perkType the perk type to check
+     * @return true if the perk type is active, false otherwise
      */
-    public boolean hasPerk(String perkId) {
-        return perkIds.contains(perkId);
+    public boolean hasPerkType(String perkType) {
+        return appliedPerks.stream().anyMatch(p -> p.getPerkType().equals(perkType));
     }
     
     /**
@@ -53,18 +54,18 @@ public class ActivePerks implements Serializable {
      * @return the count of active perks
      */
     public int getPerkCount() {
-        return perkIds.size();
+        return appliedPerks.size();
     }
     
     /**
      * Clears all active perks.
      */
     public void clear() {
-        perkIds.clear();
+        appliedPerks.clear();
     }
     
     @Override
     public String toString() {
-        return "ActivePerks{count=" + perkIds.size() + ", perks=" + perkIds + "}";
+        return "ActivePerks{count=" + appliedPerks.size() + ", perks=" + appliedPerks + "}";
     }
 }

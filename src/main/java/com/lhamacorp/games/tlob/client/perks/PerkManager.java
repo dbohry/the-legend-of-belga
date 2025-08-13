@@ -195,14 +195,14 @@ public class PerkManager {
 
         register("STAMINA_REGEN", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
-            String label = "Stamina Regeneration";
+            String label = "Stamina Regen";
             String desc = String.format("Stamina regenerates faster (+%d%%).", (int)Math.round(p * 100));
             return new Perk(label, desc, Rarity.RARE, pl -> pl.increaseStaminaRegenByPercent(p));
         });
 
         register("MANA_REGEN", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20); // 10%..20%
-            String label = "Mana Regeneration";
+            String label = "Mana Regen";
             String desc = String.format("Mana regenerates faster (+%d%%).", (int)Math.round(p * 100));
             return new Perk(label, desc, Rarity.UNCOMMON, pl -> pl.increaseManaRegenByPercent(p));
         });

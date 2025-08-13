@@ -15,8 +15,8 @@ public class SaveStateTest {
         long seed = 99999L;
         int completedMaps = 10;
         ActivePerks activePerks = new ActivePerks();
-        activePerks.addPerk("MAX_HEALTH");
-        activePerks.addPerk("MAX_STAMINA");
+        activePerks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
+        activePerks.addPerk(new AppliedPerk("MAX_STAMINA", 0.12));
         
         SaveState state = new SaveState(seed, completedMaps, activePerks);
         assertEquals(seed, state.getWorldSeed(), "World seed should match constructor parameter");
@@ -30,7 +30,7 @@ public class SaveStateTest {
         long seed = 12345L;
         int completedMaps = 7;
         ActivePerks activePerks = new ActivePerks();
-        activePerks.addPerk("MAX_HEALTH");
+        activePerks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
         
         SaveState state = new SaveState(seed, completedMaps, activePerks);
         
@@ -52,26 +52,27 @@ public class SaveStateTest {
         ActivePerks perks = new ActivePerks();
         
         assertEquals(0, perks.getPerkCount(), "New ActivePerks should have 0 perks");
-        assertFalse(perks.hasPerk("MAX_HEALTH"), "Should not have MAX_HEALTH perk initially");
+        assertFalse(perks.hasPerkType("MAX_HEALTH"), "Should not have MAX_HEALTH perk initially");
         
-        perks.addPerk("MAX_HEALTH");
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
         assertEquals(1, perks.getPerkCount(), "Should have 1 perk after adding");
-        assertTrue(perks.hasPerk("MAX_HEALTH"), "Should have MAX_HEALTH perk after adding");
+        assertTrue(perks.hasPerkType("MAX_HEALTH"), "Should have MAX_HEALTH perk after adding");
         
-        // Adding the same perk again should not duplicate
-        perks.addPerk("MAX_HEALTH");
-        assertEquals(1, perks.getPerkCount(), "Should still have 1 perk after adding duplicate");
+        // Adding the same perk type again should not duplicate
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.20));
+        assertEquals(2, perks.getPerkCount(), "Should have 2 perks after adding same type with different value");
+        assertTrue(perks.hasPerkType("MAX_HEALTH"), "Should have MAX_HEALTH perk");
         
-        perks.addPerk("MAX_STAMINA");
-        assertEquals(2, perks.getPerkCount(), "Should have 2 perks after adding second");
-        assertTrue(perks.hasPerk("MAX_STAMINA"), "Should have MAX_STAMINA perk");
+        perks.addPerk(new AppliedPerk("MAX_STAMINA", 0.12));
+        assertEquals(3, perks.getPerkCount(), "Should have 3 perks after adding second type");
+        assertTrue(perks.hasPerkType("MAX_STAMINA"), "Should have MAX_STAMINA perk");
     }
 
     @Test
     void testActivePerksToString() {
         ActivePerks perks = new ActivePerks();
-        perks.addPerk("MAX_HEALTH");
-        perks.addPerk("MAX_STAMINA");
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
+        perks.addPerk(new AppliedPerk("MAX_STAMINA", 0.12));
         
         String perksString = perks.toString();
         
@@ -84,15 +85,15 @@ public class SaveStateTest {
     @Test
     void testActivePerksImmutability() {
         ActivePerks perks = new ActivePerks();
-        perks.addPerk("MAX_HEALTH");
+        perks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
         
-        List<String> perkIds = perks.getPerkIds();
-        assertEquals(1, perkIds.size(), "Should have 1 perk");
+        List<AppliedPerk> appliedPerks = perks.getAppliedPerks();
+        assertEquals(1, appliedPerks.size(), "Should have 1 perk");
         
         // Modifying the returned list should not affect the original
-        perkIds.add("MAX_STAMINA");
+        appliedPerks.add(new AppliedPerk("MAX_STAMINA", 0.12));
         assertEquals(1, perks.getPerkCount(), "Original should still have 1 perk");
-        assertFalse(perks.hasPerk("MAX_STAMINA"), "Original should not have MAX_STAMINA");
+        assertFalse(perks.hasPerkType("MAX_STAMINA"), "Original should not have MAX_STAMINA");
     }
 
     @Test
@@ -100,7 +101,7 @@ public class SaveStateTest {
         long seed = 54321L;
         int completedMaps = 15;
         ActivePerks activePerks = new ActivePerks();
-        activePerks.addPerk("MAX_HEALTH");
+        activePerks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
         
         SaveState state = new SaveState(seed, completedMaps, activePerks);
         String stateString = state.toString();
@@ -125,10 +126,41 @@ public class SaveStateTest {
     void testSaveStateWithNegativeValues() {
         // Test edge case with negative values
         ActivePerks activePerks = new ActivePerks();
-        activePerks.addPerk("MAX_HEALTH");
+        activePerks.addPerk(new AppliedPerk("MAX_HEALTH", 0.15));
         SaveState state = new SaveState(-123L, -5, activePerks);
         assertEquals(-123L, state.getWorldSeed(), "Negative seed should be preserved");
         assertEquals(-5, state.getCompletedMaps(), "Negative completed maps should be preserved");
         assertEquals(activePerks, state.getActivePerks(), "Active perks should be preserved");
+    }
+    
+    @Test
+    void testAppliedPerkProperties() {
+        // Test AppliedPerk constructor and getters
+        AppliedPerk perk = new AppliedPerk("MAX_HEALTH", 0.15);
+        assertEquals("MAX_HEALTH", perk.getPerkType(), "Perk type should match constructor");
+        assertEquals(0.15, perk.getValue(), 0.001, "Perk value should match constructor");
+    }
+    
+    @Test
+    void testAppliedPerkToString() {
+        AppliedPerk perk = new AppliedPerk("STAMINA_REGEN", 0.075);
+        String perkString = perk.toString();
+        
+        assertTrue(perkString.contains("AppliedPerk"), "toString should contain class name");
+        assertTrue(perkString.contains("STAMINA_REGEN"), "toString should contain perk type");
+        assertTrue(perkString.contains("0.075"), "toString should contain perk value");
+    }
+    
+    @Test
+    void testAppliedPerkWithDifferentValues() {
+        // Test that different values are preserved correctly
+        AppliedPerk perk1 = new AppliedPerk("MAX_HEALTH", 0.10);
+        AppliedPerk perk2 = new AppliedPerk("MAX_HEALTH", 0.20);
+        
+        assertEquals("MAX_HEALTH", perk1.getPerkType(), "Both perks should have same type");
+        assertEquals("MAX_HEALTH", perk2.getPerkType(), "Both perks should have same type");
+        assertEquals(0.10, perk1.getValue(), 0.001, "First perk should have 10% value");
+        assertEquals(0.20, perk2.getValue(), 0.001, "Second perk should have 20% value");
+        assertNotEquals(perk1.getValue(), perk2.getValue(), "Perks should have different values");
     }
 }
