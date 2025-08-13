@@ -219,7 +219,8 @@ public class Soldier extends Entity {
             int py = (int) Math.round(y - height / 2.0) - camY;
             g2.drawImage(tex, px, py, null);
         } else {
-            drawCenteredRect(g2, camX, camY, width, height, Color.RED);
+            // Draw a more detailed soldier enemy instead of just a red circle
+            drawSoldierEnemy(g2, camX, camY);
         }
 
         if (hurtTimer > 0) {
@@ -238,5 +239,72 @@ public class Soldier extends Entity {
             g2.setColor(new Color(0, 0, 255, 80));
             drawCenteredRect(g2, camX, camY, width, height, new Color(0, 0, 255, 80));
         }
+    }
+
+    private void drawSoldierEnemy(Graphics2D g2, int camX, int camY) {
+        int centerX = (int) Math.round(x) - camX;
+        int centerY = (int) Math.round(y) - camY;
+        
+        // Enable anti-aliasing for smoother shapes
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        // Shadow
+        g2.setColor(new Color(0, 0, 0, 60));
+        g2.fillOval(centerX - width/2 + 2, centerY - height/2 + height - 6, width - 4, 4);
+        
+        // Body (armor)
+        g2.setColor(new Color(80, 80, 90)); // Dark armor
+        g2.fillRoundRect(centerX - width/2 + 2, centerY - height/2 + 6, width - 4, height - 12, 6, 6);
+        
+        // Armor highlights
+        g2.setColor(new Color(120, 120, 130));
+        g2.fillRoundRect(centerX - width/2 + 3, centerY - height/2 + 7, width - 6, height - 14, 4, 4);
+        
+        // Head
+        g2.setColor(new Color(180, 140, 100)); // Skin tone
+        g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 10);
+        
+        // Helmet
+        g2.setColor(new Color(60, 60, 70));
+        g2.fillOval(centerX - 7, centerY - height/2 + 1, 14, 8);
+        g2.setColor(new Color(80, 80, 90));
+        g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 6);
+        
+        // Eyes (red glowing)
+        g2.setColor(new Color(200, 0, 0));
+        g2.fillOval(centerX - 4, centerY - height/2 + 4, 3, 3);
+        g2.fillOval(centerX + 1, centerY - height/2 + 4, 3, 3);
+        g2.setColor(new Color(255, 0, 0));
+        g2.fillOval(centerX - 3, centerY - height/2 + 5, 1, 1);
+        g2.fillOval(centerX + 2, centerY - height/2 + 5, 1, 1);
+        
+        // Weapon (sword)
+        g2.setColor(new Color(160, 160, 180));
+        g2.fillRect(centerX + width/2 - 1, centerY - 3, 8, 6);
+        g2.setColor(new Color(200, 200, 220));
+        g2.fillRect(centerX + width/2, centerY - 2, 6, 4);
+        
+        // Shield
+        g2.setColor(new Color(100, 80, 60));
+        g2.fillOval(centerX - width/2 - 2, centerY - 2, 8, 8);
+        g2.setColor(new Color(120, 100, 80));
+        g2.fillOval(centerX - width/2 - 1, centerY - 1, 6, 6);
+        
+        // Belt
+        g2.setColor(new Color(40, 40, 50));
+        g2.fillRect(centerX - width/2 + 3, centerY + 2, width - 6, 2);
+        
+        // Legs
+        g2.setColor(new Color(60, 60, 70));
+        g2.fillRect(centerX - 4, centerY + 4, 3, 4);
+        g2.fillRect(centerX + 1, centerY + 4, 3, 4);
+        
+        // Boots
+        g2.setColor(new Color(40, 40, 50));
+        g2.fillRect(centerX - 5, centerY + 8, 5, 2);
+        g2.fillRect(centerX, centerY + 8, 5, 2);
+        
+        // Reset anti-aliasing
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
     }
 }

@@ -624,10 +624,15 @@ public final class TextureManager {
         Graphics2D g = sheet.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        Color body = new Color(200, 60, 60);
-        Color shade = new Color(150, 30, 30);
+        // Enhanced enemy color palette
+        Color armorDark = new Color(80, 80, 90);
+        Color armorMid = new Color(120, 120, 130);
+        Color armorLight = new Color(160, 160, 170);
+        Color skin = new Color(180, 140, 100);
         Color eyeW = new Color(250, 250, 250);
         Color eyeB = new Color(20, 20, 20);
+        Color weaponDark = new Color(100, 80, 60);
+        Color weaponLight = new Color(140, 120, 100);
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
@@ -643,26 +648,62 @@ public final class TextureManager {
                 f.setColor(new Color(0, 0, 0, 70));
                 f.fillOval(3, fh - 6, fw - 6, 4);
 
-                // Blobby body
-                f.setColor(body);
-                f.fillOval(2, 3 + wobble, fw - 4, fh - 8);
+                // Body (armor)
+                f.setColor(armorDark);
+                f.fillRoundRect(2, 6 + wobble, fw - 4, fh - 12, 6, 6);
+                
+                // Armor highlights
+                f.setColor(armorMid);
+                f.fillRoundRect(3, 7 + wobble, fw - 6, fh - 14, 4, 4);
+                
+                // Armor details
+                f.setColor(armorLight);
+                f.fillRect(4, 8 + wobble, fw - 8, 2); // chest plate
+                f.fillRect(4, 12 + wobble, fw - 8, 2); // belt line
 
-                // Belly shading
-                f.setColor(shade);
-                f.fillOval(4, 6 + wobble, fw - 12, fh - 14);
+                // Head
+                f.setColor(skin);
+                f.fillOval(4, 2 + wobble, fw - 8, 8);
+                
+                // Helmet
+                f.setColor(armorDark);
+                f.fillOval(3, 1 + wobble, fw - 6, 10);
+                f.setColor(armorMid);
+                f.fillOval(4, 2 + wobble, fw - 8, 8);
+                
+                // Helmet visor
+                f.setColor(armorDark);
+                f.fillRect(5, 4 + wobble, fw - 10, 2);
 
-                // Eyes (position shifts slightly per direction)
-                int ex = (r == 1) ? -1 : (r == 2) ? 1 : 0; // LEFT/RIGHT
-                f.setColor(eyeW);
-                f.fillOval(6 + ex, 7 + wobble, 5, 5);
-                f.fillOval(fw - 11 + ex, 7 + wobble, 5, 5);
-                f.setColor(eyeB);
-                f.fillOval(8 + ex, 9 + wobble, 2, 2);
-                f.fillOval(fw - 9 + ex, 9 + wobble, 2, 2);
+                // Eyes (red glowing for enemies)
+                f.setColor(new Color(200, 0, 0));
+                f.fillOval(6, 5 + wobble, 3, 3);
+                f.fillOval(fw - 9, 5 + wobble, 3, 3);
+                f.setColor(new Color(255, 0, 0));
+                f.fillOval(7, 6 + wobble, 1, 1);
+                f.fillOval(fw - 8, 6 + wobble, 1, 1);
 
-                // Little mouth / beak
-                f.setColor(new Color(240, 180, 120));
-                f.fillOval(fw / 2 - 2, 11 + wobble, 4, 3);
+                // Weapon (sword)
+                f.setColor(weaponDark);
+                f.fillRect(fw - 2, fh/2 - 3, 6, 6);
+                f.setColor(weaponLight);
+                f.fillRect(fw - 1, fh/2 - 2, 4, 4);
+                
+                // Shield
+                f.setColor(weaponDark);
+                f.fillOval(0, fh/2 - 4, 8, 8);
+                f.setColor(weaponLight);
+                f.fillOval(1, fh/2 - 3, 6, 6);
+
+                // Legs
+                f.setColor(armorDark);
+                f.fillRect(5, fh - 8 + wobble, 3, 6);
+                f.fillRect(fw - 8, fh - 8 - wobble, 3, 6);
+                
+                // Boots
+                f.setColor(armorDark);
+                f.fillRect(4, fh - 4 + wobble, 5, 2);
+                f.fillRect(fw - 9, fh - 4 - wobble, 5, 2);
 
                 f.dispose();
                 g.drawImage(frame, x0, y0, null);
