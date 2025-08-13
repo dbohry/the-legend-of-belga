@@ -1,11 +1,15 @@
 package com.lhamacorp.games.tlob.client.entities;
 
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
+import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
+import com.lhamacorp.games.tlob.core.Constants;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Archer extends Entity {
 
@@ -45,6 +49,19 @@ public class Archer extends Entity {
     // wander
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
+    
+    // Enhanced wandering behavior for archers
+    private final ArcherWanderBehavior wanderBehavior;
+    private int tacticalTimer = 0;
+    private final double preferredDistance;
+    private final double tacticalRadius;
+    private final boolean prefersHighGround;
+    private final double retreatChance;
+    private final double flankingTendency;
+    private final double coverSeeking;
+    private final boolean isTactical;
+    private final boolean isCowardly;
+    private final double precisionLevel;
 
     private int lcg;
     private final double speedScale;
@@ -56,6 +73,15 @@ public class Archer extends Entity {
     private final int baseAttackCooldown;
     private final int baseAttackDuration;
     private int ageTicks = 0;
+    
+    // Archer-specific wander behavior types
+    private enum ArcherWanderBehavior {
+        TACTICAL,     // Maintain optimal attack distance
+        COVER_SEEKING, // Prefer to move behind cover
+        FLANKING,     // Try to move to player's sides
+        RETREAT,      // Prefer to move away when threatened
+        AMBUSH        // Stay still and wait for opportunities
+    }
 
     /**
      * Creates an archer enemy at the specified position.
@@ -63,8 +89,13 @@ public class Archer extends Entity {
     public Archer(double x, double y, Weapon weapon) {
         super(x, y, ARCHER_SIZE, ARCHER_SIZE, ARCHER_BASE_SPEED, ARCHER_MAX_HP, ARCHER_MAX_STAMINA, ARCHER_MAX_MANA, 0, weapon, "Archer", Alignment.FOE);
 
+        // Improved seed generation with more entropy
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
+        
+        // Add additional entropy based on current time and object hash
+        lcg ^= System.nanoTime() & 0xFFFF;
+        lcg ^= this.hashCode() & 0xFFFF;
 
         speedScale = 0.50 + 0.30 * rand01();
         aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0);
@@ -77,6 +108,32 @@ public class Archer extends Entity {
         baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01()));
         baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));
 
+        // Initialize enhanced archer wandering behavior
+        // Fix: Use proper random selection to ensure equal 20% chances for each behavior
+        double behaviorRoll = rand01();
+        if (behaviorRoll < 0.2) {
+            wanderBehavior = ArcherWanderBehavior.TACTICAL;
+        } else if (behaviorRoll < 0.4) {
+            wanderBehavior = ArcherWanderBehavior.COVER_SEEKING;
+        } else if (behaviorRoll < 0.6) {
+            wanderBehavior = ArcherWanderBehavior.FLANKING;
+        } else if (behaviorRoll < 0.8) {
+            wanderBehavior = ArcherWanderBehavior.RETREAT;
+        } else {
+            wanderBehavior = ArcherWanderBehavior.AMBUSH;
+        }
+        preferredDistance = MIN_ATTACK_RANGE + (ATTACK_RANGE - MIN_ATTACK_RANGE) * (0.3 + 0.4 * rand01());
+        tacticalRadius = 80 + 60 * rand01();
+        prefersHighGround = rand01() < 0.4;
+        retreatChance = 0.2 + 0.3 * rand01();
+        flankingTendency = 0.3 + 0.4 * rand01();
+        coverSeeking = 0.4 + 0.4 * rand01();
+        
+        // Initialize personality traits
+        isTactical = rand01() < 0.6;
+        isCowardly = rand01() < 0.3;
+        precisionLevel = 0.5 + 0.5 * rand01();
+
         pickNewWanderDir();
     }
 
@@ -85,6 +142,14 @@ public class Archer extends Entity {
         if (!isAlive()) return;
         Player player = (Player) args[0];
         TileMap map = (TileMap) args[1];
+        
+        // Check for group behavior if enemies list is provided
+        List<Entity> nearbyAllies = null;
+        if (args.length > 2 && args[2] instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<Entity> enemies = (List<Entity>) args[2];
+            nearbyAllies = findNearbyAllies(enemies);
+        }
 
         if (hurtTimer > 0) hurtTimer--;
         if (attackCooldown > 0) attackCooldown--;
@@ -134,12 +199,102 @@ public class Archer extends Entity {
                 approachPlayer(player, map);
             }
         } else {
-            wander(map, player);
+            // Use tactical group behavior if allies are nearby
+            if (nearbyAllies != null && !nearbyAllies.isEmpty() && isTactical) {
+                tacticalGroupWander(map, player, nearbyAllies);
+            } else {
+                enhancedWander(map, player);
+            }
         }
 
         updateFacing();
         animTimeMs += TICK_MS;
         ageTicks++;
+    }
+    
+    private List<Entity> findNearbyAllies(List<Entity> enemies) {
+        List<Entity> allies = new ArrayList<>();
+        double groupRadius = 80.0; // Archers have longer tactical range
+        
+        for (Entity enemy : enemies) {
+            if (enemy != this && enemy.isAlive() && enemy.getAlignment() == Alignment.FOE) {
+                double dist = Math.hypot(enemy.getX() - x, enemy.getY() - y);
+                if (dist <= groupRadius) {
+                    allies.add(enemy);
+                }
+            }
+        }
+        return allies;
+    }
+    
+    private void tacticalGroupWander(TileMap map, Player player, List<Entity> allies) {
+        if (tacticalTimer <= 0) {
+            // Tactical group behavior: position for crossfire or support
+            if (!allies.isEmpty()) {
+                // Find the closest ally to coordinate with
+                Entity closestAlly = null;
+                double closestDist = Double.POSITIVE_INFINITY;
+                
+                for (Entity ally : allies) {
+                    double dist = Math.hypot(ally.getX() - x, ally.getY() - y);
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestAlly = ally;
+                    }
+                }
+                
+                if (closestAlly != null) {
+                    // Position for tactical advantage (crossfire, support, etc.)
+                    double playerX = player.getX();
+                    double playerY = player.getY();
+                    double allyX = closestAlly.getX();
+                    double allyY = closestAlly.getY();
+                    
+                    // Calculate tactical position (perpendicular to ally-player line)
+                    double dxToPlayer = playerX - allyX;
+                    double dyToPlayer = playerY - allyY;
+                    double distToPlayer = Math.hypot(dxToPlayer, dyToPlayer);
+                    
+                    if (distToPlayer > 0) {
+                        // Position perpendicular to the ally-player line
+                        double perpAngle = Math.atan2(dyToPlayer, dxToPlayer) + Math.PI / 2;
+                        double tacticalX = allyX + Math.cos(perpAngle) * preferredDistance;
+                        double tacticalY = allyY + Math.sin(perpAngle) * preferredDistance;
+                        
+                        // Move towards tactical position
+                        double dx = tacticalX - x;
+                        double dy = tacticalY - y;
+                        double dist = Math.hypot(dx, dy);
+                        
+                        if (dist > 0) {
+                            wanderDx = dx / dist;
+                            wanderDy = dy / dist;
+                            tacticalTimer = 90 + (int) (rand01() * 120);
+                        } else {
+                            pickNewWanderDir();
+                            tacticalTimer = 60 + (int) (rand01() * 90);
+                        }
+                    } else {
+                        pickNewWanderDir();
+                        tacticalTimer = 60 + (int) (rand01() * 90);
+                    }
+                } else {
+                    pickNewWanderDir();
+                    tacticalTimer = 60 + (int) (rand01() * 90);
+                }
+            } else {
+                pickNewWanderDir();
+                tacticalTimer = 60 + (int) (rand01() * 90);
+            }
+        }
+
+        if (tacticalTimer > 0) {
+            tacticalTimer--;
+            double moveSpeed = speed * speedScale * 0.3;
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
     }
 
     private void approachPlayer(Player player, TileMap map) {
@@ -206,17 +361,184 @@ public class Archer extends Entity {
         }
     }
 
-    private void wander(TileMap map, Player player) {
+    private void enhancedWander(TileMap map, Player player) {
+        switch (wanderBehavior) {
+            case TACTICAL:
+                tacticalWander(map, player);
+                break;
+            case COVER_SEEKING:
+                coverSeekingWander(map, player);
+                break;
+            case FLANKING:
+                flankingWander(map, player);
+                break;
+            case RETREAT:
+                retreatWander(map, player);
+                break;
+            case AMBUSH:
+                ambushWander(map, player);
+                break;
+        }
+    }
+
+    private void tacticalWander(TileMap map, Player player) {
+        if (tacticalTimer <= 0) {
+            double distToP = Math.hypot(x - player.getX(), y - player.getY());
+            if (distToP < preferredDistance) {
+                // If too close, back away
+                backAwayFromPlayer(player, map);
+            } else if (distToP > preferredDistance + tacticalRadius) {
+                // If too far, approach
+                approachPlayer(player, map);
+            } else {
+                // If at preferred distance, make small tactical movements
+                double angle = Math.atan2(player.getY() - y, player.getX() - x) + (rand01() - 0.5) * Math.PI / 4;
+                wanderDx = Math.cos(angle) * 0.3;
+                wanderDy = Math.sin(angle) * 0.3;
+                double moveSpeed = speed * speedScale * 0.2;
+                
+                // Tactical archers move more precisely
+                if (isTactical) moveSpeed *= 0.8;
+                
+                moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+                movedThisTick = true;
+            }
+            // Tactical archers adjust position more frequently
+            int baseTime = isTactical ? 40 : 60;
+            tacticalTimer = baseTime + (int) (rand01() * 120);
+        } else {
+            tacticalTimer--;
+        }
+    }
+
+    private void coverSeekingWander(TileMap map, Player player) {
         if (wanderTimer <= 0) {
-            pickNewWanderDir();
-            wanderTimer = 30 + (int) (rand01() * 60);
+            // Try to find cover by moving perpendicular to player direction
+            double dxToP = player.getX() - x;
+            double dyToP = player.getY() - y;
+            double distToP = Math.hypot(dxToP, dyToP);
+            
+            if (distToP > 0) {
+                // Move perpendicular to player direction (seeking cover)
+                double perpAngle = Math.atan2(dyToP, dxToP) + Math.PI / 2 + (rand01() - 0.5) * Math.PI / 2;
+                wanderDx = Math.cos(perpAngle);
+                wanderDy = Math.sin(perpAngle);
+                wanderTimer = 45 + (int) (rand01() * 90);
+            } else {
+                pickNewWanderDir();
+                wanderTimer = 30 + (int) (rand01() * 60);
+            }
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * 0.25;
+            
+            // Cover-seeking archers move more carefully
+            if (coverSeeking > 0.7) moveSpeed *= 0.8;
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
+    }
+
+    private void flankingWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            // Try to move to player's sides for flanking
+            double dxToP = player.getX() - x;
+            double dyToP = player.getY() - y;
+            double distToP = Math.hypot(dxToP, dyToP);
+            
+            if (distToP > 0) {
+                // Calculate flanking position (to the side of the player)
+                double flankAngle = Math.atan2(dyToP, dxToP) + (rand01() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+                double flankX = player.getX() + Math.cos(flankAngle) * preferredDistance;
+                double flankY = player.getY() + Math.sin(flankAngle) * preferredDistance;
+                
+                // Move towards flanking position
+                double dx = flankX - x;
+                double dy = flankY - y;
+                double dist = Math.hypot(dx, dy);
+                if (dist > 0) {
+                    wanderDx = dx / dist;
+                    wanderDy = dy / dist;
+                    // High flanking tendency means longer flanking movements
+                    int baseTime = (int) (60 + flankingTendency * 60);
+                    wanderTimer = baseTime + (int) (rand01() * 120);
+                } else {
+                    pickNewWanderDir();
+                    wanderTimer = 30 + (int) (rand01() * 60);
+                }
+            } else {
+                pickNewWanderDir();
+                wanderTimer = 30 + (int) (rand01() * 60);
+            }
         }
 
         if (wanderTimer > 0) {
             wanderTimer--;
             double moveSpeed = speed * speedScale * 0.3;
+            
+            // High flanking tendency means faster movement
+            if (flankingTendency > 0.7) moveSpeed *= 1.1;
+            
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
+        }
+    }
+
+    private void retreatWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            double distToP = Math.hypot(x - player.getX(), y - player.getY());
+            // Cowardly archers retreat more often
+            double actualRetreatChance = isCowardly ? retreatChance * 1.5 : retreatChance;
+            if (distToP < preferredDistance && rand01() < actualRetreatChance) {
+                // Retreat away from player
+                double retreatAngle = Math.atan2(y - player.getY(), x - player.getX());
+                wanderDx = Math.cos(retreatAngle);
+                wanderDy = Math.sin(retreatAngle);
+                wanderTimer = 90 + (int) (rand01() * 120);
+            } else {
+                // Normal wandering
+                pickNewWanderDir();
+                wanderTimer = 30 + (int) (rand01() * 60);
+            }
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * 0.35;
+            
+            // Cowardly archers retreat faster
+            if (isCowardly) moveSpeed *= 1.2;
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
+    }
+
+    private void ambushWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            double distToP = Math.hypot(x - player.getX(), y - player.getY());
+            if (distToP > preferredDistance + 20) {
+                // If too far, move closer
+                approachPlayer(player, map);
+                wanderTimer = 30 + (int) (rand01() * 60);
+            } else {
+                // Stay still and wait for opportunities
+                // Precision archers wait longer for perfect shots
+                int baseTime = (int) (120 + precisionLevel * 120);
+                wanderTimer = baseTime + (int) (rand01() * 180);
+            }
+        } else {
+            wanderTimer--;
+            // Only move occasionally during ambush
+            if (wanderTimer < 30 && rand01() < 0.1) {
+                pickNewWanderDir();
+                double moveSpeed = speed * speedScale * 0.15;
+                moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+                movedThisTick = true;
+            }
         }
     }
 
@@ -302,6 +624,34 @@ public class Archer extends Entity {
             int arrowSize = 5;
             g2.drawLine(arrowScreenX - arrowSize, arrowScreenY, arrowScreenX + arrowSize, arrowScreenY);
             g2.drawLine(arrowScreenX, arrowScreenY - arrowSize, arrowScreenX, arrowScreenY + arrowSize);
+        }
+        
+        // Draw wandering behavior indicator
+        if (GameConfig.getInstance().isShowEnemyBehaviorIndicators() && (wanderTimer > 0 || tacticalTimer > 0)) {
+            String behaviorText = wanderBehavior.name().substring(0, 1);
+            g2.setColor(new Color(0, 255, 255, 200));
+            g2.setFont(new Font("Arial", Font.BOLD, 10));
+            FontMetrics fm = g2.getFontMetrics();
+            int textX = (int) Math.round(x) - camX - fm.stringWidth(behaviorText) / 2;
+            int textY = (int) Math.round(y) - camY - height / 2 - 15;
+            g2.drawString(behaviorText, textX, textY);
+            
+            // Draw personality indicators
+            int indicatorY = textY - 12;
+            if (isTactical) {
+                g2.setColor(new Color(0, 255, 0, 150));
+                g2.fillRect((int) Math.round(x) - camX - 3, indicatorY - 3, 6, 6);
+            }
+            if (isCowardly) {
+                g2.setColor(new Color(255, 165, 0, 150));
+                g2.fillOval((int) Math.round(x) - camX - 3, indicatorY - 3, 6, 6);
+            }
+            if (precisionLevel > 0.8) {
+                g2.setColor(new Color(255, 0, 255, 150));
+                g2.fillPolygon(
+                    new int[]{(int) Math.round(x) - camX - 3, (int) Math.round(x) - camX + 3, (int) Math.round(x) - camX},
+                    new int[]{indicatorY + 3, indicatorY + 3, indicatorY - 3}, 3);
+            }
         }
     }
 

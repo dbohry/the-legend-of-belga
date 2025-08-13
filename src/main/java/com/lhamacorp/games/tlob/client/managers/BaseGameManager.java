@@ -7,6 +7,7 @@ import com.lhamacorp.games.tlob.client.managers.renderers.HudRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.PauseMenuRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.StatsRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.VictoryScreenRenderer;
+import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.perks.PerkManager;
 import com.lhamacorp.games.tlob.client.weapons.Sword;
@@ -94,6 +95,20 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
 
         addMouseListener(new UIMouseClickHandler());
         addKeyListener(new GlobalKeyHandler());
+        
+        // Initialize music volume from config
+        initializeMusicVolume();
+    }
+    
+    /**
+     * Initializes the music volume from the game configuration.
+     */
+    private void initializeMusicVolume() {
+        GameConfig config = GameConfig.getInstance();
+        musicVolumeDb = config.getMusicVolumeDb();
+        if (!musicMuted) {
+            AudioManager.setMusicVolume(musicVolumeDb);
+        }
     }
 
     protected static long readSeed() {
@@ -381,7 +396,10 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         }
         
         switch (state) {
-            case PAUSED -> pauseMenuRenderer.draw(g2, musicVolumeDb);
+            case PAUSED -> {
+                GameConfig config = GameConfig.getInstance();
+                pauseMenuRenderer.draw(g2, config.getMusicVolumeDb(), config.isShowEnemyBehaviorIndicators());
+            }
             case GAME_OVER -> gameOverRenderer.draw(g2);
             case VICTORY -> victoryRenderer.draw(g2);
             default -> {
@@ -536,10 +554,14 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         @Override
         public void mouseDragged(MouseEvent e) {
             if (state == GameState.PAUSED) {
+                GameConfig config = GameConfig.getInstance();
                 float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
+                if (Float.isNaN(maybeDb) && pauseMenuRenderer.isShowingConfig()) {
+                    maybeDb = pauseMenuRenderer.configDbFromPoint(e.getPoint());
+                }
                 if (!Float.isNaN(maybeDb)) {
-                    musicVolumeDb = maybeDb;
-                    if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
+                    config.setMusicVolumeDb(maybeDb);
+                    if (!musicMuted) AudioManager.setMusicVolume(config.getMusicVolumeDb());
                 }
             } else if (state == GameState.PLAYING) {
                 mouseScreenX = e.getX();
@@ -563,15 +585,33 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         }
                 }
                 case PAUSED -> {
+                    GameConfig config = GameConfig.getInstance();
+                    
+                    // Handle volume slider clicks - check both main menu and config menu sliders
                     float maybeDb = pauseMenuRenderer.dbFromPoint(e.getPoint());
+                    if (Float.isNaN(maybeDb) && pauseMenuRenderer.isShowingConfig()) {
+                        maybeDb = pauseMenuRenderer.configDbFromPoint(e.getPoint());
+                    }
                     if (!Float.isNaN(maybeDb)) {
-                        musicVolumeDb = maybeDb;
-                        if (!musicMuted) AudioManager.setMusicVolume(musicVolumeDb);
+                        config.setMusicVolumeDb(maybeDb);
+                        if (!musicMuted) AudioManager.setMusicVolume(config.getMusicVolumeDb());
                         return;
                     }
-                            if (pauseMenuRenderer.hitResume(e.getPoint())) resumeGame();
-        else if (pauseMenuRenderer.hitRestart(e.getPoint())) restartGame();
-        else if (pauseMenuRenderer.hitExit(e.getPoint())) System.exit(0);
+                    
+                    // Handle main menu buttons
+                    if (!pauseMenuRenderer.isShowingConfig()) {
+                        if (pauseMenuRenderer.hitResume(e.getPoint())) resumeGame();
+                        else if (pauseMenuRenderer.hitRestart(e.getPoint())) restartGame();
+                        else if (pauseMenuRenderer.hitExit(e.getPoint())) System.exit(0);
+                        else if (pauseMenuRenderer.hitConfig(e.getPoint())) pauseMenuRenderer.showConfig();
+                    } else {
+                        // Handle config menu buttons
+                        if (pauseMenuRenderer.hitBack(e.getPoint())) pauseMenuRenderer.hideConfig();
+                        else if (pauseMenuRenderer.hitBehaviorToggle(e.getPoint())) {
+                            config.setShowEnemyBehaviorIndicators(!config.isShowEnemyBehaviorIndicators());
+                        }
+                        // Volume slider clicks in config menu are handled above
+                    }
                 }
                 case VICTORY -> {
                     int idx = victoryRenderer.handleClick(e.getPoint());

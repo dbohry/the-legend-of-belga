@@ -1,11 +1,15 @@
 package com.lhamacorp.games.tlob.client.entities;
 
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
+import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
+import com.lhamacorp.games.tlob.core.Constants;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Soldier extends Entity {
 
@@ -39,6 +43,21 @@ public class Soldier extends Entity {
     // wander
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
+    
+    // Enhanced wandering behavior
+    private final WanderBehavior wanderBehavior;
+    private int patrolTimer = 0;
+    private int patrolPointIndex = 0;
+    private final double[] patrolPointsX = new double[3];
+    private final double[] patrolPointsY = new double[3];
+    private final double wanderSpeedVariation;
+    private final double wanderDirectionChangeChance;
+    private final boolean prefersStraightPaths;
+    private final double idleTimeVariation;
+    private final boolean isAggressive;
+    private final boolean isCautious;
+    private final double curiosityLevel;
+    private final boolean prefersGroupMovement;
 
     private int lcg;
     private final double speedScale;
@@ -50,6 +69,15 @@ public class Soldier extends Entity {
     private final int baseAttackCooldown;
     private final int baseAttackDuration;
     private int ageTicks = 0;
+    
+    // Wander behavior types
+    private enum WanderBehavior {
+        RANDOM,      // Completely random movement
+        PATROL,      // Move between defined patrol points
+        CIRCULAR,    // Move in circular patterns
+        LINEAR,      // Prefer straight line movement
+        IDLE         // Stay mostly still with occasional movement
+    }
 
     /**
      * Creates a soldier enemy at the specified position.
@@ -57,8 +85,13 @@ public class Soldier extends Entity {
     public Soldier(double x, double y, Weapon weapon) {
         super(x, y, SOLDIER_SIZE, SOLDIER_SIZE, SOLDIER_BASE_SPEED, SOLDIER_MAX_HP, SOLDIER_MAX_STAMINA, SOLDIER_MAX_MANA, 0, weapon, "Soldier", Alignment.FOE);
 
+        // Improved seed generation with more entropy
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
+        
+        // Add additional entropy based on current time and object hash
+        lcg ^= System.nanoTime() & 0xFFFF;
+        lcg ^= this.hashCode() & 0xFFFF;
 
         speedScale = 0.50 + 0.30 * rand01();
         aimNoiseRad = Math.toRadians((rand01() - 0.5) * 14.0);
@@ -71,6 +104,36 @@ public class Soldier extends Entity {
         baseAttackCooldown = (int) Math.round(ATTACK_COOLDOWN_TICKS * (0.85 + 0.5 * rand01()));
         baseAttackDuration = Math.max(2, ATTACK_DURATION_TICKS + (rand01() < 0.3 ? 1 : 0));
 
+        // Initialize enhanced wandering behavior
+        // Fix: Use proper random selection to ensure equal 20% chances for each behavior
+        double behaviorRoll = rand01();
+        if (behaviorRoll < 0.2) {
+            wanderBehavior = WanderBehavior.RANDOM;
+        } else if (behaviorRoll < 0.4) {
+            wanderBehavior = WanderBehavior.PATROL;
+        } else if (behaviorRoll < 0.6) {
+            wanderBehavior = WanderBehavior.CIRCULAR;
+        } else if (behaviorRoll < 0.8) {
+            wanderBehavior = WanderBehavior.LINEAR;
+        } else {
+            wanderBehavior = WanderBehavior.IDLE;
+        }
+        wanderSpeedVariation = 0.3 + 0.4 * rand01();
+        wanderDirectionChangeChance = 0.1 + 0.2 * rand01();
+        prefersStraightPaths = rand01() < 0.6;
+        idleTimeVariation = 0.5 + rand01();
+        
+        // Initialize personality traits
+        isAggressive = rand01() < 0.4;
+        isCautious = rand01() < 0.3;
+        curiosityLevel = rand01();
+        prefersGroupMovement = rand01() < 0.5;
+        
+        // Set up patrol points if using patrol behavior
+        if (wanderBehavior == WanderBehavior.PATROL) {
+            setupPatrolPoints();
+        }
+
         pickNewWanderDir();
     }
 
@@ -79,6 +142,14 @@ public class Soldier extends Entity {
         if (!isAlive()) return;
         Player player = (Player) args[0];
         TileMap map = (TileMap) args[1];
+        
+        // Check for group behavior if enemies list is provided
+        List<Entity> nearbyAllies = null;
+        if (args.length > 2 && args[2] instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<Entity> enemies = (List<Entity>) args[2];
+            nearbyAllies = findNearbyAllies(enemies);
+        }
 
         if (hurtTimer > 0) hurtTimer--;
         if (attackCooldown > 0) attackCooldown--;
@@ -104,12 +175,76 @@ public class Soldier extends Entity {
         } else if (!playerHidden && distToP <= aggressionRadius) {
             approachPlayer(player, map);
         } else {
-            wander(map, player);
+            // Use group behavior if allies are nearby
+            if (nearbyAllies != null && !nearbyAllies.isEmpty() && prefersGroupMovement) {
+                groupWander(map, player, nearbyAllies);
+            } else {
+                enhancedWander(map, player);
+            }
         }
 
         updateFacing();
         animTimeMs += TICK_MS;
         ageTicks++;
+    }
+    
+    private List<Entity> findNearbyAllies(List<Entity> enemies) {
+        List<Entity> allies = new ArrayList<>();
+        double groupRadius = 60.0; // Distance to consider allies
+        
+        for (Entity enemy : enemies) {
+            if (enemy != this && enemy.isAlive() && enemy.getAlignment() == Alignment.FOE) {
+                double dist = Math.hypot(enemy.getX() - x, enemy.getY() - y);
+                if (dist <= groupRadius) {
+                    allies.add(enemy);
+                }
+            }
+        }
+        return allies;
+    }
+    
+    private void groupWander(TileMap map, Player player, List<Entity> allies) {
+        if (wanderTimer <= 0) {
+            // Group behavior: move towards the center of nearby allies
+            if (!allies.isEmpty()) {
+                double centerX = 0, centerY = 0;
+                for (Entity ally : allies) {
+                    centerX += ally.getX();
+                    centerY += ally.getY();
+                }
+                centerX /= allies.size();
+                centerY /= allies.size();
+                
+                // Move towards the group center
+                double dx = centerX - x;
+                double dy = centerY - y;
+                double dist = Math.hypot(dx, dy);
+                
+                if (dist > 0) {
+                    wanderDx = dx / dist;
+                    wanderDy = dy / dist;
+                    wanderTimer = 45 + (int) (rand01() * 90);
+                } else {
+                    pickNewWanderDir();
+                    wanderTimer = 30 + (int) (rand01() * 60);
+                }
+            } else {
+                pickNewWanderDir();
+                wanderTimer = 30 + (int) (rand01() * 60);
+            }
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * 0.25;
+            
+            if (postAttackSlowdownTimer > 0) {
+                moveSpeed *= 0.5;
+            }
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
     }
 
     private void approachPlayer(Player player, TileMap map) {
@@ -170,6 +305,181 @@ public class Soldier extends Entity {
             
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
+        }
+    }
+    
+    private void setupPatrolPoints() {
+        // Create patrol points around the initial position
+        double radius = 40 + 20 * rand01();
+        for (int i = 0; i < 3; i++) {
+            double angle = (i * 2 * Math.PI / 3) + rand01() * Math.PI / 4;
+            patrolPointsX[i] = x + Math.cos(angle) * radius;
+            patrolPointsY[i] = y + Math.sin(angle) * radius;
+        }
+    }
+    
+    private void enhancedWander(TileMap map, Player player) {
+        switch (wanderBehavior) {
+            case RANDOM:
+                randomWander(map, player);
+                break;
+            case PATROL:
+                patrolWander(map, player);
+                break;
+            case CIRCULAR:
+                circularWander(map, player);
+                break;
+            case LINEAR:
+                linearWander(map, player);
+                break;
+            case IDLE:
+                idleWander(map, player);
+                break;
+        }
+    }
+    
+    private void randomWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            pickNewWanderDir();
+            // Aggressive soldiers change direction more frequently
+            int baseTime = isAggressive ? 20 : 30;
+            wanderTimer = (int) (baseTime + rand01() * 60 * idleTimeVariation);
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * (0.2 + wanderSpeedVariation);
+            
+            // RANDOM soldiers are slower when wandering (but full speed when hunting)
+            if (wanderBehavior == WanderBehavior.RANDOM) {
+                moveSpeed *= 0.6; // 40% slower when wandering randomly
+            }
+            
+            // Aggressive soldiers move faster
+            if (isAggressive) moveSpeed *= 1.2;
+            // Cautious soldiers move slower
+            if (isCautious) moveSpeed *= 0.8;
+            
+            if (postAttackSlowdownTimer > 0) {
+                moveSpeed *= 0.5;
+            }
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
+    }
+    
+    private void patrolWander(TileMap map, Player player) {
+        if (patrolTimer <= 0) {
+            // Move to next patrol point
+            double targetX = patrolPointsX[patrolPointIndex];
+            double targetY = patrolPointsY[patrolPointIndex];
+            
+            double dx = targetX - x;
+            double dy = targetY - y;
+            double dist = Math.hypot(dx, dy);
+            
+            if (dist < 10) {
+                // Reached patrol point, move to next
+                patrolPointIndex = (patrolPointIndex + 1) % 3;
+                // Aggressive soldiers patrol faster
+                int baseTime = isAggressive ? 40 : 60;
+                patrolTimer = baseTime + (int) (rand01() * 120);
+            } else {
+                // Move towards patrol point
+                wanderDx = dx / dist;
+                wanderDy = dy / dist;
+                double moveSpeed = speed * speedScale * 0.4;
+                
+                // Aggressive soldiers move faster during patrol
+                if (isAggressive) moveSpeed *= 1.1;
+                
+                if (postAttackSlowdownTimer > 0) {
+                    moveSpeed *= 0.5;
+                }
+                
+                moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+                movedThisTick = true;
+            }
+        } else {
+            patrolTimer--;
+        }
+    }
+    
+    private void circularWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            // Change direction in a more circular pattern
+            double currentAngle = Math.atan2(wanderDy, wanderDx);
+            // Curious soldiers make bigger direction changes
+            double maxAngleChange = Math.PI / 2 * (0.5 + curiosityLevel * 0.5);
+            double angleChange = (rand01() - 0.5) * maxAngleChange;
+            double newAngle = currentAngle + angleChange;
+            
+            wanderDx = Math.cos(newAngle);
+            wanderDy = Math.sin(newAngle);
+            wanderTimer = 45 + (int) (rand01() * 90);
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * 0.35;
+            
+            if (postAttackSlowdownTimer > 0) {
+                moveSpeed *= 0.5;
+            }
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
+    }
+    
+    private void linearWander(TileMap map, Player player) {
+        if (wanderTimer <= 0 || (prefersStraightPaths && rand01() < wanderDirectionChangeChance)) {
+            pickNewWanderDir();
+            // Cautious soldiers prefer longer straight paths
+            int baseTime = isCautious ? 90 : 60;
+            wanderTimer = baseTime + (int) (rand01() * 120);
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            double moveSpeed = speed * speedScale * 0.4;
+            
+            if (postAttackSlowdownTimer > 0) {
+                moveSpeed *= 0.5;
+            }
+            
+            moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+            movedThisTick = true;
+        }
+    }
+    
+    private void idleWander(TileMap map, Player player) {
+        if (wanderTimer <= 0) {
+            // Aggressive soldiers are less likely to stay idle
+            double moveChance = isAggressive ? 0.5 : 0.3;
+            if (rand01() < moveChance) {
+                pickNewWanderDir();
+                wanderTimer = 20 + (int) (rand01() * 40);
+            } else {
+                // Cautious soldiers stay idle longer
+                int baseTime = isCautious ? 120 : 60;
+                wanderTimer = baseTime + (int) (rand01() * 120 * idleTimeVariation);
+            }
+        }
+
+        if (wanderTimer > 0) {
+            wanderTimer--;
+            if (wanderTimer > 60) {
+                double moveSpeed = speed * speedScale * 0.2;
+                
+                if (postAttackSlowdownTimer > 0) {
+                    moveSpeed *= 0.5;
+                }
+                
+                moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
+                movedThisTick = true;
+            }
         }
     }
 
@@ -238,6 +548,34 @@ public class Soldier extends Entity {
         if (postAttackSlowdownTimer > 0) {
             g2.setColor(new Color(0, 0, 255, 80));
             drawCenteredRect(g2, camX, camY, width, height, new Color(0, 0, 255, 80));
+        }
+        
+        // Draw wandering behavior indicator
+        if (GameConfig.getInstance().isShowEnemyBehaviorIndicators() && (wanderTimer > 0 || patrolTimer > 0)) {
+            String behaviorText = wanderBehavior.name().substring(0, 1);
+            g2.setColor(new Color(0, 255, 0, 200));
+            g2.setFont(new Font("Arial", Font.BOLD, 10));
+            FontMetrics fm = g2.getFontMetrics();
+            int textX = (int) Math.round(x) - camX - fm.stringWidth(behaviorText) / 2;
+            int textY = (int) Math.round(y) - camY - height / 2 - 15;
+            g2.drawString(behaviorText, textX, textY);
+            
+            // Draw personality indicators
+            int indicatorY = textY - 12;
+            if (isAggressive) {
+                g2.setColor(new Color(255, 0, 0, 150));
+                g2.fillOval((int) Math.round(x) - camX - 3, indicatorY - 3, 6, 6);
+            }
+            if (isCautious) {
+                g2.setColor(new Color(0, 0, 255, 150));
+                g2.fillRect((int) Math.round(x) - camX - 3, indicatorY - 3, 6, 6);
+            }
+            if (prefersGroupMovement) {
+                g2.setColor(new Color(255, 255, 0, 150));
+                g2.fillPolygon(
+                    new int[]{(int) Math.round(x) - camX - 3, (int) Math.round(x) - camX + 3, (int) Math.round(x) - camX},
+                    new int[]{indicatorY + 3, indicatorY + 3, indicatorY - 3}, 3);
+            }
         }
     }
 

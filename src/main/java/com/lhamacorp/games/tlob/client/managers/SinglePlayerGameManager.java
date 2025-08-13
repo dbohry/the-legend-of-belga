@@ -78,7 +78,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
         player.update(input, levelManager.map(), enemies, aimWorld);
         for (int i = enemies.size() - 1; i >= 0; i--) {
             var e = enemies.get(i);
-            e.update(player, levelManager.map());
+            e.update(player, levelManager.map(), enemies);
             if (!e.isAlive()) enemies.remove(i);
         }
         
