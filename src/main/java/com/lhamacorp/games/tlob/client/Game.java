@@ -2,6 +2,8 @@ package com.lhamacorp.games.tlob.client;
 
 import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
 import com.lhamacorp.games.tlob.client.managers.SinglePlayerGameManager;
+import com.lhamacorp.games.tlob.client.save.SaveManager;
+import com.lhamacorp.games.tlob.client.save.SaveState;
 
 import javax.swing.*;
 import java.awt.*;
@@ -96,6 +98,31 @@ public class Game {
         }
 
         // Singleplayer flow
+        SaveManager saveManager = new SaveManager();
+        
+        if (saveManager.hasSave()) {
+            SaveState existingSave = saveManager.loadGame();
+            if (existingSave != null) {
+                int saveChoice = JOptionPane.showConfirmDialog(
+                    owner,
+                    "Found existing save:\n" +
+                    "Seed: " + existingSave.getWorldSeed() + "\n" +
+                    "Completed maps: " + existingSave.getCompletedMaps() + "\n\n" +
+                    "Do you want to continue this game?",
+                    "Continue Game?",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+                );
+                
+                if (saveChoice == JOptionPane.YES_OPTION) {
+                    return new SinglePlayerGameManager(existingSave);
+                } else {
+                    // User chose to start new game, delete old save
+                    saveManager.deleteSave();
+                }
+            }
+        }
+        
         long defSeed = new Random().nextLong();
         String seedStr = prompt(owner, "World seed:", Long.toString(defSeed));
         if (seedStr == null) System.exit(0);
