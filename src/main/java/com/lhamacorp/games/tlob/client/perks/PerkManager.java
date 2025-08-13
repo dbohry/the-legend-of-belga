@@ -222,15 +222,14 @@ public class PerkManager {
         });
 
         register("WEAPON_WIDTH", Rarity.EPIC, r -> {
-            int amount = r.nextInt(2) + 1; // +1 or +2
             String label = "Weapon Width";
-            String desc = String.format("Increases weapon width (+%d).", amount);
-            return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseWeaponWidth(amount));
+            String desc = "Increases weapon width (+1).";
+            return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseWeaponWidth(1));
         });
 
         register("SHIELD_BOOST", Rarity.EPIC, r -> {
-            String label = "Shield Boost";
-            String desc = "Increases maximum shield (+1.0).";
+            String label = "Energy Shield";
+            String desc = "Adds energy shield (+1.0).";
             return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseMaxShield(1.0));
         });
     }

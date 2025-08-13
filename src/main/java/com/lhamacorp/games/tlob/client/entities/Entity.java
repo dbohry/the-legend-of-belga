@@ -246,7 +246,6 @@ public abstract class Entity {
     public void increaseWeaponWidth(int amount) {
         if (weapon != null) {
             weapon.setWidth(weapon.getWidth() + amount);
-            // Track perk application
             if (!hasWidthPerk) {
                 hasWidthPerk = true;
                 perkCount++;

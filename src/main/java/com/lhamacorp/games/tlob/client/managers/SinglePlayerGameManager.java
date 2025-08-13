@@ -217,11 +217,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
                 player.increaseMaxManaByPercent(value);
                 break;
             case "SHIELD":
-                // Shield is always +1, so we can ignore the value
                 player.increaseMaxShield(1.0);
                 break;
             case "WEAPON_WIDTH":
-                // Weapon width is always +1, so we can ignore the value
                 player.increaseWeaponWidth(1);
                 break;
             case "STAMINA_REGEN":
