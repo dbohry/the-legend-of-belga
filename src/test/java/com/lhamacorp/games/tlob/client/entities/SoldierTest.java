@@ -79,4 +79,27 @@ class SoldierTest {
         assertFalse(soldier.isAlly());
         assertFalse(soldier.isNeutral());
     }
+
+    // ===== Perk System Integration Test =====
+
+    @Test
+    void testSoldierPerkApplication() {
+        double initialMaxHealth = soldier.getMaxHealth();
+        double initialMaxStamina = soldier.getMaxStamina();
+        double initialSpeed = soldier.getSpeed();
+        
+        // Apply perks to soldier
+        soldier.increaseMaxHealthByPercent(0.1); // +10%
+        soldier.increaseMaxStaminaByPercent(0.1); // +10%
+        soldier.increaseMoveSpeedByPercent(0.1); // +10%
+        
+        // Verify perks were applied
+        // Note: Math.ceil(1.0 * 1.1) = Math.ceil(1.1) = 2.0
+        assertEquals(2.0, soldier.getMaxHealth(), 0.01);
+        assertEquals(2.0, soldier.getMaxStamina(), 0.01);
+        assertEquals(3.3, soldier.getEffectiveSpeed(), 0.01); // 3.0 * 1.1 = 3.3
+        
+        // Verify multipliers are set correctly
+        assertEquals(1.1, soldier.getSpeedMultiplier(), 0.01);
+    }
 }

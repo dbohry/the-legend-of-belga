@@ -52,7 +52,7 @@ class HudRendererTest {
         assertEquals(0.0, player.getShield(), "Player should start with no shield");
         
         // Test shield increase
-        player.increaseShield();
+        player.increaseMaxShield(1.0);
         assertEquals(1.0, player.getMaxShield(), "Player shield should increase to 1.0");
         // Note: increaseShield only increases maxShield, not current shield
         assertEquals(0.0, player.getShield(), "Player shield should remain at 0 until restored");
@@ -73,7 +73,7 @@ class HudRendererTest {
     @Test
     void testPlayerDamageWithShield() {
         // Give player a shield
-        player.increaseShield();
+        player.increaseMaxShield(1.0);
         player.setShield(1.0);
         
         // Test damage absorption by shield
@@ -98,7 +98,7 @@ class HudRendererTest {
         assertEquals(0.0, player.getShield(), "Player should start with no shield");
         
         // Add shield and set it
-        player.increaseShield();
+        player.increaseMaxShield(1.0);
         player.setShield(2.0);
         
         assertEquals(1.0, player.getMaxShield(), "Player max shield should be 1.0");
@@ -134,7 +134,7 @@ class HudRendererTest {
     @Test
     void testHudRendererWithShield() {
         // Test that HUD renderer can handle shield display
-        player.increaseShield(); // Give player a shield
+        player.increaseMaxShield(1.0); // Give player a shield
         player.setShield(1.0);   // Set shield to max
         
         // Verify shield is active
@@ -221,5 +221,18 @@ class HudRendererTest {
         // Test that mana system is properly disabled
         assertFalse(player.getMaxMana() > 0, "Player should have no mana capacity");
         assertFalse(player.getMana() > 0, "Player should have no current mana");
+    }
+
+    @Test
+    void testPerkDisplay() {
+        // Give player some perks to test perk display
+        player.increaseMaxHealthByPercent(0.2); // +20% health
+        player.increaseMaxStaminaByPercent(0.3); // +30% stamina
+        player.increaseMaxShield(1.0); // +1 shield
+
+        // Test that HUD renderer can draw with perks
+        assertDoesNotThrow(() -> {
+            hudRenderer.draw(graphics, player, 10, 10);
+        }, "HUD renderer should handle perk display without errors");
     }
 }

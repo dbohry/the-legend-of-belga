@@ -1,6 +1,6 @@
 package com.lhamacorp.games.tlob.client.perks;
 
-import com.lhamacorp.games.tlob.client.entities.Player;
+import com.lhamacorp.games.tlob.client.entities.Entity;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -9,7 +9,7 @@ import java.util.function.Predicate;
  * Flexible, registry-based perk manager with rarity and eligibility.
  * Add new perks via:
  *   register("ID", Rarity.RARE, rng -> new Perk(...));
- *   register("ID", Rarity.UNCOMMON, player -> player.hasMana(), rng -> new Perk(...));
+ *   register("ID", Rarity.UNCOMMON, entity -> entity.hasMana(), rng -> new Perk(...));
  */
 public class PerkManager {
 
@@ -29,20 +29,20 @@ public class PerkManager {
         }
     }
 
-    /** Registry entry with weight (for rarity) and optional player-based eligibility. */
+    /** Registry entry with weight (for rarity) and optional entity-based eligibility. */
     public static final class PerkEntry {
         public final int weight;
-        public final Predicate<Player> eligibility;
+        public final Predicate<Entity> eligibility;
         public final PerkFactory factory;
 
-        private PerkEntry(int weight, Predicate<Player> eligibility, PerkFactory factory) {
+        private PerkEntry(int weight, Predicate<Entity> eligibility, PerkFactory factory) {
             if (weight <= 0) throw new IllegalArgumentException("weight must be > 0");
             this.weight = weight;
-            this.eligibility = (eligibility != null) ? eligibility : p -> true;
+            this.eligibility = (eligibility != null) ? eligibility : e -> true;
             this.factory = Objects.requireNonNull(factory);
         }
 
-        public static PerkEntry of(int weight, Predicate<Player> eligibility, PerkFactory factory) {
+        public static PerkEntry of(int weight, Predicate<Entity> eligibility, PerkFactory factory) {
             return new PerkEntry(weight, eligibility, factory);
         }
 
@@ -77,7 +77,7 @@ public class PerkManager {
     }
 
     /** Register with rarity and eligibility. */
-    public void register(String id, Rarity rarity, Predicate<Player> eligibility, PerkFactory factory) {
+    public void register(String id, Rarity rarity, Predicate<Entity> eligibility, PerkFactory factory) {
         register(id, PerkEntry.of(rarity.weight, eligibility, factory));
     }
 
@@ -106,23 +106,23 @@ public class PerkManager {
         currentChoices.clear();
     }
 
-    /** Backward-compatible roll (no eligibility). Prefer rollChoicesFor(player). */
+    /** Backward-compatible roll (no eligibility). Prefer rollChoicesFor(entity). */
     public void rollChoices() {
         rollChoicesFor(null);
     }
 
     /**
-     * Roll up to 3 distinct perk choices, honoring eligibility if a player is provided.
+     * Roll up to 3 distinct perk choices, honoring eligibility if an entity is provided.
      * Weighted sampling without replacement based on entry.weight.
      */
-    public void rollChoicesFor(Player player) {
+    public void rollChoicesFor(Entity entity) {
         currentChoices.clear();
         if (registry.isEmpty()) return;
 
         // Build a pool filtered by eligibility
         List<Map.Entry<String, PerkEntry>> pool = new ArrayList<>();
         for (Map.Entry<String, PerkEntry> e : registry.entrySet()) {
-            if (player == null || e.getValue().eligibility.test(player)) {
+            if (entity == null || e.getValue().eligibility.test(entity)) {
                 pool.add(e);
             }
         }
@@ -154,11 +154,11 @@ public class PerkManager {
         Collections.shuffle(currentChoices, rng);
     }
 
-    /** Apply the chosen perk to the player. Returns the perk applied (or null if bad index). */
-    public Perk applyChoice(int index, Player player) {
+    /** Apply the chosen perk to the entity. Returns the perk applied (or null if bad index). */
+    public Perk applyChoice(int index, Entity entity) {
         if (index < 0 || index >= currentChoices.size()) return null;
         Perk chosen = currentChoices.get(index);
-        chosen.apply(player);
+        chosen.apply(entity);
         return chosen;
     }
 
@@ -169,65 +169,70 @@ public class PerkManager {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Life";
             String desc = String.format("Increases maximum life (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.COMMON, pl -> pl.increaseMaxHealthByPercent(p));
+            return new Perk(label, desc, Rarity.COMMON, entity -> entity.increaseMaxHealthByPercent(p));
         });
 
         register("MAX_STAMINA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Stamina";
             String desc = String.format("Increases maximum stamina (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.COMMON, pl -> pl.increaseMaxStaminaByPercent(p));
+            return new Perk(label, desc, Rarity.COMMON, entity -> entity.increaseMaxStaminaByPercent(p));
         });
 
         register("MAX_MANA", Rarity.COMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Max Mana";
             String desc = String.format("Increases maximum mana (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.COMMON, pl -> pl.increaseMaxManaByPercent(p));
+            return new Perk(label, desc, Rarity.COMMON, entity -> entity.increaseMaxManaByPercent(p));
         });
 
         register("MOVE_SPEED", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.05, 0.10);
             String label = "Movement Speed";
             String desc = String.format("Increases movement speed (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.UNCOMMON, pl -> pl.increaseMoveSpeedByPercent(p));
+            return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseMoveSpeedByPercent(p));
         });
 
         register("STAMINA_REGEN", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Stamina Regen";
             String desc = String.format("Stamina regenerates faster (+%d%%).", (int)Math.round(p * 100));
-            return new Perk(label, desc, Rarity.RARE, pl -> pl.increaseStaminaRegenByPercent(p));
+            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseStaminaRegenByPercent(p));
         });
 
-        register("MANA_REGEN", Rarity.UNCOMMON, r -> {
-            double p = pct(r, 0.10, 0.20); // 10%..20%
+        register("MANA_REGEN", Rarity.RARE, r -> {
+            double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Mana Regen";
             String desc = String.format("Mana regenerates faster (+%d%%).", (int)Math.round(p * 100));
-            return new Perk(label, desc, Rarity.UNCOMMON, pl -> pl.increaseManaRegenByPercent(p));
+            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseManaRegenByPercent(p));
         });
 
-        register("WEAPON_DAMAGE", Rarity.UNCOMMON, r -> {
+        register("ATTACK_DAMAGE", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20);
-            String label = "Weapon Damage";
-            String desc = String.format("Increases melee damage (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.UNCOMMON, pl -> pl.increaseAttackDamageByPercent(p));
+            String label = "Attack Damage";
+            String desc = String.format("Increases attack damage (+%d%%).", (int)Math.round(p * 100));
+            return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseAttackDamageByPercent(p));
         });
 
         register("WEAPON_RANGE", Rarity.RARE, r -> {
-            double p = pct(r, 0.05, 0.10);
+            double p = pct(r, 0.15, 0.25);
             String label = "Weapon Range";
-            String desc = String.format("Increases weapon range (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.RARE, pl -> pl.increaseWeaponRangeByPercent(p));
+            String desc = String.format("Increases weapon range (+%d%%).", (int)Math.round(p * 100));
+            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseWeaponRangeByPercent(p));
         });
 
-        register("WEAPON_WIDTH", Rarity.LEGENDARY, r ->
-            new Perk("Weapon Width +1", "Enlarge your weapon by 1.", Rarity.LEGENDARY, Player::increaseWeaponWidth)
-        );
+        register("WEAPON_WIDTH", Rarity.EPIC, r -> {
+            int amount = r.nextInt(2) + 1; // +1 or +2
+            String label = "Weapon Width";
+            String desc = String.format("Increases weapon width (+%d).", amount);
+            return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseWeaponWidth(amount));
+        });
 
-        register("SHIELD", Rarity.RARE, r ->
-            new Perk("Shield +1", "Adds +1 to HP shield.", Rarity.RARE, Player::increaseShield)
-        );
+        register("SHIELD_BOOST", Rarity.EPIC, r -> {
+            String label = "Shield Boost";
+            String desc = "Increases maximum shield (+1.0).";
+            return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseMaxShield(1.0));
+        });
     }
 
     private static double pct(Random r, double min, double max) {

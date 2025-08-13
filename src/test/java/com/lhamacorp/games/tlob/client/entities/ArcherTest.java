@@ -79,4 +79,29 @@ class ArcherTest {
         assertFalse(archer.isAlly());
         assertFalse(archer.isNeutral());
     }
+
+    // ===== Perk System Integration Test =====
+
+    @Test
+    void testArcherPerkApplication() {
+        double initialMaxHealth = archer.getMaxHealth();
+        double initialMaxStamina = archer.getMaxStamina();
+        double initialSpeed = archer.getSpeed();
+        
+        // Apply perks to archer
+        archer.increaseMaxHealthByPercent(0.2); // +20%
+        archer.increaseMaxStaminaByPercent(0.15); // +15%
+        archer.increaseMoveSpeedByPercent(0.25); // +25%
+        archer.increaseAttackDamageByPercent(0.3); // +30%
+        
+        // Verify perks were applied
+        // Note: Math.ceil(2.0 * 1.2) = Math.ceil(2.4) = 3.0
+        assertEquals(3.0, archer.getMaxHealth(), 0.01);
+        assertEquals(2.0, archer.getMaxStamina(), 0.01); // Math.ceil(1.0 * 1.15) = Math.ceil(1.15) = 2.0
+        assertEquals(1.25, archer.getEffectiveSpeed(), 0.01); // 1.0 * 1.25 = 1.25
+        
+        // Verify multipliers are set correctly
+        assertEquals(1.25, archer.getSpeedMultiplier(), 0.01);
+        assertEquals(1.3, archer.getDamageMultiplier(), 0.01);
+    }
 }

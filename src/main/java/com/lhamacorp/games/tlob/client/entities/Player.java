@@ -179,41 +179,20 @@ public class Player extends Entity {
         this.shield = this.maxShield;
     }
 
-    /**
-     * Increases maximum health by the specified percentage.
-     */
-    public void increaseMaxHealthByPercent(double pct) {
-        this.maxHealth = Math.ceil(getMaxHealth() * (1.0 + pct));
-    }
-
-    /**
-     * Increases maximum stamina by the specified percentage.
-     */
-    public void increaseMaxStaminaByPercent(double pct) {
-        this.maxStamina = Math.ceil(getMaxStamina() * (1.0 + pct));
-    }
-
-    /**
-     * Increases maximum mana by the specified percentage.
-     */
-    public void increaseMaxManaByPercent(double pct) {
-        if (getMaxMana() == 0) this.maxMana = 1.0;
-        this.maxMana = Math.ceil(getMaxMana() * (1.0 + pct));
-    }
-
-    /**
-     * Increases stamina regeneration rate by the specified percentage.
-     */
-    public void increaseStaminaRegenByPercent(double pct) {
-        staminaRegenRateMult *= (1.0 + pct);
-    }
-
-    /**
-     * Increases mana regeneration rate by the specified percentage.
-     */
-    public void increaseManaRegenByPercent(double pct) {
-        manaRegenRateMult *= (1.0 + pct);
-    }
+    // Note: Perk methods are now inherited from Entity base class
+    // - increaseMaxHealthByPercent()
+    // - increaseMaxStaminaByPercent()
+    // - increaseMaxManaByPercent()
+    // - increaseStaminaRegenByPercent()
+    // - increaseManaRegenByPercent()
+    // - increaseMoveSpeedByPercent()
+    // - increaseAttackDamageByPercent()
+    // - increaseWeaponRangeByPercent()
+    // - increaseWeaponWidth()
+    // - getDamageMultiplier()
+    // - getSpeedMultiplier()
+    // - getStaminaRegenRateMult()
+    // - getManaRegenRateMult()
 
     private int effectiveStaminaRegenInterval() {
         double interval = STAMINA_REGEN_INTERVAL / Math.max(0.0001, staminaRegenRateMult);
@@ -225,45 +204,7 @@ public class Player extends Entity {
         return Math.max(1, (int) Math.round(interval));
     }
 
-    private double effectiveBaseSpeed() {
-        return (PLAYER_SPEED_PPS / TICKS_PER_SECOND) * speedMultiplier;
-    }
-
-    private double effectiveAttackDamage() {
-        return weapon.getDamage() * damageMultiplier;
-    }
-
-    /**
-     * Increases movement speed by the specified percentage.
-     */
-    public void increaseMoveSpeedByPercent(double pct) {
-        speedMultiplier *= (1.0 + pct);
-    }
-
-    /**
-     * Increases attack damage by the specified percentage.
-     */
-    public void increaseAttackDamageByPercent(double pct) {
-        weapon.setDamage((int) Math.ceil(weapon.getDamage() * (1.0 + pct)));
-    }
-
-    /**
-     * Increases weapon range by the specified percentage.
-     */
-    public void increaseWeaponRangeByPercent(double pct) {
-        weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
-    }
-
-    /**
-     * Increases maximum shield by 1.0.
-     */
-    public void increaseShield() {
-        this.maxShield += 1.0;
-    }
-
-    public void increaseWeaponWidth() {
-        weapon.setWidth(weapon.getWidth() + 1);
-    }
+    // Note: effectiveAttackDamage is now available as getEffectiveAttackDamage() from Entity base class
 
     public boolean canDash() {
         return canDash && mana >= DASH_MANA_COST;
@@ -271,36 +212,6 @@ public class Player extends Entity {
 
     public double getDashManaCost() {
         return DASH_MANA_COST;
-    }
-
-    /**
-     * Gets the current damage multiplier from perks.
-     */
-    public double getDamageMultiplier() {
-        return damageMultiplier;
-    }
-
-    /**
-     * Gets the current speed multiplier from perks.
-     */
-    public double getSpeedMultiplier() {
-        return speedMultiplier;
-    }
-    
-    /**
-     * Gets the current stamina regeneration multiplier from perks.
-     * @return The current stamina regeneration multiplier
-     */
-    public double getStaminaRegenRateMult() {
-        return staminaRegenRateMult;
-    }
-    
-    /**
-     * Gets the current mana regeneration multiplier from perks.
-     * @return The current mana regeneration multiplier
-     */
-    public double getManaRegenRateMult() {
-        return manaRegenRateMult;
     }
 
     public boolean isDashTrailActive() {
@@ -481,7 +392,7 @@ public class Player extends Entity {
         // --- Dash ability and Sprint / stamina ---
         boolean shiftPressed = input.sprint();
         boolean sprinting = false;
-        double speedBase = effectiveBaseSpeed();
+        double speedBase = (PLAYER_SPEED_PPS / TICKS_PER_SECOND) * speedMultiplier;
         
         // Update dash cooldown
         if (dashCooldownTimer > 0) {
@@ -656,7 +567,7 @@ public class Player extends Entity {
             Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
 
-            double dmg = effectiveAttackDamage();
+            double dmg = getEffectiveAttackDamage();
             for (Entity e : enemies) {
                 if (e.isAlive() && swing.intersects(e.getBounds())) {
                     e.damage(dmg);

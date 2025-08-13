@@ -30,6 +30,12 @@ public abstract class Entity {
     protected String name;
     protected Alignment alignment;
 
+    // Perk system fields
+    protected double damageMultiplier = 1.0;
+    protected double speedMultiplier = 1.0;
+    protected double staminaRegenRateMult = 1.0;
+    protected double manaRegenRateMult = 1.0;
+
     protected Direction facing = Direction.DOWN;
 
     // Knockback system
@@ -103,6 +109,144 @@ public abstract class Entity {
      */
     public double getY() {
         return y;
+    }
+
+    // ===== Perk System Methods =====
+
+    /**
+     * Increases maximum health by the specified percentage.
+     */
+    public void increaseMaxHealthByPercent(double pct) {
+        this.maxHealth = Math.ceil(getMaxHealth() * (1.0 + pct));
+        // Ensure current health doesn't exceed new max
+        if (this.health > this.maxHealth) {
+            this.health = this.maxHealth;
+        }
+    }
+
+    /**
+     * Increases maximum stamina by the specified percentage.
+     */
+    public void increaseMaxStaminaByPercent(double pct) {
+        this.maxStamina = Math.ceil(getMaxStamina() * (1.0 + pct));
+        // Ensure current stamina doesn't exceed new max
+        if (this.stamina > this.maxStamina) {
+            this.stamina = this.maxStamina;
+        }
+    }
+
+    /**
+     * Increases maximum mana by the specified percentage.
+     */
+    public void increaseMaxManaByPercent(double pct) {
+        if (getMaxMana() == 0) this.maxMana = 1.0;
+        this.maxMana = Math.ceil(getMaxMana() * (1.0 + pct));
+        // Ensure current mana doesn't exceed new max
+        if (this.mana > this.maxMana) {
+            this.mana = this.maxMana;
+        }
+    }
+
+    /**
+     * Increases maximum shield by the specified amount.
+     */
+    public void increaseMaxShield(double amount) {
+        this.maxShield += amount;
+        // Ensure current shield doesn't exceed new max
+        if (this.shield > this.maxShield) {
+            this.shield = this.maxShield;
+        }
+    }
+
+    /**
+     * Increases stamina regeneration rate by the specified percentage.
+     */
+    public void increaseStaminaRegenByPercent(double pct) {
+        staminaRegenRateMult *= (1.0 + pct);
+    }
+
+    /**
+     * Increases mana regeneration rate by the specified percentage.
+     */
+    public void increaseManaRegenByPercent(double pct) {
+        manaRegenRateMult *= (1.0 + pct);
+    }
+
+    /**
+     * Increases movement speed by the specified percentage.
+     */
+    public void increaseMoveSpeedByPercent(double pct) {
+        speedMultiplier *= (1.0 + pct);
+    }
+
+    /**
+     * Increases attack damage by the specified percentage.
+     */
+    public void increaseAttackDamageByPercent(double pct) {
+        damageMultiplier *= (1.0 + pct);
+    }
+
+    /**
+     * Increases weapon range by the specified percentage.
+     */
+    public void increaseWeaponRangeByPercent(double pct) {
+        if (weapon != null) {
+            weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
+        }
+    }
+
+    /**
+     * Increases weapon width by the specified amount.
+     */
+    public void increaseWeaponWidth(int amount) {
+        if (weapon != null) {
+            weapon.setWidth(weapon.getWidth() + amount);
+        }
+    }
+
+    /**
+     * Gets the current damage multiplier from perks.
+     */
+    public double getDamageMultiplier() {
+        return damageMultiplier;
+    }
+
+    /**
+     * Gets the current speed multiplier from perks.
+     */
+    public double getSpeedMultiplier() {
+        return speedMultiplier;
+    }
+
+    /**
+     * Gets the current stamina regeneration rate multiplier from perks.
+     */
+    public double getStaminaRegenRateMult() {
+        return staminaRegenRateMult;
+    }
+
+    /**
+     * Gets the current mana regeneration rate multiplier from perks.
+     */
+    public double getManaRegenRateMult() {
+        return manaRegenRateMult;
+    }
+
+    /**
+     * Gets the effective speed considering perks.
+     */
+    public double getEffectiveSpeed() {
+        return speed * speedMultiplier;
+    }
+
+    /**
+     * Gets the effective attack damage considering perks.
+     */
+    public double getEffectiveAttackDamage() {
+        if (weapon != null) {
+            return weapon.getDamage() * damageMultiplier;
+        }
+        return 0.0;
     }
 
     /**
