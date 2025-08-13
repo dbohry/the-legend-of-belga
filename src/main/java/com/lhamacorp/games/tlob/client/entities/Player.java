@@ -268,6 +268,20 @@ public class Player extends Entity {
         return DASH_MANA_COST;
     }
 
+    /**
+     * Gets the current damage multiplier from perks.
+     */
+    public double getDamageMultiplier() {
+        return damageMultiplier;
+    }
+
+    /**
+     * Gets the current speed multiplier from perks.
+     */
+    public double getSpeedMultiplier() {
+        return speedMultiplier;
+    }
+
     public boolean isDashTrailActive() {
         return dashTrailTimer > 0;
     }

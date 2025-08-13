@@ -21,6 +21,7 @@ public class KeyManager implements KeyListener, MouseListener {
     private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
     private static final int KEY_SHIFT = KeyEvent.VK_SHIFT;
     private static final int KEY_M = KeyEvent.VK_M;
+    private static final int KEY_I = KeyEvent.VK_I;
 
     public volatile boolean up;
     public volatile boolean down;
@@ -31,6 +32,7 @@ public class KeyManager implements KeyListener, MouseListener {
     public volatile boolean escape;
     public volatile boolean shift;
     public volatile boolean mute = false;
+    public volatile boolean i;
 
     private volatile boolean attackKey;
     private volatile boolean attackMouse;
@@ -99,6 +101,9 @@ public class KeyManager implements KeyListener, MouseListener {
                     mDown = true;
                 }
                 break;
+            case KEY_I:
+                i = true;
+                break;
             default:
         }
     }
@@ -138,6 +143,9 @@ public class KeyManager implements KeyListener, MouseListener {
                 break;
             case KEY_M:
                 mDown = false;
+                break;
+            case KEY_I:
+                i = false;
                 break;
             default:
         }

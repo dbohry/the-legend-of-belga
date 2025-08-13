@@ -5,6 +5,7 @@ import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.managers.renderers.GameOverRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.HudRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.PauseMenuRenderer;
+import com.lhamacorp.games.tlob.client.managers.renderers.StatsRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.VictoryScreenRenderer;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.perks.PerkManager;
@@ -14,6 +15,7 @@ import com.lhamacorp.games.tlob.client.world.InputState;
 
 import javax.swing.*;
 import java.awt.*;
+
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -59,6 +61,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             VOLUME_DB_MIN, VOLUME_DB_MAX);
     protected final VictoryScreenRenderer victoryRenderer = new VictoryScreenRenderer();
     protected final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
+    protected final StatsRenderer statsRenderer = new StatsRenderer();
 
     protected long worldSeed = 0L;
     private Random rootRng;
@@ -74,6 +77,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
 
     protected boolean musicMuted = false;
     protected float musicVolumeDb = -12.0f;
+    protected boolean statsPageOpen = false;
 
     public BaseGameManager() {
         setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
@@ -83,6 +87,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         addKeyListener(keyManager);
         addMouseListener(keyManager);
         setFocusable(true);
+
+
 
         UIMouseHandler mouseHandler = new UIMouseHandler();
         addMouseMotionListener(mouseHandler);
@@ -151,6 +157,14 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             input.right = keyManager.right;
             input.attack = keyManager.attack;
             input.shift = keyManager.shift;
+
+            // Handle I key for stats page
+            if (keyManager.i && !statsPageOpen) {
+                statsPageOpen = true;
+            }
+            if (!keyManager.i && statsPageOpen) {
+                statsPageOpen = false;
+            }
 
             Point aimWorld = null;
             if (mouseInside) {
@@ -316,6 +330,12 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
 
     private void drawOverlays(Graphics2D g2) {
         drawSeedOverlay(g2);
+        
+        // Draw stats page if open
+        if (statsPageOpen && player != null) {
+            statsRenderer.draw(g2, player);
+        }
+        
         switch (state) {
             case PAUSED -> pauseMenuRenderer.draw(g2, musicVolumeDb);
             case GAME_OVER -> gameOverRenderer.draw(g2);
