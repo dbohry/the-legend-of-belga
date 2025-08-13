@@ -316,8 +316,10 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         drawRemotePlayers(g2, camera.offsetX(), camera.offsetY());
         drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
 
-        for (Entity e : enemies) e.draw(g2, camera.offsetX(), camera.offsetY());
-                    player.draw(g2, camera.offsetX(), camera.offsetY(), enemies);
+        // Create a defensive copy to avoid ConcurrentModificationException
+        List<Entity> enemiesCopy = new ArrayList<>(enemies);
+        for (Entity e : enemiesCopy) e.draw(g2, camera.offsetX(), camera.offsetY());
+        player.draw(g2, camera.offsetX(), camera.offsetY(), enemiesCopy);
     }
 
     /** SP no-op; MP overrides. */

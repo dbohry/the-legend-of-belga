@@ -142,6 +142,24 @@ public class StatsRenderer {
         g.setColor(VALUE_COLOR);
         g.drawString(String.format("%.1f", player.getMaxMana()), x + 200, currentY);
         
+        currentY += 22;
+        g.setFont(statFont);
+        g.setColor(STAT_COLOR);
+        g.drawString("Stamina Recovery:", x + 30, currentY);
+        g.setFont(valueFont);
+        g.setColor(VALUE_COLOR);
+        double staminaRecoveryPct = (player.getStaminaRegenRateMult() - 1.0) * 100.0;
+        g.drawString(String.format("%+.0f%%", staminaRecoveryPct), x + 200, currentY);
+        
+        currentY += 22;
+        g.setFont(statFont);
+        g.setColor(STAT_COLOR);
+        g.drawString("Mana Recovery:", x + 30, currentY);
+        g.setFont(valueFont);
+        g.setColor(VALUE_COLOR);
+        double manaRecoveryPct = (player.getManaRegenRateMult() - 1.0) * 100.0;
+        g.drawString(String.format("%+.0f%%", manaRecoveryPct), x + 200, currentY);
+        
         return currentY + 15;
     }
 

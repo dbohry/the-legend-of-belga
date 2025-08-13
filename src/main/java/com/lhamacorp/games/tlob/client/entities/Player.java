@@ -281,6 +281,22 @@ public class Player extends Entity {
     public double getSpeedMultiplier() {
         return speedMultiplier;
     }
+    
+    /**
+     * Gets the current stamina regeneration multiplier from perks.
+     * @return The current stamina regeneration multiplier
+     */
+    public double getStaminaRegenRateMult() {
+        return staminaRegenRateMult;
+    }
+    
+    /**
+     * Gets the current mana regeneration multiplier from perks.
+     * @return The current mana regeneration multiplier
+     */
+    public double getManaRegenRateMult() {
+        return manaRegenRateMult;
+    }
 
     public boolean isDashTrailActive() {
         return dashTrailTimer > 0;
