@@ -260,21 +260,22 @@ public class Archer extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        BufferedImage tex = TextureManager.getEnemyTexture();
-        if (tex != null) {
-            int px = (int) Math.round(x - width / 2.0) - camX;
-            int py = (int) Math.round(y - height / 2.0) - camY;
-            
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
-            g2.drawImage(tex, px, py, null);
-            
-            g2.setColor(new Color(0, 200, 0, 80));
-            g2.fillRect(px, py, width, height);
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
-        } else {
+        // Temporarily force custom drawing to see our blue archer design
+        // BufferedImage tex = TextureManager.getEnemyTexture();
+        // if (tex != null) {
+        //     int px = (int) Math.round(x - width / 2.0) - camX;
+        //     int py = (int) Math.round(y - height / 2.0) - camY;
+        //     
+        //     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
+        //     g2.drawImage(tex, px, py, null);
+        //     
+        //     g2.setColor(new Color(0, 200, 0, 80));
+        //     g2.fillRect(px, py, width, height);
+        //     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+        // } else {
             // Draw a more detailed archer enemy instead of just a green square
             drawArcherEnemy(g2, camX, camY);
-        }
+        // }
 
         if (hurtTimer > 0) {
             int alpha = (int) (255 * (double) hurtTimer / HURT_FLASH_TICKS);
@@ -315,69 +316,57 @@ public class Archer extends Entity {
         g2.setColor(new Color(0, 0, 0, 60));
         g2.fillOval(centerX - width/2 + 2, centerY - height/2 + height - 6, width - 4, 4);
         
-        // Body (cloak)
-        g2.setColor(new Color(60, 100, 60)); // Dark green cloak
+        // Body (armor) - BLUE instead of gray
+        g2.setColor(new Color(60, 80, 120)); // Dark blue armor
         g2.fillRoundRect(centerX - width/2 + 2, centerY - height/2 + 6, width - 4, height - 12, 6, 6);
         
-        // Cloak highlights
-        g2.setColor(new Color(80, 130, 80));
+        // Armor highlights - BLUE instead of gray
+        g2.setColor(new Color(80, 100, 140));
         g2.fillRoundRect(centerX - width/2 + 3, centerY - height/2 + 7, width - 6, height - 14, 4, 4);
         
         // Head
         g2.setColor(new Color(180, 140, 100)); // Skin tone
         g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 10);
         
-        // Hood (archer's signature feature)
-        g2.setColor(new Color(40, 80, 40));
-        g2.fillOval(centerX - 8, centerY - height/2, 16, 12);
-        g2.setColor(new Color(60, 100, 60));
-        g2.fillOval(centerX - 7, centerY - height/2 + 1, 14, 10);
+        // Helmet - BLUE instead of gray
+        g2.setColor(new Color(40, 60, 100));
+        g2.fillOval(centerX - 7, centerY - height/2 + 1, 14, 8);
+        g2.setColor(new Color(60, 80, 120));
+        g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 6);
         
-        // Hood shadow over face
-        g2.setColor(new Color(30, 60, 30, 120));
-        g2.fillOval(centerX - 6, centerY - height/2 + 3, 12, 8);
-        
-        // Eyes (green glowing)
-        g2.setColor(new Color(0, 200, 0));
+        // Eyes (blue glowing instead of red)
+        g2.setColor(new Color(0, 100, 200));
         g2.fillOval(centerX - 4, centerY - height/2 + 4, 3, 3);
         g2.fillOval(centerX + 1, centerY - height/2 + 4, 3, 3);
-        g2.setColor(new Color(0, 255, 0));
+        g2.setColor(new Color(0, 150, 255));
         g2.fillOval(centerX - 3, centerY - height/2 + 5, 1, 1);
         g2.fillOval(centerX + 2, centerY - height/2 + 5, 1, 1);
         
-        // Bow (held in both hands)
-        g2.setColor(new Color(120, 80, 40)); // Wooden bow
-        g2.setStroke(new BasicStroke(2f));
+        // Weapon (bow instead of sword) - BLUE to match armor
+        g2.setColor(new Color(80, 100, 140));
+        g2.fillRect(centerX + width/2 - 1, centerY - 3, 8, 6);
+        g2.setColor(new Color(100, 120, 160));
+        g2.fillRect(centerX + width/2, centerY - 2, 6, 4);
+        
         // Bow string
-        g2.setColor(new Color(200, 200, 200));
-        g2.drawLine(centerX - width/2 - 3, centerY - 1, centerX - width/2 - 3, centerY + 3);
-        // Bow body (curved)
-        g2.setColor(new Color(120, 80, 40));
-        g2.drawArc(centerX - width/2 - 4, centerY - 2, 8, 6, 0, 180);
+        g2.setColor(new Color(220, 220, 220));
+        g2.drawLine(centerX + width/2 + 1, centerY - 1, centerX + width/2 + 1, centerY + 1);
         
-        // Quiver on back
-        g2.setColor(new Color(80, 60, 40));
-        g2.fillOval(centerX + width/2 - 1, centerY - 3, 6, 8);
-        g2.setColor(new Color(100, 80, 60));
-        g2.fillOval(centerX + width/2, centerY - 2, 4, 6);
+        // NO SHIELD - removed as requested
         
-        // Arrows in quiver
-        g2.setColor(new Color(200, 200, 200));
-        g2.drawLine(centerX + width/2 + 1, centerY - 1, centerX + width/2 + 1, centerY + 3);
-        g2.drawLine(centerX + width/2 + 2, centerY, centerX + width/2 + 2, centerY + 4);
-        
-        // Belt
-        g2.setColor(new Color(40, 60, 40));
+        // Belt - BLUE instead of gray
+        g2.setColor(new Color(40, 60, 80));
         g2.fillRect(centerX - width/2 + 3, centerY + 2, width - 6, 2);
         
-        // Legs
-        g2.setColor(new Color(50, 80, 50));
+        // Legs - BLUE instead of gray
+        g2.setColor(new Color(60, 80, 100));
         g2.fillRect(centerX - 4, centerY + 4, 3, 4);
         g2.fillRect(centerX + 1, centerY + 4, 3, 4);
         
-        // Boots
-        g2.setColor(new Color(30, 50, 30));
+        // Boots - BLUE instead of gray
+        g2.setColor(new Color(40, 60, 80));
         g2.fillRect(centerX - 5, centerY + 8, 5, 2);
+        g2.setColor(new Color(40, 60, 80));
         g2.fillRect(centerX, centerY + 8, 5, 2);
         
         // Reset anti-aliasing
