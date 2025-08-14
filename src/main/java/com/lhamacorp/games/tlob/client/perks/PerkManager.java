@@ -196,28 +196,28 @@ public class PerkManager {
         register("STAMINA_REGEN", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Stamina Regen";
-            String desc = String.format("Stamina regenerates faster (+%d%%).", (int)Math.round(p * 100));
+            String desc = String.format("Stamina regenerates faster (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseStaminaRegenByPercent(p));
         });
 
         register("MANA_REGEN", Rarity.RARE, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Mana Regen";
-            String desc = String.format("Mana regenerates faster (+%d%%).", (int)Math.round(p * 100));
+            String desc = String.format("Mana regenerates faster (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseManaRegenByPercent(p));
         });
 
         register("ATTACK_DAMAGE", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.10, 0.20);
             String label = "Attack Damage";
-            String desc = String.format("Increases attack damage (+%d%%).", (int)Math.round(p * 100));
+            String desc = String.format("Increases attack damage (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseAttackDamageByPercent(p));
         });
 
         register("WEAPON_RANGE", Rarity.RARE, r -> {
             double p = pct(r, 0.15, 0.25);
             String label = "Weapon Range";
-            String desc = String.format("Increases weapon range (+%d%%).", (int)Math.round(p * 100));
+            String desc = String.format("Increases weapon range (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseWeaponRangeByPercent(p));
         });
 
@@ -231,6 +231,12 @@ public class PerkManager {
             String label = "Energy Shield";
             String desc = "Adds energy shield (+1.0).";
             return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseMaxShield(1.0));
+        });
+
+        register("ARMOR", Rarity.COMMON, r -> {
+            String label = "Max Armor";
+            String desc = "Increases max armor (1)";
+            return new Perk(label, desc, Rarity.COMMON, entity -> entity.increaseArmor(1.0));
         });
     }
 

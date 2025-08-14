@@ -30,7 +30,7 @@ class ArcherTest {
     void testArcherStats() {
         assertEquals(18, archer.getWidth());
         assertEquals(18, archer.getHeight());
-        assertEquals(1.0, archer.getSpeed(), 0.01);
+        assertEquals(3.0, archer.getSpeed(), 0.01);
         assertEquals(2.0, archer.getMaxHealth(), 0.01);
         assertEquals(1.0, archer.getMaxStamina(), 0.01);
         assertEquals(0.0, archer.getMaxMana(), 0.01);
@@ -98,7 +98,7 @@ class ArcherTest {
         // Note: Math.ceil(2.0 * 1.2) = Math.ceil(2.4) = 3.0
         assertEquals(3.0, archer.getMaxHealth(), 0.01);
         assertEquals(2.0, archer.getMaxStamina(), 0.01); // Math.ceil(1.0 * 1.15) = Math.ceil(1.15) = 2.0
-        assertEquals(1.25, archer.getEffectiveSpeed(), 0.01); // 1.0 * 1.25 = 1.25
+        assertEquals(3.75, archer.getEffectiveSpeed(), 0.01); // 3.0 * 1.25 = 3.75
         
         // Verify multipliers are set correctly
         assertEquals(1.25, archer.getSpeedMultiplier(), 0.01);

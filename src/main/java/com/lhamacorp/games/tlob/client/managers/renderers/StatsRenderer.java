@@ -129,6 +129,14 @@ public class StatsRenderer {
         currentY += 22;
         g.setFont(statFont);
         g.setColor(STAT_COLOR);
+        g.drawString("Armor:", x + 30, currentY);
+        g.setFont(valueFont);
+        g.setColor(VALUE_COLOR);
+        g.drawString(String.format("%.1f", player.getArmor()), x + 200, currentY);
+        
+        currentY += 22;
+        g.setFont(statFont);
+        g.setColor(STAT_COLOR);
         g.drawString("Max Stamina:", x + 30, currentY);
         g.setFont(valueFont);
         g.setColor(VALUE_COLOR);

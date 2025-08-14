@@ -156,6 +156,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (name.contains("Mana Regen")) return "MANA_REGEN";
         if (name.contains("Weapon Damage")) return "WEAPON_DAMAGE";
         if (name.contains("Weapon Range")) return "WEAPON_RANGE";
+        if (name.contains("Max Armor")) return "ARMOR";
         return null;
     }
     
@@ -203,6 +204,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (name.contains("Mana Regen")) return 0.15; // Default 15%
         if (name.contains("Weapon Damage")) return 0.15; // Default 15%
         if (name.contains("Weapon Range")) return 0.075; // Default 7.5%
+        if (name.contains("Max Armor")) return 0.10; // Default 10%
         
         return null;
     }
@@ -244,6 +246,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
                 break;
             case "WEAPON_RANGE":
                 player.increaseWeaponRangeByPercent(value);
+                break;
+            case "ARMOR":
+                player.increaseArmor(1.0);
                 break;
             default:
                 System.out.println("Unknown perk type: " + perkType);

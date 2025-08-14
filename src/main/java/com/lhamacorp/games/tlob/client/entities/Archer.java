@@ -1,13 +1,10 @@
 package com.lhamacorp.games.tlob.client.entities;
 
-import com.lhamacorp.games.tlob.client.managers.TextureManager;
 import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
-import com.lhamacorp.games.tlob.core.Constants;
 
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +46,7 @@ public class Archer extends Entity {
     // wander
     private int wanderTimer = 0;
     private double wanderDx = 0, wanderDy = 0;
-    
+
     // Enhanced wandering behavior for archers
     private final ArcherWanderBehavior wanderBehavior;
     private int tacticalTimer = 0;
@@ -73,7 +70,7 @@ public class Archer extends Entity {
     private final int baseAttackCooldown;
     private final int baseAttackDuration;
     private int ageTicks = 0;
-    
+
     // Archer-specific wander behavior types
     private enum ArcherWanderBehavior {
         TACTICAL,     // Maintain optimal attack distance
@@ -87,12 +84,12 @@ public class Archer extends Entity {
      * Creates an archer enemy at the specified position.
      */
     public Archer(double x, double y, Weapon weapon) {
-        super(x, y, ARCHER_SIZE, ARCHER_SIZE, ARCHER_BASE_SPEED, ARCHER_MAX_HP, ARCHER_MAX_STAMINA, ARCHER_MAX_MANA, 0, weapon, "Archer", Alignment.FOE);
+        super(x, y, ARCHER_SIZE, ARCHER_SIZE, ARCHER_BASE_SPEED, ARCHER_MAX_HP, ARCHER_MAX_STAMINA, ARCHER_MAX_MANA, 0, 0, weapon, "Archer", Alignment.FOE);
 
         // Improved seed generation with more entropy
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
         lcg = (seed == 0) ? 1 : seed;
-        
+
         // Add additional entropy based on current time and object hash
         lcg ^= System.nanoTime() & 0xFFFF;
         lcg ^= this.hashCode() & 0xFFFF;
@@ -128,7 +125,7 @@ public class Archer extends Entity {
         retreatChance = 0.2 + 0.3 * rand01();
         flankingTendency = 0.3 + 0.4 * rand01();
         coverSeeking = 0.4 + 0.4 * rand01();
-        
+
         // Initialize personality traits
         isTactical = rand01() < 0.6;
         isCowardly = rand01() < 0.3;
@@ -142,7 +139,7 @@ public class Archer extends Entity {
         if (!isAlive()) return;
         Player player = (Player) args[0];
         TileMap map = (TileMap) args[1];
-        
+
         // Check for group behavior if enemies list is provided
         List<Entity> nearbyAllies = null;
         if (args.length > 2 && args[2] instanceof List) {
@@ -157,13 +154,13 @@ public class Archer extends Entity {
 
         if (arrowTimer > 0) {
             arrowTimer--;
-            
+
             double progress = 1.0 - (double) arrowTimer / ARROW_TRAVEL_TICKS;
             double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
             double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
-            
+
             double arrowToPlayerDist = Math.hypot(currentArrowX - player.getX(), currentArrowY - player.getY());
-            
+
             if (arrowToPlayerDist <= 25) {
                 player.damage(ARROW_DAMAGE);
                 player.applyKnockback(arrowX, arrowY);
@@ -177,12 +174,12 @@ public class Archer extends Entity {
 
         boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
 
-        if (!playerHidden && distToP <= ATTACK_RANGE && distToP >= MIN_ATTACK_RANGE && 
+        if (!playerHidden && distToP <= ATTACK_RANGE && distToP >= MIN_ATTACK_RANGE &&
             attackCooldown == 0 && attackTimer == 0 && arrowTimer == 0) {
-            
+
             attackTimer = baseAttackDuration;
             attackCooldown = baseAttackCooldown;
-            
+
             arrowX = x;
             arrowY = y;
             arrowTargetX = player.getX();
@@ -211,11 +208,11 @@ public class Archer extends Entity {
         animTimeMs += TICK_MS;
         ageTicks++;
     }
-    
+
     private List<Entity> findNearbyAllies(List<Entity> enemies) {
         List<Entity> allies = new ArrayList<>();
         double groupRadius = 80.0; // Archers have longer tactical range
-        
+
         for (Entity enemy : enemies) {
             if (enemy != this && enemy.isAlive() && enemy.getAlignment() == Alignment.FOE) {
                 double dist = Math.hypot(enemy.getX() - x, enemy.getY() - y);
@@ -226,7 +223,7 @@ public class Archer extends Entity {
         }
         return allies;
     }
-    
+
     private void tacticalGroupWander(TileMap map, Player player, List<Entity> allies) {
         if (tacticalTimer <= 0) {
             // Tactical group behavior: position for crossfire or support
@@ -234,7 +231,7 @@ public class Archer extends Entity {
                 // Find the closest ally to coordinate with
                 Entity closestAlly = null;
                 double closestDist = Double.POSITIVE_INFINITY;
-                
+
                 for (Entity ally : allies) {
                     double dist = Math.hypot(ally.getX() - x, ally.getY() - y);
                     if (dist < closestDist) {
@@ -242,30 +239,30 @@ public class Archer extends Entity {
                         closestAlly = ally;
                     }
                 }
-                
+
                 if (closestAlly != null) {
                     // Position for tactical advantage (crossfire, support, etc.)
                     double playerX = player.getX();
                     double playerY = player.getY();
                     double allyX = closestAlly.getX();
                     double allyY = closestAlly.getY();
-                    
+
                     // Calculate tactical position (perpendicular to ally-player line)
                     double dxToPlayer = playerX - allyX;
                     double dyToPlayer = playerY - allyY;
                     double distToPlayer = Math.hypot(dxToPlayer, dyToPlayer);
-                    
+
                     if (distToPlayer > 0) {
                         // Position perpendicular to the ally-player line
                         double perpAngle = Math.atan2(dyToPlayer, dxToPlayer) + Math.PI / 2;
                         double tacticalX = allyX + Math.cos(perpAngle) * preferredDistance;
                         double tacticalY = allyY + Math.sin(perpAngle) * preferredDistance;
-                        
+
                         // Move towards tactical position
                         double dx = tacticalX - x;
                         double dy = tacticalY - y;
                         double dist = Math.hypot(dx, dy);
-                        
+
                         if (dist > 0) {
                             wanderDx = dx / dist;
                             wanderDy = dy / dist;
@@ -291,7 +288,7 @@ public class Archer extends Entity {
         if (tacticalTimer > 0) {
             tacticalTimer--;
             double moveSpeed = speed * speedScale * 0.3;
-            
+
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
@@ -324,7 +321,7 @@ public class Archer extends Entity {
             if (totalDist > 0) {
                 noisyDx /= totalDist;
                 noisyDy /= totalDist;
-                
+
                 double moveSpeed = speed * speedScale * 0.5;
                 moveWithCollision(noisyDx * moveSpeed, noisyDy * moveSpeed, map, player);
                 movedThisTick = true;
@@ -353,7 +350,7 @@ public class Archer extends Entity {
             if (totalDist > 0) {
                 awayDx /= totalDist;
                 awayDy /= totalDist;
-                
+
                 double moveSpeed = speed * speedScale * 0.7;
                 moveWithCollision(awayDx * moveSpeed, awayDy * moveSpeed, map, player);
                 movedThisTick = true;
@@ -396,10 +393,10 @@ public class Archer extends Entity {
                 wanderDx = Math.cos(angle) * 0.3;
                 wanderDy = Math.sin(angle) * 0.3;
                 double moveSpeed = speed * speedScale * 0.2;
-                
+
                 // Tactical archers move more precisely
                 if (isTactical) moveSpeed *= 0.8;
-                
+
                 moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
                 movedThisTick = true;
             }
@@ -417,7 +414,7 @@ public class Archer extends Entity {
             double dxToP = player.getX() - x;
             double dyToP = player.getY() - y;
             double distToP = Math.hypot(dxToP, dyToP);
-            
+
             if (distToP > 0) {
                 // Move perpendicular to player direction (seeking cover)
                 double perpAngle = Math.atan2(dyToP, dxToP) + Math.PI / 2 + (rand01() - 0.5) * Math.PI / 2;
@@ -433,10 +430,10 @@ public class Archer extends Entity {
         if (wanderTimer > 0) {
             wanderTimer--;
             double moveSpeed = speed * speedScale * 0.25;
-            
+
             // Cover-seeking archers move more carefully
             if (coverSeeking > 0.7) moveSpeed *= 0.8;
-            
+
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
@@ -448,13 +445,13 @@ public class Archer extends Entity {
             double dxToP = player.getX() - x;
             double dyToP = player.getY() - y;
             double distToP = Math.hypot(dxToP, dyToP);
-            
+
             if (distToP > 0) {
                 // Calculate flanking position (to the side of the player)
                 double flankAngle = Math.atan2(dyToP, dxToP) + (rand01() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
                 double flankX = player.getX() + Math.cos(flankAngle) * preferredDistance;
                 double flankY = player.getY() + Math.sin(flankAngle) * preferredDistance;
-                
+
                 // Move towards flanking position
                 double dx = flankX - x;
                 double dy = flankY - y;
@@ -478,10 +475,10 @@ public class Archer extends Entity {
         if (wanderTimer > 0) {
             wanderTimer--;
             double moveSpeed = speed * speedScale * 0.3;
-            
+
             // High flanking tendency means faster movement
             if (flankingTendency > 0.7) moveSpeed *= 1.1;
-            
+
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
@@ -508,10 +505,10 @@ public class Archer extends Entity {
         if (wanderTimer > 0) {
             wanderTimer--;
             double moveSpeed = speed * speedScale * 0.35;
-            
+
             // Cowardly archers retreat faster
             if (isCowardly) moveSpeed *= 1.2;
-            
+
             moveWithCollision(wanderDx * moveSpeed, wanderDy * moveSpeed, map, player);
             movedThisTick = true;
         }
@@ -566,7 +563,7 @@ public class Archer extends Entity {
         if (!collidesWithMap(newX, y, map) && !collidesWithPlayer(newX, y, player)) {
             x = newX;
         }
-        
+
         // Check map collision for Y movement
         if (!collidesWithMap(x, newY, map) && !collidesWithPlayer(x, newY, player)) {
             y = newY;
@@ -595,8 +592,8 @@ public class Archer extends Entity {
         //     g2.fillRect(px, py, width, height);
         //     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
         // } else {
-            // Draw a more detailed archer enemy instead of just a green square
-            drawArcherEnemy(g2, camX, camY);
+        // Draw a more detailed archer enemy instead of just a green square
+        drawArcherEnemy(g2, camX, camY);
         // }
 
         if (hurtTimer > 0) {
@@ -615,17 +612,17 @@ public class Archer extends Entity {
             double progress = 1.0 - (double) arrowTimer / ARROW_TRAVEL_TICKS;
             double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
             double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
-            
+
             int arrowScreenX = (int) Math.round(currentArrowX) - camX;
             int arrowScreenY = (int) Math.round(currentArrowY) - camY;
-            
+
             g2.setColor(Color.YELLOW);
             g2.setStroke(new BasicStroke(2f));
             int arrowSize = 5;
             g2.drawLine(arrowScreenX - arrowSize, arrowScreenY, arrowScreenX + arrowSize, arrowScreenY);
             g2.drawLine(arrowScreenX, arrowScreenY - arrowSize, arrowScreenX, arrowScreenY + arrowSize);
         }
-        
+
         // Draw wandering behavior indicator
         if (GameConfig.getInstance().isShowEnemyBehaviorIndicators() && (wanderTimer > 0 || tacticalTimer > 0)) {
             String behaviorText = wanderBehavior.name().substring(0, 1);
@@ -635,7 +632,7 @@ public class Archer extends Entity {
             int textX = (int) Math.round(x) - camX - fm.stringWidth(behaviorText) / 2;
             int textY = (int) Math.round(y) - camY - height / 2 - 15;
             g2.drawString(behaviorText, textX, textY);
-            
+
             // Draw personality indicators
             int indicatorY = textY - 12;
             if (isTactical) {
@@ -658,67 +655,67 @@ public class Archer extends Entity {
     private void drawArcherEnemy(Graphics2D g2, int camX, int camY) {
         int centerX = (int) Math.round(x) - camX;
         int centerY = (int) Math.round(y) - camY;
-        
+
         // Enable anti-aliasing for smoother shapes
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
+
         // Shadow
         g2.setColor(new Color(0, 0, 0, 60));
-        g2.fillOval(centerX - width/2 + 2, centerY - height/2 + height - 6, width - 4, 4);
-        
+        g2.fillOval(centerX - width / 2 + 2, centerY - height / 2 + height - 6, width - 4, 4);
+
         // Body (armor) - BLUE instead of gray
         g2.setColor(new Color(60, 80, 120)); // Dark blue armor
-        g2.fillRoundRect(centerX - width/2 + 2, centerY - height/2 + 6, width - 4, height - 12, 6, 6);
-        
+        g2.fillRoundRect(centerX - width / 2 + 2, centerY - height / 2 + 6, width - 4, height - 12, 6, 6);
+
         // Armor highlights - BLUE instead of gray
         g2.setColor(new Color(80, 100, 140));
-        g2.fillRoundRect(centerX - width/2 + 3, centerY - height/2 + 7, width - 6, height - 14, 4, 4);
-        
+        g2.fillRoundRect(centerX - width / 2 + 3, centerY - height / 2 + 7, width - 6, height - 14, 4, 4);
+
         // Head
         g2.setColor(new Color(180, 140, 100)); // Skin tone
-        g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 10);
-        
+        g2.fillOval(centerX - 6, centerY - height / 2 + 2, 12, 10);
+
         // Helmet - BLUE instead of gray
         g2.setColor(new Color(40, 60, 100));
-        g2.fillOval(centerX - 7, centerY - height/2 + 1, 14, 8);
+        g2.fillOval(centerX - 7, centerY - height / 2 + 1, 14, 8);
         g2.setColor(new Color(60, 80, 120));
-        g2.fillOval(centerX - 6, centerY - height/2 + 2, 12, 6);
-        
+        g2.fillOval(centerX - 6, centerY - height / 2 + 2, 12, 6);
+
         // Eyes (blue glowing instead of red)
         g2.setColor(new Color(0, 100, 200));
-        g2.fillOval(centerX - 4, centerY - height/2 + 4, 3, 3);
-        g2.fillOval(centerX + 1, centerY - height/2 + 4, 3, 3);
+        g2.fillOval(centerX - 4, centerY - height / 2 + 4, 3, 3);
+        g2.fillOval(centerX + 1, centerY - height / 2 + 4, 3, 3);
         g2.setColor(new Color(0, 150, 255));
-        g2.fillOval(centerX - 3, centerY - height/2 + 5, 1, 1);
-        g2.fillOval(centerX + 2, centerY - height/2 + 5, 1, 1);
-        
+        g2.fillOval(centerX - 3, centerY - height / 2 + 5, 1, 1);
+        g2.fillOval(centerX + 2, centerY - height / 2 + 5, 1, 1);
+
         // Weapon (bow instead of sword) - BLUE to match armor
         g2.setColor(new Color(80, 100, 140));
-        g2.fillRect(centerX + width/2 - 1, centerY - 3, 8, 6);
+        g2.fillRect(centerX + width / 2 - 1, centerY - 3, 8, 6);
         g2.setColor(new Color(100, 120, 160));
-        g2.fillRect(centerX + width/2, centerY - 2, 6, 4);
-        
+        g2.fillRect(centerX + width / 2, centerY - 2, 6, 4);
+
         // Bow string
         g2.setColor(new Color(220, 220, 220));
-        g2.drawLine(centerX + width/2 + 1, centerY - 1, centerX + width/2 + 1, centerY + 1);
-        
+        g2.drawLine(centerX + width / 2 + 1, centerY - 1, centerX + width / 2 + 1, centerY + 1);
+
         // NO SHIELD - removed as requested
-        
+
         // Belt - BLUE instead of gray
         g2.setColor(new Color(40, 60, 80));
-        g2.fillRect(centerX - width/2 + 3, centerY + 2, width - 6, 2);
-        
+        g2.fillRect(centerX - width / 2 + 3, centerY + 2, width - 6, 2);
+
         // Legs - BLUE instead of gray
         g2.setColor(new Color(60, 80, 100));
         g2.fillRect(centerX - 4, centerY + 4, 3, 4);
         g2.fillRect(centerX + 1, centerY + 4, 3, 4);
-        
+
         // Boots - BLUE instead of gray
         g2.setColor(new Color(40, 60, 80));
         g2.fillRect(centerX - 5, centerY + 8, 5, 2);
         g2.setColor(new Color(40, 60, 80));
         g2.fillRect(centerX, centerY + 8, 5, 2);
-        
+
         // Reset anti-aliasing
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
     }

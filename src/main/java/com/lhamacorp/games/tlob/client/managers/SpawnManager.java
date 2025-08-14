@@ -129,7 +129,7 @@ public class SpawnManager {
         perkStrength = Math.min(perkStrength, 0.5); // Cap at 50%
         
         // Choose perk type based on enemy type and random chance
-        int perkType = rng.nextInt(6); // 6 different perk types
+        int perkType = rng.nextInt(7); // 7 different perk types
         
         switch (perkType) {
             case 0: // Health boost
@@ -151,6 +151,9 @@ public class SpawnManager {
                 break;
             case 5: // Weapon width boost
                 enemy.increaseWeaponWidth(1);
+                break;
+            case 6: // Armor boost
+                enemy.increaseArmor(perkStrength);
                 break;
         }
     }

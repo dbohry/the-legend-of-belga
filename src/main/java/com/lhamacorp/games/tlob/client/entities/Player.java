@@ -53,18 +53,18 @@ public class Player extends Entity {
     private boolean dashTriggered = false;
     private int dashCooldownTimer = 0;
     private boolean canDash = true;
-    
+
     private int dashTrailTimer = 0;
     private double dashStartX = 0;
     private double dashStartY = 0;
     private static final int DASH_TRAIL_DURATION = 10;
-    
+
     private int dashMovementTimer = 0;
     private double dashTargetX = 0;
     private double dashTargetY = 0;
     private double dashDirectionX = 0;
     private double dashDirectionY = 0;
-    
+
     private static final int MAX_SHADOW_TRAILS = 8;
     private static final int SHADOW_TRAIL_INTERVAL = 1;
     private int shadowTrailCounter = 0;
@@ -72,7 +72,7 @@ public class Player extends Entity {
     private final double[] shadowTrailY = new double[MAX_SHADOW_TRAILS];
     private final int[] shadowTrailTimer = new int[MAX_SHADOW_TRAILS];
     private static final int SHADOW_TRAIL_DURATION = 20;
-    
+
     private boolean isInvulnerable = false;
     private boolean isBlocking = false;
 
@@ -83,7 +83,7 @@ public class Player extends Entity {
 
     private long animTimeMs = 0L;
     private boolean movingThisTick = false;
-    
+
     private Point lastAimPoint = null;
     private int aimIndicatorAlpha = 0;
     private int attackSwingPhase = 0;
@@ -92,7 +92,7 @@ public class Player extends Entity {
     private static final int AIM_INDICATOR_FADE_TIME = 60;
     private static final int ATTACK_SWING_DURATION = 10;
     private static final int SCREEN_SHAKE_DURATION = 8;
-    
+
     private static final double SWING_ARC_RADIANS = Math.PI / 2.0;
     private static final double SWING_TRAIL_SPACING = 0.1;
     private static final int MAX_TRAIL_COUNT = 3;
@@ -105,13 +105,16 @@ public class Player extends Entity {
      * Creates a player at the specified position with the given weapon.
      */
     public Player(double x, double y, Weapon weapon) {
-        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, weapon, "Player", Alignment.NEUTRAL);
+        super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, 0, weapon, "Player", Alignment.NEUTRAL);
     }
 
     /**
      * Sets the player's position without triggering effects.
      */
-    public void setPosition(double x, double y) { this.x = x; this.y = y; }
+    public void setPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
 
     /**
      * Sets the player's health, clamping to valid range.
@@ -142,17 +145,17 @@ public class Player extends Entity {
         this.facingAngle = signed * (Math.PI / 4.0);
         updateFacingFromAngle(signed);
     }
-    
+
     /**
      * Updates facing direction based on angle octant
      * @param octant signed octant value [-4..4]
      */
     private void updateFacingFromAngle(int octant) {
         switch (octant) {
-            case 0  -> this.facing = Direction.RIGHT;
-            case 1  -> this.facing = Direction.DOWN_RIGHT;
-            case 2  -> this.facing = Direction.DOWN;
-            case 3  -> this.facing = Direction.DOWN_LEFT;
+            case 0 -> this.facing = Direction.RIGHT;
+            case 1 -> this.facing = Direction.DOWN_RIGHT;
+            case 2 -> this.facing = Direction.DOWN;
+            case 3 -> this.facing = Direction.DOWN_LEFT;
             case -1 -> this.facing = Direction.UP_RIGHT;
             case -2 -> this.facing = Direction.UP;
             case -3 -> this.facing = Direction.UP_LEFT;
@@ -202,11 +205,11 @@ public class Player extends Entity {
 
     public Point getDashTrailOffset() {
         if (dashTrailTimer <= 0) return new Point(0, 0);
-        
+
         double progress = (double) dashTrailTimer / DASH_TRAIL_DURATION;
         int offsetX = (int) ((dashStartX - x) * progress);
         int offsetY = (int) ((dashStartY - y) * progress);
-        
+
         return new Point(offsetX, offsetY);
     }
 
@@ -283,7 +286,7 @@ public class Player extends Entity {
     public boolean canBlock(double damage) {
         return stamina >= (damage * 0.5);
     }
-    
+
     /**
      * Checks if the player can currently block (has enough stamina).
      * @return true if the player can block, false otherwise
@@ -301,33 +304,93 @@ public class Player extends Entity {
             input = piv;
         } else if (k0 instanceof InputState is) {
             input = new PlayerInputView() {
-                public boolean left()   { return is.left; }
-                public boolean right()  { return is.right; }
-                public boolean up()     { return is.up; }
-                public boolean down()   { return is.down; }
-                public boolean sprint() { return is.shift; }
-                public boolean attack() { return is.attack; }
-                public boolean block()  { return is.block; }
+                public boolean left() {
+                    return is.left;
+                }
+
+                public boolean right() {
+                    return is.right;
+                }
+
+                public boolean up() {
+                    return is.up;
+                }
+
+                public boolean down() {
+                    return is.down;
+                }
+
+                public boolean sprint() {
+                    return is.shift;
+                }
+
+                public boolean attack() {
+                    return is.attack;
+                }
+
+                public boolean block() {
+                    return is.block;
+                }
             };
         } else if (k0 instanceof KeyManager km) {
             input = new PlayerInputView() {
-                public boolean left()   { return km.left; }
-                public boolean right()  { return km.right; }
-                public boolean up()     { return km.up; }
-                public boolean down()   { return km.down; }
-                public boolean sprint() { return km.shift; }
-                public boolean attack() { return km.attack; }
-                public boolean block()  { return km.block; }
+                public boolean left() {
+                    return km.left;
+                }
+
+                public boolean right() {
+                    return km.right;
+                }
+
+                public boolean up() {
+                    return km.up;
+                }
+
+                public boolean down() {
+                    return km.down;
+                }
+
+                public boolean sprint() {
+                    return km.shift;
+                }
+
+                public boolean attack() {
+                    return km.attack;
+                }
+
+                public boolean block() {
+                    return km.block;
+                }
             };
         } else {
             input = new PlayerInputView() {
-                public boolean left()   { return false; }
-                public boolean right()  { return false; }
-                public boolean up()     { return false; }
-                public boolean down()   { return false; }
-                public boolean sprint() { return false; }
-                public boolean attack() { return false; }
-                public boolean block()  { return false; }
+                public boolean left() {
+                    return false;
+                }
+
+                public boolean right() {
+                    return false;
+                }
+
+                public boolean up() {
+                    return false;
+                }
+
+                public boolean down() {
+                    return false;
+                }
+
+                public boolean sprint() {
+                    return false;
+                }
+
+                public boolean attack() {
+                    return false;
+                }
+
+                public boolean block() {
+                    return false;
+                }
             };
         }
 
@@ -337,7 +400,7 @@ public class Player extends Entity {
         // Optional mouse-aim point in WORLD coords
         Point aimPoint = null;
         if (args.length >= 4 && args[3] instanceof Point p) aimPoint = p;
-        
+
         // Update aim direction tracking
         if (aimPoint != null) {
             lastAimPoint = aimPoint;
@@ -348,10 +411,10 @@ public class Player extends Entity {
 
         // --- Input -> movement intent (WASD) ---
         int dxRaw = 0, dyRaw = 0;
-        if (input.left())  dxRaw -= 1;
+        if (input.left()) dxRaw -= 1;
         if (input.right()) dxRaw += 1;
-        if (input.up())    dyRaw -= 1;
-        if (input.down())  dyRaw += 1;
+        if (input.up()) dyRaw -= 1;
+        if (input.down()) dyRaw += 1;
 
         // --- Facing ---
         if (aimPoint != null) {
@@ -374,7 +437,8 @@ public class Player extends Entity {
         double dx = dxRaw, dy = dyRaw;
         if (dx != 0 && dy != 0) {
             double inv = Math.sqrt(0.5);
-            dx *= inv; dy *= inv;
+            dx *= inv;
+            dy *= inv;
         }
 
         movingThisTick = (dxRaw != 0 || dyRaw != 0) && knockbackTimer == 0;
@@ -383,7 +447,7 @@ public class Player extends Entity {
         boolean shiftPressed = input.sprint();
         boolean sprinting = false;
         double speedBase = (PLAYER_SPEED_PPS / TICKS_PER_SECOND) * speedMultiplier;
-        
+
         // Update dash cooldown
         if (dashCooldownTimer > 0) {
             dashCooldownTimer--;
@@ -391,7 +455,7 @@ public class Player extends Entity {
                 canDash = true;
             }
         }
-        
+
         // Handle dash ability
         if (shiftPressed && !wasShiftPressed && canDash && mana >= DASH_MANA_COST && (dxRaw != 0 || dyRaw != 0)) {
             // Dash triggered - consume mana and set up dash movement
@@ -399,16 +463,16 @@ public class Player extends Entity {
             dashTriggered = true;
             canDash = false;
             dashCooldownTimer = DASH_COOLDOWN_TICKS;
-            
+
             // Record dash start position for trail effect
             dashStartX = x;
             dashStartY = y;
             dashTrailTimer = DASH_TRAIL_DURATION;
-            
+
             // Calculate dash target position
             double dashX = x + dxRaw * DASH_DISTANCE;
             double dashY = y + dyRaw * DASH_DISTANCE;
-            
+
             // Check if dash destination is valid (no collision)
             if (!collidesWithMap(dashX, dashY, map)) {
                 dashTargetX = dashX;
@@ -429,21 +493,21 @@ public class Player extends Entity {
                     mana += DASH_MANA_COST; // Refund mana
                 }
             }
-            
+
             // Set up dash movement if target is valid
             if (dashTriggered) {
                 dashMovementTimer = DASH_MOVEMENT_TICKS;
                 dashDirectionX = (dashTargetX - x) / DASH_MOVEMENT_TICKS;
                 dashDirectionY = (dashTargetY - y) / DASH_MOVEMENT_TICKS;
-                
+
                 // Start invulnerability during dash
                 isInvulnerable = true;
-                
+
                 // Add dash screen shake effect
                 screenShakeTimer = SCREEN_SHAKE_DURATION;
             }
         }
-        
+
         // Handle sprinting (only if not dashing and has stamina)
         if (shiftPressed && stamina >= 1.0 && !dashTriggered && dashMovementTimer == 0) {
             sprinting = true;
@@ -473,7 +537,7 @@ public class Player extends Entity {
             }
             staminaDrainCounter = 0;
         }
-        
+
         // Independent mana regeneration (separate from stamina)
         if (++manaRegenCounter >= effectiveManaRegenInterval()) {
             if (mana < maxMana) {
@@ -481,12 +545,12 @@ public class Player extends Entity {
             }
             manaRegenCounter = 0;
         }
-        
+
         // Reset dash trigger when shift is released and dash movement is complete
         if (!shiftPressed && dashMovementTimer == 0) {
             dashTriggered = false;
         }
-        
+
         wasShiftPressed = shiftPressed;
         wasSprinting = sprinting;
 
@@ -497,38 +561,38 @@ public class Player extends Entity {
         // --- Block mechanism ---
         boolean blockPressed = input.block();
         isBlocking = blockPressed && stamina > 0; // Will check actual stamina cost when damage is received
-        
+
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
-        
+
         // Update attack swing animation
         if (attackSwingPhase > 0) attackSwingPhase--;
         if (screenShakeTimer > 0) screenShakeTimer--;
-        
+
         // Update dash trail effect
         if (dashTrailTimer > 0) dashTrailTimer--;
-        
+
         // Update shadow trail timers
         for (int i = 0; i < MAX_SHADOW_TRAILS; i++) {
             if (shadowTrailTimer[i] > 0) {
                 shadowTrailTimer[i]--;
             }
         }
-        
+
         // Handle dash movement
         if (dashMovementTimer > 0) {
             dashMovementTimer--;
-            
+
             // Move towards dash target
             double newX = x + dashDirectionX;
             double newY = y + dashDirectionY;
-            
+
             // Check collision for this movement step
             if (!collidesWithMap(newX, newY, map)) {
                 x = newX;
                 y = newY;
-                
+
                 // Create shadow trail at every frame for maximum visibility
                 addShadowTrail(x, y);
                 shadowTrailCounter++;
@@ -536,7 +600,7 @@ public class Player extends Entity {
                 // Hit something during dash, stop movement
                 dashMovementTimer = 0;
             }
-            
+
             // Dash movement complete
             if (dashMovementTimer == 0) {
                 dashTriggered = false;
@@ -548,7 +612,7 @@ public class Player extends Entity {
             stamina -= 0.5;
             attackTimer = scaleFrom60(weapon.getDuration());
             attackCooldown = scaleFrom60(weapon.getCooldown());
-            
+
             // Initialize attack swing animation
             attackSwingPhase = ATTACK_SWING_DURATION;
             attackSwingAngle = facingAngle;
@@ -636,7 +700,7 @@ public class Player extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         draw(g2, camX, camY, null);
     }
-    
+
     public void draw(Graphics2D g2, int camX, int camY, List<Entity> enemies) {
         TextureManager.Direction dir = toCardinal(facing);
         TextureManager.Motion motion = movingThisTick ? TextureManager.Motion.WALK : TextureManager.Motion.IDLE;
@@ -656,28 +720,28 @@ public class Player extends Entity {
         if (isBlocking) {
             int px = (int) Math.round(x) - camX;
             int py = (int) Math.round(y) - camY;
-            
+
             // Draw shield-like effect around the player
             g2.setColor(new Color(100, 150, 255, 120)); // Blue shield with transparency
             g2.setStroke(new BasicStroke(3f));
-            g2.drawOval(px - width/2 - 4, py - height/2 - 4, width + 8, height + 8);
-            
+            g2.drawOval(px - width / 2 - 4, py - height / 2 - 4, width + 8, height + 8);
+
             // Draw inner shield ring
             g2.setColor(new Color(150, 200, 255, 80));
             g2.setStroke(new BasicStroke(2f));
-            g2.drawOval(px - width/2 - 2, py - height/2 - 2, width + 4, height + 4);
+            g2.drawOval(px - width / 2 - 2, py - height / 2 - 2, width + 4, height + 4);
         }
 
         if (attackTimer > 0) {
             // Enhanced sword attack animation with swing phase
             int r = weapon.getReach();
             int w = weapon.getWidth();
-            
+
             // Calculate swing animation based on phase
             double swingProgress = 1.0 - (double) attackSwingPhase / ATTACK_SWING_DURATION;
             double swingOffset = SWING_ARC_RADIANS * swingProgress;
-            double theta = attackSwingAngle - SWING_ARC_RADIANS/2 + swingOffset;
-            
+            double theta = attackSwingAngle - SWING_ARC_RADIANS / 2 + swingOffset;
+
             double cos = Math.cos(theta), sin = Math.sin(theta);
             int cx = (int) Math.round(x);
             int cy = (int) Math.round(y);
@@ -703,41 +767,41 @@ public class Player extends Entity {
                 // Enhanced swing highlight with animation
                 Shape swingWorld = getSwordSwingShape();
                 Shape swing = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(swingWorld);
-                
+
                 // Animated swing trail effect
                 int alpha = (int) (180 * swingProgress);
                 g2.setColor(new Color(255, 255, 200, alpha));
                 g2.fill(swing);
-                
+
                 // Animated swing outline
                 g2.setColor(new Color(255, 255, 255, alpha + 40));
                 g2.setStroke(new BasicStroke(3f * (float) swingProgress));
                 g2.draw(swing);
-                
+
                 // Dynamic swing trail effect
                 if (swingProgress > 0.3) {
                     int trailAlpha = (int) (100 * swingProgress);
                     g2.setColor(new Color(255, 255, 150, trailAlpha));
                     g2.setStroke(new BasicStroke(1f));
-                    
+
                     // Draw multiple trail lines
                     for (int i = 1; i <= MAX_TRAIL_COUNT; i++) {
                         double trailProgress = swingProgress - (i * SWING_TRAIL_SPACING);
                         if (trailProgress > 0) {
-                            double trailAngle = attackSwingAngle - SWING_ARC_RADIANS/2 + (SWING_ARC_RADIANS * trailProgress);
+                            double trailAngle = attackSwingAngle - SWING_ARC_RADIANS / 2 + (SWING_ARC_RADIANS * trailProgress);
                             double trailCos = Math.cos(trailAngle), trailSin = Math.sin(trailAngle);
                             double trailAx = cx + trailCos * edge;
                             double trailAy = cy + trailSin * edge;
                             double trailCxBlade = trailAx + trailCos * (r / 2.0);
                             double trailCyBlade = trailAy + trailSin * (r / 2.0);
-                            
+
                             Rectangle2D.Double trailBlade = new Rectangle2D.Double(-r / 2.0, -w / 2.0, r, w);
                             AffineTransform trailAt = new AffineTransform();
                             trailAt.translate(trailCxBlade - camX, trailCyBlade - camY);
                             trailAt.rotate(trailAngle);
                             Shape trailShape = trailAt.createTransformedShape(trailBlade);
                             Shape trailScreen = AffineTransform.getTranslateInstance(-camX, -camY).createTransformedShape(trailShape);
-                            
+
                             g2.setColor(new Color(255, 255, 150, (int) (trailAlpha * trailProgress)));
                             g2.draw(trailScreen);
                         }
@@ -762,33 +826,33 @@ public class Player extends Entity {
             int py = (int) Math.round(y) - camY;
             int ax = lastAimPoint.x - camX;
             int ay = lastAimPoint.y - camY;
-            
+
             // Calculate alpha for fade effect
             float alpha = (float) aimIndicatorAlpha / AIM_INDICATOR_FADE_TIME;
-            
+
             // Draw aim line
             g2.setColor(new Color(255, 255, 0, (int) (180 * alpha)));
             g2.setStroke(new BasicStroke(2f));
             g2.drawLine(px, py, ax, ay);
-            
+
             // Draw aim crosshair at mouse position
             g2.setColor(new Color(255, 255, 0, (int) (200 * alpha)));
             g2.setStroke(new BasicStroke(2f));
             g2.drawLine(ax - CROSSHAIR_SIZE, ay, ax + CROSSHAIR_SIZE, ay);
             g2.drawLine(ax, ay - CROSSHAIR_SIZE, ax, ay + CROSSHAIR_SIZE);
-            
+
             // Draw aim circle around player
             int aimRadius = Math.max(width, height) / 2 + 4;
             g2.setColor(new Color(255, 255, 0, (int) (60 * alpha)));
             g2.setStroke(new BasicStroke(1f));
             g2.drawOval(px - aimRadius, py - aimRadius, aimRadius * 2, aimRadius * 2);
-            
+
             // Draw weapon range indicator
             int weaponRange = weapon.getReach();
             g2.setColor(new Color(255, 255, 0, (int) (30 * alpha)));
             g2.setStroke(new BasicStroke(1f));
             g2.drawOval(px - weaponRange, py - weaponRange, weaponRange * 2, weaponRange * 2);
-            
+
             // Draw range markers at cardinal directions
             g2.setColor(new Color(255, 255, 0, (int) (80 * alpha)));
             g2.setStroke(new BasicStroke(1f));
@@ -797,7 +861,7 @@ public class Player extends Entity {
             g2.drawLine(px + weaponRange, py - markerSize, px + weaponRange, py + markerSize);
             g2.drawLine(px - markerSize, py - weaponRange, px + markerSize, py - weaponRange);
             g2.drawLine(px - markerSize, py + weaponRange, px + markerSize, py + weaponRange);
-            
+
             // Draw aim assist indicator when close to enemies
             if (enemies != null) {
                 for (Entity enemy : enemies) {
@@ -806,13 +870,13 @@ public class Player extends Entity {
                         if (distance < weapon.getReach() * ENEMY_HIGHLIGHT_RANGE_MULTIPLIER) {
                             int enemyScreenX = (int) Math.round(enemy.getX()) - camX;
                             int enemyScreenY = (int) Math.round(enemy.getY()) - camY;
-                            
+
                             // Draw enemy highlight when in range
                             g2.setColor(new Color(255, 100, 100, (int) (120 * alpha)));
                             g2.setStroke(new BasicStroke(2f));
-                            g2.drawOval(enemyScreenX - ENEMY_HIGHLIGHT_SIZE, enemyScreenY - ENEMY_HIGHLIGHT_SIZE, 
-                                       ENEMY_HIGHLIGHT_SIZE * 2, ENEMY_HIGHLIGHT_SIZE * 2);
-                            
+                            g2.drawOval(enemyScreenX - ENEMY_HIGHLIGHT_SIZE, enemyScreenY - ENEMY_HIGHLIGHT_SIZE,
+                                ENEMY_HIGHLIGHT_SIZE * 2, ENEMY_HIGHLIGHT_SIZE * 2);
+
                             // Draw line to enemy if it's the closest one
                             if (distance < weapon.getReach()) {
                                 g2.setColor(new Color(255, 100, 100, (int) (100 * alpha)));
@@ -845,26 +909,26 @@ public class Player extends Entity {
 
     public void tickClientAnimations(boolean moving) {
         if (attackCooldown > 0) attackCooldown--;
-        if (attackTimer   > 0) attackTimer--;
+        if (attackTimer > 0) attackTimer--;
         if (attackSwingPhase > 0) attackSwingPhase--;
         if (screenShakeTimer > 0) screenShakeTimer--;
         this.movingThisTick = moving && (knockbackTimer == 0);
         this.animTimeMs += TICK_MS;
     }
-    
+
     public Point getScreenShakeOffset() {
         if (screenShakeTimer <= 0) return new Point(0, 0);
-        
+
         double intensity = (double) screenShakeTimer / SCREEN_SHAKE_DURATION;
         double shakeAmount = SCREEN_SHAKE_INTENSITY * intensity;
-        
+
         // Create a subtle random shake pattern
         long seed = (long) (x * 1000 + y * 1000 + screenShakeTimer);
         Random shakeRng = new Random(seed);
-        
-        int shakeX = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount/2);
-        int shakeY = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount/2);
-        
+
+        int shakeX = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
+        int shakeY = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
+
         return new Point(shakeX, shakeY);
     }
 
@@ -874,28 +938,28 @@ public class Player extends Entity {
         if (isInvulnerable) {
             return; // No damage taken while invulnerable
         }
-        
+
         // Handle blocking
         double blockStaminaCost = amount * 0.5;
         if (isBlocking && stamina >= blockStaminaCost) {
             // Consume stamina for blocking (half of incoming damage)
             stamina -= blockStaminaCost;
-            
+
             // Reduce damage by block reduction percentage
             double reducedDamage = amount * (1.0 - BLOCK_DAMAGE_REDUCTION);
-            
+
             // Call parent damage method with reduced damage
             super.damage(reducedDamage);
-            
+
             // Play block sound effect (if available)
             AudioManager.playSound("slash-hit.wav", -20.0f); // Quieter than normal hit
-            
+
             // Add visual feedback for successful block
             screenShakeTimer = SCREEN_SHAKE_DURATION / 2; // Reduced screen shake for blocks
         } else {
             // Normal damage handling
             super.damage(amount);
-            
+
             // Play audio effects
             if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
             else AudioManager.playSound("hero-death.wav");

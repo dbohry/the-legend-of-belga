@@ -35,7 +35,10 @@ public abstract class Entity {
     protected double speedMultiplier = 1.0;
     protected double staminaRegenRateMult = 1.0;
     protected double manaRegenRateMult = 1.0;
-    
+
+    // Armor system
+    protected double armor;
+
     // Perk tracking for visual indicators
     protected int perkCount = 0;
     protected boolean hasHealthPerk = false;
@@ -44,6 +47,7 @@ public abstract class Entity {
     protected boolean hasStaminaPerk = false;
     protected boolean hasRangePerk = false;
     protected boolean hasWidthPerk = false;
+    protected boolean hasArmorPerk = false;
 
     protected Direction facing = Direction.DOWN;
 
@@ -59,14 +63,14 @@ public abstract class Entity {
     /**
      * Creates an entity with default name and neutral alignment.
      */
-    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon) {
-        this(x, y, width, height, speed, maxHealth, maxStamina, maxMana, maxShield, weapon, "Entity", Alignment.NEUTRAL);
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, double maxArmor, Weapon weapon) {
+        this(x, y, width, height, speed, maxHealth, maxStamina, maxMana, maxShield, maxArmor, weapon, "Entity", Alignment.NEUTRAL);
     }
 
     /**
      * Creates an entity with specified parameters.
      */
-    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, Weapon weapon, String name, Alignment alignment) {
+    public Entity(double x, double y, int width, int height, double speed, double maxHealth, double maxStamina, double maxMana, double maxShield, double maxArmor, Weapon weapon, String name, Alignment alignment) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -81,6 +85,7 @@ public abstract class Entity {
         this.weapon = weapon;
         this.maxShield = maxShield;
         this.shield = maxShield;
+        this.armor = maxArmor;
         this.name = name;
         this.alignment = alignment;
     }
@@ -143,11 +148,9 @@ public abstract class Entity {
      */
     public void increaseMaxStaminaByPercent(double pct) {
         this.maxStamina = Math.ceil(getMaxStamina() * (1.0 + pct));
-        // Ensure current stamina doesn't exceed new max
         if (this.stamina > this.maxStamina) {
             this.stamina = this.maxStamina;
         }
-        // Track perk application
         if (!hasStaminaPerk) {
             hasStaminaPerk = true;
             perkCount++;
@@ -164,7 +167,6 @@ public abstract class Entity {
         if (this.mana > this.maxMana) {
             this.mana = this.maxMana;
         }
-        // Note: Mana perks don't have a specific tracker, but perkCount is still incremented
         perkCount++;
     }
 
@@ -173,11 +175,9 @@ public abstract class Entity {
      */
     public void increaseMaxShield(double amount) {
         this.maxShield += amount;
-        // Ensure current shield doesn't exceed new max
         if (this.shield > this.maxShield) {
             this.shield = this.maxShield;
         }
-        // Note: Shield perks don't have a specific tracker, but perkCount is still incremented
         perkCount++;
     }
 
@@ -186,7 +186,6 @@ public abstract class Entity {
      */
     public void increaseStaminaRegenByPercent(double pct) {
         staminaRegenRateMult *= (1.0 + pct);
-        // Track perk application
         if (!hasStaminaPerk) {
             hasStaminaPerk = true;
             perkCount++;
@@ -198,7 +197,6 @@ public abstract class Entity {
      */
     public void increaseManaRegenByPercent(double pct) {
         manaRegenRateMult *= (1.0 + pct);
-        // Note: Mana regen perks don't have a specific tracker, but perkCount is still incremented
         perkCount++;
     }
 
@@ -219,7 +217,6 @@ public abstract class Entity {
      */
     public void increaseAttackDamageByPercent(double pct) {
         damageMultiplier *= (1.0 + pct);
-        // Track perk application
         if (!hasDamagePerk) {
             hasDamagePerk = true;
             perkCount++;
@@ -232,7 +229,6 @@ public abstract class Entity {
     public void increaseWeaponRangeByPercent(double pct) {
         if (weapon != null) {
             weapon.setReach((int) Math.ceil(weapon.getReach() * (1.0 + pct)));
-            // Track perk application
             if (!hasRangePerk) {
                 hasRangePerk = true;
                 perkCount++;
@@ -250,6 +246,17 @@ public abstract class Entity {
                 hasWidthPerk = true;
                 perkCount++;
             }
+        }
+    }
+
+    /**
+     * Increases armor by the specified amount.
+     */
+    public void increaseArmor(double amount) {
+        armor += amount;
+        if (!hasArmorPerk) {
+            hasArmorPerk = true;
+            perkCount++;
         }
     }
 
@@ -282,6 +289,20 @@ public abstract class Entity {
     }
 
     /**
+     * Gets the current armor value.
+     */
+    public double getArmor() {
+        return armor * 10;
+    }
+
+    /**
+     * Gets the effective armor value (capped at 10).
+     */
+    public double getEffectiveArmorValue() {
+        return Math.min(armor, 10.0);
+    }
+
+    /**
      * Gets the effective speed considering perks.
      */
     public double getEffectiveSpeed() {
@@ -301,60 +322,11 @@ public abstract class Entity {
     // ===== Perk Information Getters =====
 
     /**
-     * Gets the total number of perks applied to this entity.
-     */
-    public int getPerkCount() {
-        return perkCount;
-    }
-
-    /**
-     * Checks if this entity has a health perk.
-     */
-    public boolean hasHealthPerk() {
-        return hasHealthPerk;
-    }
-
-    /**
-     * Checks if this entity has a speed perk.
-     */
-    public boolean hasSpeedPerk() {
-        return hasSpeedPerk;
-    }
-
-    /**
-     * Checks if this entity has a damage perk.
-     */
-    public boolean hasDamagePerk() {
-        return hasDamagePerk;
-    }
-
-    /**
-     * Checks if this entity has a stamina perk.
-     */
-    public boolean hasStaminaPerk() {
-        return hasStaminaPerk;
-    }
-
-    /**
-     * Checks if this entity has a range perk.
-     */
-    public boolean hasRangePerk() {
-        return hasRangePerk;
-    }
-
-    /**
-     * Checks if this entity has a width perk.
-     */
-    public boolean hasWidthPerk() {
-        return hasWidthPerk;
-    }
-
-    /**
      * Gets a summary of all perks applied to this entity.
      */
     public String getPerkSummary() {
         if (perkCount == 0) return "No perks";
-        
+
         StringBuilder summary = new StringBuilder();
         if (hasHealthPerk) summary.append("HP+ ");
         if (hasSpeedPerk) summary.append("SPD+ ");
@@ -362,7 +334,8 @@ public abstract class Entity {
         if (hasStaminaPerk) summary.append("STM+ ");
         if (hasRangePerk) summary.append("RNG+ ");
         if (hasWidthPerk) summary.append("WID+ ");
-        
+        if (hasArmorPerk) summary.append("ARM+ ");
+
         return summary.toString().trim();
     }
 
@@ -489,21 +462,27 @@ public abstract class Entity {
     }
 
     /**
-     * Applies damage to the entity, absorbing with shield first.
+     * Applies damage to the entity, applying armor reduction first, then absorbing with shield.
      */
     public void damage(double amount) {
         if (!alive) return;
 
-        double remaining = amount;
-
-        if (shield > 0) {
-            double absorbed = Math.min(shield, remaining);
-            shield -= absorbed;
-            remaining -= absorbed;
+        if (armor > 0) {
+            double cappedArmor = Math.min(armor, 10); // Cap at 10 for 100%
+            double chance = cappedArmor * 0.1;  // Each point = 10%
+            if (Math.random() < chance) {
+                amount *= 0.2; // 80% damage reduction
+            }
         }
 
-        if (remaining > 0) {
-            health -= remaining;
+        if (shield > 0) {
+            double absorbed = Math.min(shield, amount);
+            shield -= absorbed;
+            amount -= absorbed;
+        }
+
+        if (amount > 0) {
+            health -= amount;
         }
 
         if (health <= 0) {
@@ -579,10 +558,10 @@ public abstract class Entity {
 
     protected boolean collidesWithPlayer(double cx, double cy, Player player) {
         if (player == null || !player.isAlive()) return false;
-        
+
         Rectangle entityBounds = getBoundsAt(cx, cy);
         Rectangle playerBounds = player.getBounds();
-        
+
         return entityBounds.intersects(playerBounds);
     }
 

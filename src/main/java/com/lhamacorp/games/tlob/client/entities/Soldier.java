@@ -83,7 +83,7 @@ public class Soldier extends Entity {
      * Creates a soldier enemy at the specified position.
      */
     public Soldier(double x, double y, Weapon weapon) {
-        super(x, y, SOLDIER_SIZE, SOLDIER_SIZE, SOLDIER_BASE_SPEED, SOLDIER_MAX_HP, SOLDIER_MAX_STAMINA, SOLDIER_MAX_MANA, 0, weapon, "Soldier", Alignment.FOE);
+        super(x, y, SOLDIER_SIZE, SOLDIER_SIZE, SOLDIER_BASE_SPEED, SOLDIER_MAX_HP, SOLDIER_MAX_STAMINA, SOLDIER_MAX_MANA, 0, 0, weapon, "Soldier", Alignment.FOE);
 
         // Improved seed generation with more entropy
         int seed = (int) ((Double.doubleToLongBits(x) * 31 + Double.doubleToLongBits(y)) ^ 0x9E3779B9);
