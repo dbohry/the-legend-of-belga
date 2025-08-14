@@ -361,6 +361,62 @@ public abstract class Entity {
     }
 
     /**
+     * Gets the total number of perks applied to this entity.
+     */
+    public int getPerkCount() {
+        return perkCount;
+    }
+
+    /**
+     * Checks if this entity has a health perk.
+     */
+    public boolean hasHealthPerk() {
+        return hasHealthPerk;
+    }
+
+    /**
+     * Checks if this entity has a speed perk.
+     */
+    public boolean hasSpeedPerk() {
+        return hasSpeedPerk;
+    }
+
+    /**
+     * Checks if this entity has a damage perk.
+     */
+    public boolean hasDamagePerk() {
+        return hasDamagePerk;
+    }
+
+    /**
+     * Checks if this entity has a stamina perk.
+     */
+    public boolean hasStaminaPerk() {
+        return hasStaminaPerk;
+    }
+
+    /**
+     * Checks if this entity has a range perk.
+     */
+    public boolean hasRangePerk() {
+        return hasRangePerk;
+    }
+
+    /**
+     * Checks if this entity has a width perk.
+     */
+    public boolean hasWidthPerk() {
+        return hasWidthPerk;
+    }
+
+    /**
+     * Checks if this entity has an armor perk.
+     */
+    public boolean hasArmorPerk() {
+        return hasArmorPerk;
+    }
+
+    /**
      * Gets the entity's current shield value.
      */
     public double getShield() {
