@@ -205,7 +205,6 @@ public abstract class Entity {
      */
     public void increaseMoveSpeedByPercent(double pct) {
         speedMultiplier *= (1.0 + pct);
-        // Track perk application
         if (!hasSpeedPerk) {
             hasSpeedPerk = true;
             perkCount++;

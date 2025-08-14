@@ -29,15 +29,17 @@ public class KeyManager implements KeyListener, MouseListener {
     public volatile boolean left;
     public volatile boolean right;
     public volatile boolean attack;
+    public volatile boolean defense;
     public volatile boolean enter;
     public volatile boolean escape;
     public volatile boolean shift;
-    public volatile boolean block;
     public volatile boolean mute = false;
     public volatile boolean i;
 
     private volatile boolean attackKey;
     private volatile boolean attackMouse;
+    private volatile boolean defenseKey;
+    private volatile boolean defenseMouse;
 
     private volatile boolean escapePressedOnce;
     private volatile boolean enterPressedOnce;
@@ -47,7 +49,9 @@ public class KeyManager implements KeyListener, MouseListener {
         attack = attackKey || attackMouse;
     }
 
-
+    private void updateDefense() {
+        defense = defenseKey || defenseMouse;
+    }
 
     @Override
     public void keyTyped(KeyEvent e) {
@@ -73,17 +77,14 @@ public class KeyManager implements KeyListener, MouseListener {
             case KEY_RIGHT:
                 right = true;
                 break;
-
             case KEY_SPACE:
                 attackKey = true;
                 updateAttack();
                 break;
-
             case KEY_ENTER:
                 if (!enter) enterPressedOnce = true;
                 enter = true;
                 break;
-
             case KEY_ESCAPE:
                 if (!escape) escapePressedOnce = true;
                 escape = true;
@@ -92,7 +93,8 @@ public class KeyManager implements KeyListener, MouseListener {
                 shift = true;
                 break;
             case KEY_CTRL:
-                block = true;
+                defenseKey = true;
+                updateDefense();
                 break;
             case KEY_M:
                 if (!mDown) {
@@ -141,7 +143,8 @@ public class KeyManager implements KeyListener, MouseListener {
                 shift = false;
                 break;
             case KEY_CTRL:
-                block = false;
+                defenseKey = false;
+                updateDefense();
                 break;
             case KEY_M:
                 mDown = false;
@@ -159,6 +162,12 @@ public class KeyManager implements KeyListener, MouseListener {
             attackMouse = true;
             updateAttack();
         }
+
+        if (e.getButton() == MouseEvent.BUTTON3) {
+            defenseMouse = true;
+            updateDefense();
+        }
+
     }
 
     @Override
@@ -166,6 +175,11 @@ public class KeyManager implements KeyListener, MouseListener {
         if (e.getButton() == MouseEvent.BUTTON1) {
             attackMouse = false;
             updateAttack();
+        }
+
+        if (e.getButton() == MouseEvent.BUTTON3) {
+            defenseMouse = false;
+            updateDefense();
         }
     }
 

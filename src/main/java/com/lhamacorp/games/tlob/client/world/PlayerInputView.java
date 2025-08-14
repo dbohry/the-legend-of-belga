@@ -13,5 +13,5 @@ public interface PlayerInputView {
 
     boolean attack();
     
-    boolean block();
+    boolean defense();
 }

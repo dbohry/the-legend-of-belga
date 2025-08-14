@@ -22,7 +22,7 @@ class InputStateTest {
         assertFalse(inputState.right);
         assertFalse(inputState.attack);
         assertFalse(inputState.shift);
-        assertFalse(inputState.block);
+        assertFalse(inputState.defense);
     }
 
     @Test
@@ -33,7 +33,7 @@ class InputStateTest {
         inputState.right = true;
         inputState.attack = true;
         inputState.shift = true;
-        inputState.block = true;
+        inputState.defense = true;
 
         assertTrue(inputState.up);
         assertTrue(inputState.down);
@@ -41,7 +41,7 @@ class InputStateTest {
         assertTrue(inputState.right);
         assertTrue(inputState.attack);
         assertTrue(inputState.shift);
-        assertTrue(inputState.block);
+        assertTrue(inputState.defense);
     }
 
     @Test
@@ -53,7 +53,7 @@ class InputStateTest {
         inputState.right = true;
         inputState.attack = true;
         inputState.shift = true;
-        inputState.block = true;
+        inputState.defense = true;
 
         // Verify they're all true
         assertTrue(inputState.up);
@@ -62,7 +62,7 @@ class InputStateTest {
         assertTrue(inputState.right);
         assertTrue(inputState.attack);
         assertTrue(inputState.shift);
-        assertTrue(inputState.block);
+        assertTrue(inputState.defense);
 
         // Clear all inputs
         inputState.clear();
@@ -74,7 +74,7 @@ class InputStateTest {
         assertFalse(inputState.right);
         assertFalse(inputState.attack);
         assertFalse(inputState.shift);
-        assertFalse(inputState.block);
+        assertFalse(inputState.defense);
     }
 
     @Test
@@ -82,7 +82,7 @@ class InputStateTest {
         // Set only some inputs
         inputState.up = true;
         inputState.right = true;
-        inputState.block = true;
+        inputState.defense = true;
 
         // Verify only those are true
         assertTrue(inputState.up);
@@ -91,7 +91,7 @@ class InputStateTest {
         assertTrue(inputState.right);
         assertFalse(inputState.attack);
         assertFalse(inputState.shift);
-        assertTrue(inputState.block);
+        assertTrue(inputState.defense);
     }
 
     @Test
@@ -102,18 +102,18 @@ class InputStateTest {
 
         // Set different values
         input1.up = true;
-        input1.block = true;
+        input1.defense = true;
         input2.down = true;
         input2.attack = true;
 
         // Verify they're independent
         assertTrue(input1.up);
-        assertTrue(input1.block);
+        assertTrue(input1.defense);
         assertFalse(input1.down);
         assertFalse(input1.attack);
 
         assertFalse(input2.up);
-        assertFalse(input2.block);
+        assertFalse(input2.defense);
         assertTrue(input2.down);
         assertTrue(input2.attack);
     }
@@ -121,13 +121,13 @@ class InputStateTest {
     @Test
     void testBlockInputSpecific() {
         // Test block input specifically
-        assertFalse(inputState.block);
+        assertFalse(inputState.defense);
         
-        inputState.block = true;
-        assertTrue(inputState.block);
+        inputState.defense = true;
+        assertTrue(inputState.defense);
         
-        inputState.block = false;
-        assertFalse(inputState.block);
+        inputState.defense = false;
+        assertFalse(inputState.defense);
     }
 
     @Test
@@ -135,7 +135,7 @@ class InputStateTest {
         // Test various combinations
         inputState.up = true;
         inputState.left = true;
-        inputState.block = true;
+        inputState.defense = true;
         
         assertTrue(inputState.up);
         assertFalse(inputState.down);
@@ -143,7 +143,7 @@ class InputStateTest {
         assertFalse(inputState.right);
         assertFalse(inputState.attack);
         assertFalse(inputState.shift);
-        assertTrue(inputState.block);
+        assertTrue(inputState.defense);
         
         // Change some inputs
         inputState.up = false;
@@ -156,6 +156,6 @@ class InputStateTest {
         assertTrue(inputState.right);
         assertTrue(inputState.attack);
         assertFalse(inputState.shift);
-        assertTrue(inputState.block);
+        assertTrue(inputState.defense);
     }
 }

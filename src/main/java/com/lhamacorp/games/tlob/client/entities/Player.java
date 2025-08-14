@@ -328,8 +328,8 @@ public class Player extends Entity {
                     return is.attack;
                 }
 
-                public boolean block() {
-                    return is.block;
+                public boolean defense() {
+                    return is.defense;
                 }
             };
         } else if (k0 instanceof KeyManager km) {
@@ -358,8 +358,8 @@ public class Player extends Entity {
                     return km.attack;
                 }
 
-                public boolean block() {
-                    return km.block;
+                public boolean defense() {
+                    return km.defense;
                 }
             };
         } else {
@@ -388,7 +388,7 @@ public class Player extends Entity {
                     return false;
                 }
 
-                public boolean block() {
+                public boolean defense() {
                     return false;
                 }
             };
@@ -559,8 +559,12 @@ public class Player extends Entity {
         if (knockbackTimer == 0 && dashMovementTimer == 0) moveWithCollision(dx * speed, dy * speed, map, enemies);
 
         // --- Block mechanism ---
-        boolean blockPressed = input.block();
-        isBlocking = blockPressed && stamina > 0; // Will check actual stamina cost when damage is received
+        boolean defensePressed = input.defense();
+        isBlocking = defensePressed && stamina > 0; // Will check actual stamina cost when damage is received
+
+        if (isBlocking && input.attack()) {
+            isBlocking = false;
+        }
 
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;

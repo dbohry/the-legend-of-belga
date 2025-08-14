@@ -26,7 +26,7 @@ class KeyManagerTest {
         assertFalse(keyManager.right);
         assertFalse(keyManager.attack);
         assertFalse(keyManager.shift);
-        assertFalse(keyManager.block);
+        assertFalse(keyManager.defense);
         assertFalse(keyManager.escape);
         assertFalse(keyManager.enter);
         assertFalse(keyManager.i);
@@ -115,11 +115,11 @@ class KeyManagerTest {
     void testBlockKey() {
         // Test Ctrl key press
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
-        assertTrue(keyManager.block);
+        assertTrue(keyManager.defense);
 
         // Test Ctrl key release
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
-        assertFalse(keyManager.block);
+        assertFalse(keyManager.defense);
     }
 
     @Test
@@ -127,11 +127,11 @@ class KeyManagerTest {
         // Multiple presses should keep block true
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
-        assertTrue(keyManager.block);
+        assertTrue(keyManager.defense);
 
         // Release should set it to false
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
-        assertFalse(keyManager.block);
+        assertFalse(keyManager.defense);
     }
 
     // ===== Other Keys =====
@@ -213,7 +213,7 @@ class KeyManagerTest {
         assertTrue(keyManager.up);
         assertTrue(keyManager.right);
         assertTrue(keyManager.attack);
-        assertTrue(keyManager.block);
+        assertTrue(keyManager.defense);
 
         // Release all keys
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_W));
@@ -224,7 +224,7 @@ class KeyManagerTest {
         assertFalse(keyManager.up);
         assertFalse(keyManager.right);
         assertFalse(keyManager.attack);
-        assertFalse(keyManager.block);
+        assertFalse(keyManager.defense);
     }
 
     // ===== Edge Cases =====

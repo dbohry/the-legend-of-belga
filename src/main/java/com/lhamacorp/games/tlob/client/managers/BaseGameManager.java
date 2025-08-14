@@ -7,7 +7,6 @@ import com.lhamacorp.games.tlob.client.managers.renderers.HudRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.PauseMenuRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.StatsRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.VictoryScreenRenderer;
-import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.perks.PerkManager;
 import com.lhamacorp.games.tlob.client.weapons.Sword;
@@ -170,7 +169,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             input.right = keyManager.right;
             input.attack = keyManager.attack;
             input.shift = keyManager.shift;
-            input.block = keyManager.block;
+            input.defense = keyManager.defense;
 
             // Handle I key for stats page
             if (keyManager.i && !statsPageOpen) {
