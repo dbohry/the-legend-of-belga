@@ -642,9 +642,6 @@ public class Player extends Entity {
                     e.damage(dmg);
                     e.applyKnockback(x, y);
                     hitSomething = true;
-                    
-                    // Add extra screen shake when hitting enemies
-                    screenShakeTimer = Math.max(screenShakeTimer, SCREEN_SHAKE_DURATION);
                 }
             }
             if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
@@ -949,7 +946,7 @@ public class Player extends Entity {
 
         // Debug output (you can remove this later)
         if (screenShakeTimer == SCREEN_SHAKE_DURATION) {
-            System.out.println("Screen shake triggered on HIT! Timer: " + screenShakeTimer + 
+            System.out.println("Screen shake triggered on PLAYER DAMAGE! Timer: " + screenShakeTimer + 
                              ", Intensity: " + intensity + 
                              ", Shake amount: " + shakeAmount + 
                              ", Offset: (" + shakeX + ", " + shakeY + ")");
@@ -997,6 +994,9 @@ public class Player extends Entity {
         } else {
             // Normal damage handling
             super.damage(amount);
+
+            // Add screen shake when player takes damage
+            screenShakeTimer = SCREEN_SHAKE_DURATION;
 
             // Play audio effects
             if (isAlive()) AudioManager.playSound("hero-hurt.wav", -10);
