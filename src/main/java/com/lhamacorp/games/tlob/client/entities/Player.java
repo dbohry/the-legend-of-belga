@@ -47,7 +47,7 @@ public class Player extends Entity {
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
 
-    private boolean wasShiftPressed = false;
+    private boolean wasDashPressed = false;
     private boolean dashTriggered = false;
     private int dashCooldownTimer = 0;
     private boolean canDash = true;
@@ -329,6 +329,10 @@ public class Player extends Entity {
                 public boolean defense() {
                     return is.defense;
                 }
+                
+                public boolean dash() {
+                    return is.dash;
+                }
             };
         } else if (k0 instanceof KeyManager km) {
             input = new PlayerInputView() {
@@ -359,6 +363,10 @@ public class Player extends Entity {
                 public boolean defense() {
                     return km.defense;
                 }
+                
+                public boolean dash() {
+                    return km.dash;
+                }
             };
         } else {
             input = new PlayerInputView() {
@@ -387,6 +395,10 @@ public class Player extends Entity {
                 }
 
                 public boolean defense() {
+                    return false;
+                }
+                
+                public boolean dash() {
                     return false;
                 }
             };
@@ -443,6 +455,7 @@ public class Player extends Entity {
 
         // --- Dash ability and Sprint / stamina ---
         boolean shiftPressed = input.sprint();
+        boolean dashPressed = input.dash();
         boolean sprinting = false;
         double speedBase = (PLAYER_SPEED_PPS / TICKS_PER_SECOND) * speedMultiplier;
 
@@ -455,7 +468,7 @@ public class Player extends Entity {
         }
 
         // Handle dash ability
-        if (shiftPressed && !wasShiftPressed && canDash && mana >= DASH_MANA_COST && (dxRaw != 0 || dyRaw != 0)) {
+        if (dashPressed && !wasDashPressed && canDash && mana >= DASH_MANA_COST && (dxRaw != 0 || dyRaw != 0)) {
             // Dash triggered - consume mana and set up dash movement
             mana -= DASH_MANA_COST;
             dashTriggered = true;
@@ -544,12 +557,12 @@ public class Player extends Entity {
             manaRegenCounter = 0;
         }
 
-        // Reset dash trigger when shift is released and dash movement is complete
-        if (!shiftPressed && dashMovementTimer == 0) {
+        // Reset dash trigger when dash is released and dash movement is complete
+        if (!dashPressed && dashMovementTimer == 0) {
             dashTriggered = false;
         }
 
-        wasShiftPressed = shiftPressed;
+        wasDashPressed = dashPressed;
         wasSprinting = sprinting;
 
         // --- Knockback & movement ---

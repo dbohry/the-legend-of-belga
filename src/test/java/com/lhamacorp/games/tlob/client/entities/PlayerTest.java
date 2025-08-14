@@ -195,6 +195,8 @@ class PlayerTest {
             public boolean attack() { return false; }
             @Override
             public boolean defense() { return true; }
+            @Override
+            public boolean dash() { return false; }
         };
         
         // Update player with block input
@@ -239,6 +241,8 @@ class PlayerTest {
             public boolean attack() { return true; }
             @Override
             public boolean defense() { return true; }
+            @Override
+            public boolean dash() { return false; }
         };
         
         // Update player with both block and attack input
@@ -269,6 +273,8 @@ class PlayerTest {
             public boolean attack() { return false; }
             @Override
             public boolean defense() { return true; }
+            @Override
+            public boolean dash() { return false; }
         };
         
         // Update player with block input

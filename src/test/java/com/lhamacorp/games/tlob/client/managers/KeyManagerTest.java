@@ -113,25 +113,38 @@ class KeyManagerTest {
 
     @Test
     void testBlockKey() {
-        // Test Ctrl key press
-        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
+        // Test Alt key press
+        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_ALT));
         assertTrue(keyManager.defense);
 
-        // Test Ctrl key release
-        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
+        // Test Alt key release
+        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_ALT));
         assertFalse(keyManager.defense);
     }
 
     @Test
     void testBlockKeyMultiplePresses() {
         // Multiple presses should keep block true
-        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
-        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
+        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_ALT));
+        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_ALT));
         assertTrue(keyManager.defense);
 
         // Release should set it to false
-        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
+        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_ALT));
         assertFalse(keyManager.defense);
+    }
+
+    // ===== Dash Key (New Feature) =====
+
+    @Test
+    void testDashKey() {
+        // Test Ctrl key press
+        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
+        assertTrue(keyManager.dash);
+
+        // Test Ctrl key release
+        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
+        assertFalse(keyManager.dash);
     }
 
     // ===== Other Keys =====
@@ -208,7 +221,7 @@ class KeyManagerTest {
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_W));
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_D));
         keyManager.keyPressed(createKeyEvent(KeyEvent.VK_SPACE));
-        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_CONTROL));
+        keyManager.keyPressed(createKeyEvent(KeyEvent.VK_ALT));
 
         assertTrue(keyManager.up);
         assertTrue(keyManager.right);
@@ -219,7 +232,7 @@ class KeyManagerTest {
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_W));
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_D));
         keyManager.keyReleased(createKeyEvent(KeyEvent.VK_SPACE));
-        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_CONTROL));
+        keyManager.keyReleased(createKeyEvent(KeyEvent.VK_ALT));
 
         assertFalse(keyManager.up);
         assertFalse(keyManager.right);

@@ -64,4 +64,9 @@ final class VirtualInput implements PlayerInputView {
     public boolean defense() {
         return false; // Virtual input doesn't support blocking
     }
+    
+    @Override
+    public boolean dash() {
+        return false; // Virtual input doesn't support dashing
+    }
 }
