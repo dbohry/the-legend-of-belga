@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-and-release:
     # Do nothing on the automated bump commit
-    if: "! contains(github.event.head_commit.message, '[skip ci]')"
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -136,5 +136,43 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Wait for native builds to complete and then update release
+  update-release-with-natives:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: Wait for Native Builds
+        run: |
+          echo "Waiting for native builds to complete..."
+          sleep 300  # Wait 5 minutes for native builds
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Native Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: native-artifacts
+
+      - name: List Downloaded Artifacts
+        run: |
+          echo "Available native artifacts:"
+          find native-artifacts -type f
+
+      - name: Update Release with Native Executables
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build-and-release.outputs.VERSION || env.VERSION }}
+          files: |
+            native-artifacts/TheLegendOfBelga-Windows/TheLegendOfBelga-Windows.exe
+            native-artifacts/TheLegendOfBelga-Linux/TheLegendOfBelga-Linux
+            native-artifacts/TheLegendOfBelga-macOS/TheLegendOfBelga-macOS
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

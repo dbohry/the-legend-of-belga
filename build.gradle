@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.graalvm.buildtools.native' version '0.9.28'
 }
 
 group = 'com.lhamacorp.games'
@@ -100,4 +101,69 @@ processResources {
     filesMatching("version.properties") {
         expand(version: project.version)
     }
+}
+
+// Native Image configuration
+graalvmNative {
+    binaries {
+        executable {
+            mainClass = application.mainClass
+            imageName = 'TheLegendOfBelga'
+            buildArgs.add('--no-fallback')
+            buildArgs.add('--enable-http')
+            buildArgs.add('--enable-https')
+            buildArgs.add('--enable-all-security-services')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.Game')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.managers')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.entities')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games/tlob.client.maps')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.perks')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.save')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.weapons')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.client.world')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.core')
+            buildArgs.add('--initialize-at-build-time=com.lhamacorp.games.tlob.server')
+            buildArgs.add('--report-unsupported-elements-at-runtime')
+            buildArgs.add('--allow-incomplete-classpath')
+            buildArgs.add('--no-server')
+            
+            // Platform-specific configurations
+            if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+                buildArgs.add('--windows-console-mode=auto')
+            }
+            
+            // Resource handling
+            buildArgs.add('--include-resources=assets/.*')
+            buildArgs.add('--include-resources=version.properties')
+        }
+    }
+}
+
+// Custom native build tasks
+tasks.register('buildNativeWindows', Exec) {
+    group = 'native'
+    description = 'Builds native Windows executable'
+    dependsOn 'nativeCompile'
+    
+    commandLine 'cmd', '/c', 'copy', 
+        "${buildDir}/native/nativeCompile/TheLegendOfBelga.exe",
+        "${buildDir}/TheLegendOfBelga-Windows.exe"
+}
+
+tasks.register('buildNativeLinux', Exec) {
+    group = 'native'
+    description = 'Builds native Linux executable'
+    dependsOn 'nativeCompile'
+    
+    commandLine 'bash', '-c', 
+        "cp ${buildDir}/native/nativeCompile/TheLegendOfBelga ${buildDir}/TheLegendOfBelga-Linux"
+}
+
+tasks.register('buildNativeMac', Exec) {
+    group = 'native'
+    description = 'Builds native macOS executable'
+    dependsOn 'nativeCompile'
+    
+    commandLine 'bash', '-c', 
+        "cp ${buildDir}/native/nativeCompile/TheLegendOfBelga ${buildDir}/TheLegendOfBelga-macOS"
 }

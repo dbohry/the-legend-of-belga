@@ -1,0 +1,19 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "assets/.*"
+      },
+      {
+        "pattern": "version.properties"
+      },
+      {
+        "pattern": "sfx/.*"
+      },
+      {
+        "pattern": "logo/.*"
+      }
+    ]
+  },
+  "bundles": []
+}
