@@ -14,12 +14,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Job 1: Build, Test, and Create JAR
-  build-test-jar:
-    name: Build, Test & Create JAR
+  # Job 1: Build and Test
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ env.VERSION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +35,28 @@ jobs:
 
       - name: Run Tests
         run: ./gradlew test
+
+  # Job 2: Build JAR (depends on tests passing)
+  build-jar:
+    name: Build JAR File
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ env.VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Gradle wrapper perms
+        run: chmod +x gradlew
 
       - name: Resolve & bump version (0.0.X)
         id: bump
@@ -80,7 +100,7 @@ jobs:
             if [ -f build.gradle ]; then
               # Groovy DSL
               if grep -qE "^[[:space:]]*version[[:space:]]*=" build.gradle; then
-                sed -i -E "s/^[[:space:]]*version[[:space:]]*=.*/version = '${NEW_VERSION}'/" build.gradle && UPDATED=1
+                sed -i -E "s/^[[:space:]]*version[[:space]]*=.*/version = '${NEW_VERSION}'/" build.gradle && UPDATED=1
               fi
             fi
             if [ -f build.gradle.kts ]; then
@@ -124,9 +144,10 @@ jobs:
           path: build/libs/*.jar
           retention-days: 30
 
-  # Job 2: Build Windows Native Executable (runs in parallel)
+  # Job 3: Build Windows Native (depends on JAR build)
   build-native-windows:
     name: Build Windows Native Executable
+    needs: build-jar
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -139,14 +160,30 @@ jobs:
           distribution: 'graalvm'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set GraalVM Environment
+        shell: cmd
+        run: |
+          set JAVA_HOME=%GRAALVM_HOME%
+          set PATH=%GRAALVM_HOME%\bin;%PATH%
+          echo "JAVA_HOME=%JAVA_HOME%"
+          echo "PATH=%PATH%"
+
       - name: Install Native Image
-        run: gu install native-image
+        shell: cmd
+        run: |
+          set JAVA_HOME=%GRAALVM_HOME%
+          set PATH=%GRAALVM_HOME%\bin;%PATH%
+          gu install native-image
 
       - name: Gradle wrapper perms
         run: chmod +x gradlew
 
       - name: Build Windows Native Executable
-        run: ./gradlew nativeCompile
+        shell: cmd
+        run: |
+          set JAVA_HOME=%GRAALVM_HOME%
+          set PATH=%GRAALVM_HOME%\bin;%PATH%
+          ./gradlew nativeCompile
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
@@ -155,40 +192,10 @@ jobs:
           path: build/native/nativeCompile/TheLegendOfBelga.exe
           retention-days: 30
 
-  # Job 3: Build macOS Native Executable (runs in parallel)
-  build-native-macos:
-    name: Build macOS Native Executable
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup GraalVM
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '21'
-          distribution: 'graalvm'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Native Image
-        run: gu install native-image
-
-      - name: Gradle wrapper perms
-        run: chmod +x gradlew
-
-      - name: Build macOS Native Executable
-        run: ./gradlew nativeCompile
-
-      - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TheLegendOfBelga-macOS
-          path: build/native/nativeCompile/TheLegendOfBelga
-          retention-days: 30
-
-  # Job 4: Build Linux Native Executable (runs in parallel)
+  # Job 4: Build Linux Native (depends on Windows native build)
   build-native-linux:
     name: Build Linux Native Executable
+    needs: build-native-windows
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -201,8 +208,18 @@ jobs:
           distribution: 'graalvm'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set GraalVM Environment
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "PATH=$PATH"
+
       - name: Install Native Image
-        run: gu install native-image
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          gu install native-image
 
       - name: Install Dependencies
         run: |
@@ -213,7 +230,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Linux Native Executable
-        run: ./gradlew nativeCompile
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          ./gradlew nativeCompile
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
@@ -222,10 +242,55 @@ jobs:
           path: build/native/nativeCompile/TheLegendOfBelga
           retention-days: 30
 
-  # Job 5: Create Release with All Assets (waits for all builds to complete)
+  # Job 5: Build macOS Native (depends on Linux native build)
+  build-native-macos:
+    name: Build macOS Native Executable
+    needs: build-native-linux
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set GraalVM Environment
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "PATH=$PATH"
+
+      - name: Install Native Image
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          gu install native-image
+
+      - name: Gradle wrapper perms
+        run: chmod +x gradlew
+
+      - name: Build macOS Native Executable
+        run: |
+          export JAVA_HOME=$GRAALVM_HOME
+          export PATH=$GRAALVM_HOME/bin:$PATH
+          ./gradlew nativeCompile
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TheLegendOfBelga-macOS
+          path: build/native/nativeCompile/TheLegendOfBelga
+          retention-days: 30
+
+  # Job 6: Create Release with All Assets (depends on all builds completing)
   create-release:
     name: Create Release with All Assets
-    needs: [build-test-jar, build-native-windows, build-native-linux, build-native-macos]
+    needs: build-native-macos
     runs-on: ubuntu-latest
     steps:
       - name: Download All Artifacts
@@ -241,8 +306,8 @@ jobs:
       - name: Create Release with All Assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build-test-jar.outputs.version }}
-          name: Release v${{ needs.build-test-jar.outputs.version }}
+          tag_name: v${{ needs.build-jar.outputs.version }}
+          name: Release v${{ needs.build-jar.outputs.version }}
           files: |
             artifacts/TheLegendOfBelga-JAR/*.jar
             artifacts/TheLegendOfBelga-Windows/TheLegendOfBelga.exe
@@ -252,7 +317,7 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: false
           body: |
-            ## 🎮 The Legend of Belga v${{ needs.build-test-jar.outputs.version }}
+            ## 🎮 The Legend of Belga v${{ needs.build-jar.outputs.version }}
             
             ### 📦 Downloads
             
