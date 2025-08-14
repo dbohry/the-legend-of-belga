@@ -102,4 +102,24 @@ class SoldierTest {
         // Verify multipliers are set correctly
         assertEquals(1.1, soldier.getSpeedMultiplier(), 0.01);
     }
+
+    @Test
+    void testSoldierPerkCountIndicator() {
+        // Initially no perks
+        assertEquals(0, soldier.getPerkCount());
+        
+        // Apply some perks
+        soldier.increaseMaxHealthByPercent(0.1);
+        soldier.increaseMoveSpeedByPercent(0.1);
+        
+        // Should now have 2 perks
+        assertEquals(2, soldier.getPerkCount());
+        
+        // Apply more perks
+        soldier.increaseMaxStaminaByPercent(0.1);
+        soldier.increaseAttackDamageByPercent(0.1);
+        
+        // Should now have 4 perks
+        assertEquals(4, soldier.getPerkCount());
+    }
 }

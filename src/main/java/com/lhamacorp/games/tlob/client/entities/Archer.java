@@ -650,6 +650,17 @@ public class Archer extends Entity {
                     new int[]{indicatorY + 3, indicatorY + 3, indicatorY - 3}, 3);
             }
         }
+        
+        // Draw perk count indicator
+        if (GameConfig.getInstance().isShowEnemyBehaviorIndicators() && getPerkCount() > 0) {
+            String perkText = String.valueOf(getPerkCount());
+            g2.setColor(new Color(255, 215, 0, 220)); // Gold color for perks
+            g2.setFont(new Font("Arial", Font.BOLD, 10)); // Same size as behavior indicator
+            FontMetrics fm = g2.getFontMetrics();
+            int textX = (int) Math.round(x) - camX + 8; // To the right of behavior indicator
+            int textY = (int) Math.round(y) - camY - height / 2 - 15; // Same Y as behavior indicator
+            g2.drawString(perkText, textX, textY);
+        }
     }
 
     private void drawArcherEnemy(Graphics2D g2, int camX, int camY) {
