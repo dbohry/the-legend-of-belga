@@ -944,14 +944,6 @@ public class Player extends Entity {
         int shakeX = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
         int shakeY = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
 
-        // Debug output (you can remove this later)
-        if (screenShakeTimer == SCREEN_SHAKE_DURATION) {
-            System.out.println("Screen shake triggered on PLAYER DAMAGE! Timer: " + screenShakeTimer + 
-                             ", Intensity: " + intensity + 
-                             ", Shake amount: " + shakeAmount + 
-                             ", Offset: (" + shakeX + ", " + shakeY + ")");
-        }
-
         return new Point(shakeX, shakeY);
     }
 
