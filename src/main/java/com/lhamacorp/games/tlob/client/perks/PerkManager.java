@@ -193,18 +193,18 @@ public class PerkManager {
             return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseMoveSpeedByPercent(p));
         });
 
-        register("STAMINA_REGEN", Rarity.RARE, r -> {
-            double p = pct(r, 0.05, 0.10); // 5%..10%
+        register("STAMINA_REGEN", Rarity.UNCOMMON, r -> {
+            double p = pct(r, 0.10, 0.20); // 5%..10%
             String label = "Stamina Regen";
             String desc = String.format("Stamina regenerates faster (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseStaminaRegenByPercent(p));
+            return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseStaminaRegenByPercent(p));
         });
 
-        register("MANA_REGEN", Rarity.RARE, r -> {
+        register("MANA_REGEN", Rarity.UNCOMMON, r -> {
             double p = pct(r, 0.05, 0.10); // 5%..10%
             String label = "Mana Regen";
             String desc = String.format("Mana regenerates faster (+%d%%).", (int) Math.round(p * 100));
-            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseManaRegenByPercent(p));
+            return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseManaRegenByPercent(p));
         });
 
         register("ATTACK_DAMAGE", Rarity.UNCOMMON, r -> {
@@ -221,6 +221,12 @@ public class PerkManager {
             return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseWeaponRangeByPercent(p));
         });
 
+        register("ARMOR", Rarity.RARE, r -> {
+            String label = "Max Armor";
+            String desc = "Increases max armor (+1)";
+            return new Perk(label, desc, Rarity.RARE, entity -> entity.increaseArmor(1.0));
+        });
+
         register("WEAPON_WIDTH", Rarity.EPIC, r -> {
             String label = "Weapon Width";
             String desc = "Increases weapon width (+1).";
@@ -233,11 +239,6 @@ public class PerkManager {
             return new Perk(label, desc, Rarity.EPIC, entity -> entity.increaseMaxShield(1.0));
         });
 
-        register("ARMOR", Rarity.COMMON, r -> {
-            String label = "Max Armor";
-            String desc = "Increases max armor (1)";
-            return new Perk(label, desc, Rarity.COMMON, entity -> entity.increaseArmor(1.0));
-        });
     }
 
     private static double pct(Random r, double min, double max) {

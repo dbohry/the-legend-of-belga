@@ -43,9 +43,7 @@ public class Player extends Entity {
 
     private int staminaDrainCounter = 0;
     private int staminaRegenCounter = 0;
-    private double staminaRegenRateMult = 1.0;
     private int manaRegenCounter = 0;
-    private double manaRegenRateMult = 1.0;
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
 
