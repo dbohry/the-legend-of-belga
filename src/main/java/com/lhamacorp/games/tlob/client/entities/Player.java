@@ -39,7 +39,6 @@ public class Player extends Entity {
     private static final int DASH_MOVEMENT_TICKS = 5;
 
     // Block mechanism constants
-    private static final double BLOCK_STAMINA_COST = 0.5;
     private static final double BLOCK_DAMAGE_REDUCTION = 0.8; // 80% damage reduction when blocking
 
     private int staminaDrainCounter = 0;
@@ -179,21 +178,6 @@ public class Player extends Entity {
         this.shield = this.maxShield;
     }
 
-    // Note: Perk methods are now inherited from Entity base class
-    // - increaseMaxHealthByPercent()
-    // - increaseMaxStaminaByPercent()
-    // - increaseMaxManaByPercent()
-    // - increaseStaminaRegenByPercent()
-    // - increaseManaRegenByPercent()
-    // - increaseMoveSpeedByPercent()
-    // - increaseAttackDamageByPercent()
-    // - increaseWeaponRangeByPercent()
-    // - increaseWeaponWidth()
-    // - getDamageMultiplier()
-    // - getSpeedMultiplier()
-    // - getStaminaRegenRateMult()
-    // - getManaRegenRateMult()
-
     private int effectiveStaminaRegenInterval() {
         double interval = STAMINA_REGEN_INTERVAL / Math.max(0.0001, staminaRegenRateMult);
         return Math.max(1, (int) Math.round(interval));
@@ -203,8 +187,6 @@ public class Player extends Entity {
         double interval = MANA_REGEN_INTERVAL / Math.max(0.0001, manaRegenRateMult);
         return Math.max(1, (int) Math.round(interval));
     }
-
-    // Note: effectiveAttackDamage is now available as getEffectiveAttackDamage() from Entity base class
 
     public boolean canDash() {
         return canDash && mana >= DASH_MANA_COST;
@@ -238,7 +220,6 @@ public class Player extends Entity {
     }
 
     private void addShadowTrail(double x, double y) {
-        // Find an available slot for the shadow trail
         for (int i = 0; i < MAX_SHADOW_TRAILS; i++) {
             if (shadowTrailTimer[i] <= 0) {
                 shadowTrailX[i] = x;
@@ -295,11 +276,20 @@ public class Player extends Entity {
     }
 
     /**
+     * Checks if the player can currently block a specific damage amount (has enough stamina).
+     * @param damage the incoming damage amount
+     * @return true if the player can block, false otherwise
+     */
+    public boolean canBlock(double damage) {
+        return stamina >= (damage * 0.5);
+    }
+    
+    /**
      * Checks if the player can currently block (has enough stamina).
      * @return true if the player can block, false otherwise
      */
     public boolean canBlock() {
-        return stamina >= BLOCK_STAMINA_COST;
+        return stamina > 0; // Can always attempt to block if they have any stamina
     }
 
     @Override
@@ -506,7 +496,7 @@ public class Player extends Entity {
 
         // --- Block mechanism ---
         boolean blockPressed = input.block();
-        isBlocking = blockPressed && stamina >= BLOCK_STAMINA_COST;
+        isBlocking = blockPressed && stamina > 0; // Will check actual stamina cost when damage is received
         
         // --- Attack ---
         if (attackCooldown > 0) attackCooldown--;
@@ -886,9 +876,10 @@ public class Player extends Entity {
         }
         
         // Handle blocking
-        if (isBlocking && stamina >= BLOCK_STAMINA_COST) {
-            // Consume stamina for blocking
-            stamina -= BLOCK_STAMINA_COST;
+        double blockStaminaCost = amount * 0.5;
+        if (isBlocking && stamina >= blockStaminaCost) {
+            // Consume stamina for blocking (half of incoming damage)
+            stamina -= blockStaminaCost;
             
             // Reduce damage by block reduction percentage
             double reducedDamage = amount * (1.0 - BLOCK_DAMAGE_REDUCTION);

@@ -163,9 +163,12 @@ class PlayerTest {
 
     @Test
     void testPlayerBlockWithLowStamina() {
-        // Set stamina below block cost
+        // Set stamina below block cost for a 1.0 damage attack
         player.setStamina(0.3);
-        assertFalse(player.canBlock());
+        assertFalse(player.canBlock(1.0)); // Need 0.5 stamina to block 1.0 damage
+        
+        // But can still attempt to block (the actual check happens when damage is received)
+        assertTrue(player.canBlock());
     }
 
     @Test
@@ -256,6 +259,53 @@ class PlayerTest {
         // However, stamina regeneration might occur during updates, so we just verify
         // that the player is still blocking and the attack didn't go through
         assertTrue(player.isBlocking());
+    }
+    
+    @Test
+    void testPlayerDynamicBlockStaminaCost() {
+        // Test that blocking stamina cost is half of incoming damage
+        player.setStamina(3.0); // Ensure enough stamina
+        
+        // Create mock input that simulates blocking
+        PlayerInputView mockInput = new PlayerInputView() {
+            @Override
+            public boolean left() { return false; }
+            @Override
+            public boolean right() { return false; }
+            @Override
+            public boolean up() { return false; }
+            @Override
+            public boolean down() { return false; }
+            @Override
+            public boolean sprint() { return false; }
+            @Override
+            public boolean attack() { return false; }
+            @Override
+            public boolean block() { return true; }
+        };
+        
+        // Update player with block input
+        player.update(mockInput, mockMap, enemies);
+        assertTrue(player.isBlocking());
+        
+        double initialStamina = player.getStamina();
+        
+        // Test with different damage amounts
+        double[] testDamages = {1.0, 2.0, 4.0, 8.0};
+        
+        for (double damage : testDamages) {
+            double requiredStamina = damage * 0.5;
+            player.setStamina(requiredStamina + 0.1); // Ensure enough stamina for blocking
+            
+            // Take damage while blocking
+            player.damage(damage);
+            
+            // Check that stamina was consumed by half the damage amount
+            double expectedStaminaConsumption = damage * 0.5;
+            double actualStaminaConsumption = (requiredStamina + 0.1) - player.getStamina();
+            assertEquals(expectedStaminaConsumption, actualStaminaConsumption, 0.01, 
+                "Stamina cost for blocking " + damage + " damage should be " + expectedStaminaConsumption);
+        }
     }
 
     // ===== Perk System Integration =====
