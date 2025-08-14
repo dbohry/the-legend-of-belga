@@ -89,7 +89,7 @@ public class Player extends Entity {
     private int screenShakeTimer = 0;
     private static final int AIM_INDICATOR_FADE_TIME = 60;
     private static final int ATTACK_SWING_DURATION = 10;
-    private static final int SCREEN_SHAKE_DURATION = 8;
+    private static final int SCREEN_SHAKE_DURATION = 12;  // Increased from 8 to 12 frames
 
     private static final double SWING_ARC_RADIANS = Math.PI / 2.0;
     private static final double SWING_TRAIL_SPACING = 0.1;
@@ -97,7 +97,7 @@ public class Player extends Entity {
     private static final int CROSSHAIR_SIZE = 8;
     private static final int ENEMY_HIGHLIGHT_SIZE = 12;
     private static final double ENEMY_HIGHLIGHT_RANGE_MULTIPLIER = 1.5;
-    private static final double SCREEN_SHAKE_INTENSITY = 2.0;
+    private static final double SCREEN_SHAKE_INTENSITY = 6.0;  // Increased from 2.0 to 6.0 pixels
 
     /**
      * Creates a player at the specified position with the given weapon.
@@ -631,7 +631,7 @@ public class Player extends Entity {
             // Initialize attack swing animation
             attackSwingPhase = ATTACK_SWING_DURATION;
             attackSwingAngle = facingAngle;
-            screenShakeTimer = SCREEN_SHAKE_DURATION;
+            // Don't trigger screen shake yet - only when we actually hit something
 
             Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
@@ -642,6 +642,9 @@ public class Player extends Entity {
                     e.damage(dmg);
                     e.applyKnockback(x, y);
                     hitSomething = true;
+                    
+                    // Add extra screen shake when hitting enemies
+                    screenShakeTimer = Math.max(screenShakeTimer, SCREEN_SHAKE_DURATION);
                 }
             }
             if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
@@ -944,7 +947,27 @@ public class Player extends Entity {
         int shakeX = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
         int shakeY = (int) (shakeRng.nextDouble() * shakeAmount - shakeAmount / 2);
 
+        // Debug output (you can remove this later)
+        if (screenShakeTimer == SCREEN_SHAKE_DURATION) {
+            System.out.println("Screen shake triggered on HIT! Timer: " + screenShakeTimer + 
+                             ", Intensity: " + intensity + 
+                             ", Shake amount: " + shakeAmount + 
+                             ", Offset: (" + shakeX + ", " + shakeY + ")");
+        }
+
         return new Point(shakeX, shakeY);
+    }
+
+    /**
+     * Debug method to check screen shake status
+     */
+    public String getScreenShakeDebugInfo() {
+        if (screenShakeTimer <= 0) {
+            return "No screen shake active";
+        }
+        return "Screen shake active: Timer=" + screenShakeTimer + 
+               "/" + SCREEN_SHAKE_DURATION + 
+               ", Intensity=" + String.format("%.2f", (double) screenShakeTimer / SCREEN_SHAKE_DURATION);
     }
 
     @Override
