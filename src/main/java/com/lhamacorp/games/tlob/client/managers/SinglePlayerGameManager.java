@@ -61,11 +61,19 @@ public class SinglePlayerGameManager extends BaseGameManager {
     /**
      * Applies all active perks to the player.
      * This method recreates the perk effects by applying them in sequence with their exact values.
+     * After applying all perks, restores the player's health, stamina, and mana to their new maximum values.
      */
     private void applyActivePerksToPlayer() {
         for (AppliedPerk appliedPerk : activePerks.getAppliedPerks()) {
             applyPerkByTypeAndValue(appliedPerk.getPerkType(), appliedPerk.getValue());
         }
+        
+        // After applying all perks, restore player stats to their new maximum values
+        // This ensures that when loading a save, the player gets full health/stamina/mana
+        player.setHealth(player.getMaxHealth());
+        player.setStamina(player.getMaxStamina());
+        // Note: Mana is automatically restored to max when increaseMaxManaByPercent is called
+        // So we don't need to manually set it here
     }
 
 
