@@ -16,12 +16,12 @@ public class Golen extends Entity {
     private static final int GOLEN_SIZE = 80;
     private static final double GOLEN_BASE_SPEED = 1.0;
 
-    private static final double GOLEN_MAX_HP = 6.0;
+    private static final double GOLEN_MAX_HP = 20.0;
     private static final double GOLEN_MAX_STAMINA = 2.0;
     private static final double GOLEN_MAX_MANA = 0;
 
     private static final int ATTACK_RANGE = 60;
-    private static final double ATTACK_DAMAGE = 5.0;
+    private static final double ATTACK_DAMAGE = 10.0;
 
     // --- timing base (keep 30Hz for anim feel, independent from sim Hz) ---
     private static final int TICKS_PER_SECOND = 30;
@@ -555,8 +555,8 @@ public class Golen extends Entity {
         isRageMode = true;
         rageModeTimer = RAGE_MODE_DURATION;
         // Rage mode effects: increased speed and aggression
-        speedScale = baseSpeedScale * 1.5;
-        aggressionRadius *= 1.3;
+        speedScale = baseSpeedScale * 3;
+        aggressionRadius *= 1.5;
     }
     
     /**

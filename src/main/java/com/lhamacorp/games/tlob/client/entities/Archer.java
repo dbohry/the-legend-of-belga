@@ -14,7 +14,7 @@ import java.util.List;
 public class Archer extends Entity {
 
     private static final int ARCHER_SIZE = 18;
-    private static final double ARCHER_BASE_SPEED = 1.0;
+    private static final double ARCHER_BASE_SPEED = 3.0;
     private static final double ARCHER_MAX_HP = 2.0;
     private static final double ARCHER_MAX_STAMINA = 1.0;
     private static final double ARCHER_MAX_MANA = 0;
