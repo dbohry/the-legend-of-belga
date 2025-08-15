@@ -172,11 +172,11 @@ public class TileMap {
     /**
      * Gets the appropriate texture for a tile based on the current biome.
      */
-    private BufferedImage getBiomeTexture(int tileId, boolean isWall, int tick30) {
+    private BufferedImage getBiomeTexture(int tileId, boolean isWall, int tick60) {
         if (isWall) {
             return getBiomeWallTexture(tileId);
         } else {
-            return getBiomeFloorTexture(tileId, tick30);
+            return getBiomeFloorTexture(tileId, tick60);
         }
     }
     
@@ -198,7 +198,7 @@ public class TileMap {
     /**
      * Gets the appropriate floor texture for the current biome.
      */
-    private BufferedImage getBiomeFloorTexture(int tileId, int tick30) {
+    private BufferedImage getBiomeFloorTexture(int tileId, int tick60) {
         return switch (tileId) {
             case FLOOR_DIRT -> TextureManager.getDirtTexture();
             case FLOOR_PLANTS -> TextureManager.getPlantsTexture();
@@ -211,7 +211,7 @@ public class TileMap {
             case FLOOR_DESERT_SAND -> TextureManager.getDesertSandTexture();
             case FLOOR_DESERT_ROCK -> TextureManager.getDesertRockTexture();
             case FLOOR_DESERT_CACTUS -> TextureManager.getDesertCactusTexture();
-            default -> TextureManager.getGrassTextureFrame(tick30); // Default grass texture
+            default -> TextureManager.getGrassTextureFrame(tick60); // Default grass texture
         };
     }
 
@@ -225,7 +225,7 @@ public class TileMap {
     /**
      * Draws the tile map with animation support.
      */
-    public void draw(Graphics2D g, int camX, int camY, int viewW, int viewH, int tick30) {
+    public void draw(Graphics2D g, int camX, int camY, int viewW, int viewH, int tick60) {
         final int tileSize = Constants.TILE_SIZE;
 
         int startX = Math.max(0, camX / tileSize);
@@ -241,7 +241,7 @@ public class TileMap {
                 int t = tiles[x][y];
                 boolean isWall = isWall(x, y);
 
-                BufferedImage tex = getBiomeTexture(t, isWall, tick30);
+                BufferedImage tex = getBiomeTexture(t, isWall, tick60);
 
                 if (tex != null) {
                     g.drawImage(tex, px, py, tileSize, tileSize, null);

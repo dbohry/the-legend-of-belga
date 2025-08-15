@@ -20,8 +20,8 @@ public class Golen extends Entity {
     private static final int ATTACK_RANGE = 60;
     private static final double ATTACK_DAMAGE = 10.0;
 
-    // --- timing base (keep 30Hz for anim feel, independent from sim Hz) ---
-    private static final int TICKS_PER_SECOND = 30;
+    // --- timing base (60Hz for consistent simulation) ---
+    private static final int TICKS_PER_SECOND = 60;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
     private static final int ATTACK_COOLDOWN_TICKS = 180; // 3x slower than Soldier
@@ -45,7 +45,7 @@ public class Golen extends Entity {
     private int stompTimer = 0;
     private boolean isRageMode = false;
     private int rageModeTimer = 0;
-    private static final int RAGE_MODE_DURATION = 600; // 20 seconds at 30Hz
+    private static final int RAGE_MODE_DURATION = 600; // 10 seconds at 60Hz
     private boolean hasStompedThisLevel = false;
 
     private long animTimeMs = 0L;

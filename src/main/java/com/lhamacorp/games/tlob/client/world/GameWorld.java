@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Authoritative, UI-free simulation. One call to tick() = one sim step. */
 public final class GameWorld {
 
-    /** 30 Hz fixed tick for the sim. Rendering can stay at 60 FPS. */
-    public static final int TICK_RATE = 30;
+    /** 60 Hz fixed tick for the sim. Rendering can stay at 60 FPS. */
+    public static final int TICK_RATE = 60;
 
     private final TileMap map;
     private final Player player;

@@ -21,7 +21,7 @@ public class PerkManager {
 
     /** Rarity presets mapped to weights (higher weight => more common). */
     public enum Rarity {
-        COMMON(10), UNCOMMON(6), RARE(3), EPIC(1), LEGENDARY(1);
+        COMMON(15), UNCOMMON(8), RARE(4), EPIC(2), LEGENDARY(1);
         public final int weight;
 
         Rarity(int w) {

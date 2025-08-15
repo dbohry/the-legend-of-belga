@@ -142,7 +142,7 @@ public final class GameSession implements Runnable {
     @Override
     public void run() {
         final long stepNs = 1_000_000_000L / tickrate;
-        final int broadcastDiv = Math.max(1, tickrate / 30); // ~30 Hz snapshots
+        final int broadcastDiv = Math.max(1, tickrate / 30); // ~30 Hz snapshots (maintained for network efficiency)
         long last = System.nanoTime();
 
         while (running) {
@@ -165,7 +165,7 @@ public final class GameSession implements Runnable {
             updatePlayers();
             updateEnemies();
 
-            // 3) broadcast snapshots at ~30 Hz
+            // 3) broadcast snapshots at ~30 Hz (maintained for network efficiency)
             if ((tick % broadcastDiv) == 0) {
                 broadcastSnapshot();
             }
@@ -396,7 +396,7 @@ public final class GameSession implements Runnable {
 
     private void pickNewWanderDir(EnemyState e) {
         e.lcg = lcgNext(e.lcg);
-        int span = 15 + (int) Math.floor(lcg01(e.lcg) * 21.0); // 15..35 ticks (~0.5–1.2s @30Hz feel)
+        int span = 15 + (int) Math.floor(lcg01(e.lcg) * 21.0); // 15..35 ticks (~0.25–0.6s @60Hz feel)
         e.wanderTimer = span;
 
         e.lcg = lcgNext(e.lcg);

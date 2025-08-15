@@ -43,7 +43,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     private volatile boolean running = false;
 
     protected final InputState input = new InputState();
-    protected int animTick30 = 0;
+    protected int animTick60 = 0;
     protected long simTick = 0;
 
     private int mouseScreenX = SCREEN_WIDTH / 2;
@@ -156,8 +156,13 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     private void update() {
         if (keyManager.mute != musicMuted) {
             musicMuted = keyManager.mute;
-            if (musicMuted) AudioManager.stopMusic();
-            else AudioManager.playRandomMusic(musicVolumeDb);
+            if (musicMuted) {
+                // Mute music (turn volume way down)
+                AudioManager.toggleMute();
+            } else {
+                // Unmute music (restore original volume)
+                AudioManager.toggleMute();
+            }
         }
 
         if (state == GameState.PLAYING) {
@@ -198,7 +203,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             camera.setShakeOffset(player.getScreenShakeOffset());
 
             simTick++;
-            if ((simTick & 1) == 0) animTick30++;
+            animTick60++;
 
             logChecksumIfDue();
         }
@@ -236,7 +241,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
         camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        if (!musicMuted) AudioManager.playRandomMusic(musicVolumeDb);
+        // Always start music, mute state will be handled by AudioManager
+        AudioManager.playRandomMusic(musicVolumeDb);
         requestFocusInWindow();
         repaint();
     }
@@ -273,7 +279,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
 
-        animTick30 = 0;
+        animTick60 = 0;
         simTick = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
@@ -296,7 +302,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         state = GameState.PLAYING;
         enemiesAtLevelStart = enemies.size();
 
-        animTick30 = 0;
+        animTick60 = 0;
         simTick = 0;
 
         int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
@@ -371,7 +377,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     protected void drawWorld(Graphics2D g2) {
         if (levelManager == null || player == null) return;
         TileMap map = levelManager.map();
-        map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick30);
+        map.draw(g2, camera.offsetX(), camera.offsetY(), getWidth(), getHeight(), animTick60);
 
         drawRemotePlayers(g2, camera.offsetX(), camera.offsetY());
         drawRemoteEnemies(g2, camera.offsetX(), camera.offsetY());
@@ -564,7 +570,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
                 }
                 if (!Float.isNaN(maybeDb)) {
                     config.setMusicVolumeDb(maybeDb);
-                    if (!musicMuted) AudioManager.setMusicVolume(config.getMusicVolumeDb());
+                    // Update music volume (mute state will be handled by AudioManager)
+                    AudioManager.setMusicVolume(config.getMusicVolumeDb());
                 }
             } else if (state == GameState.PLAYING) {
                 mouseScreenX = e.getX();
@@ -597,7 +604,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
                     }
                     if (!Float.isNaN(maybeDb)) {
                         config.setMusicVolumeDb(maybeDb);
-                        if (!musicMuted) AudioManager.setMusicVolume(config.getMusicVolumeDb());
+                        // Update music volume (mute state will be handled by AudioManager)
+                        AudioManager.setMusicVolume(config.getMusicVolumeDb());
                         return;
                     }
                     

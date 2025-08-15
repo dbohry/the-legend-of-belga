@@ -649,7 +649,7 @@ public class Player extends Entity {
             else AudioManager.playSound("slash-clean.wav");
         }
 
-        // --- Advance local animation clock (30 Hz sim) ---
+        // --- Advance local animation clock (60 Hz sim) ---
         animTimeMs += TICK_MS;
     }
 

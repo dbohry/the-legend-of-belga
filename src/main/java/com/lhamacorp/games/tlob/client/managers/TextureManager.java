@@ -227,11 +227,11 @@ public final class TextureManager {
         return enemyAnimations.get(new Key(motion, dir));
     }
 
-    public static BufferedImage getGrassTextureFrame(int tick30) {
+    public static BufferedImage getGrassTextureFrame(int tick60) {
         ensureLoaded();
         if (!ANIMATE_GRASS) return grassTexture;
         if (grassFrames == null || grassFrames.length == 0) return grassTexture;
-        int idx = Math.floorMod(tick30 / 2, GRASS_FRAMES);
+        int idx = Math.floorMod(tick60 / 2, GRASS_FRAMES);
         return grassFrames[idx];
     }
 

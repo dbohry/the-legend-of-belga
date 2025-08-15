@@ -15,6 +15,11 @@ public class AudioManager {
         // "music-bossfight.wav",
         "music-upbeat.wav"
     };
+    
+    // Mute functionality
+    private static float originalVolumeDb = -10.0f; // Default volume
+    private static boolean isMuted = false;
+    private static final float MUTED_VOLUME_DB = -80.0f; // Very quiet when muted
 
     public static void playRandomMusic(float volumeDb) {
         int index = (int) (Math.random() * PLAYLIST.length);
@@ -37,7 +42,10 @@ public class AudioManager {
 
             if (musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 FloatControl gainControl = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
-                gainControl.setValue(volumeDb);
+                // Store the original volume and apply it (or muted volume if currently muted)
+                originalVolumeDb = volumeDb;
+                float volumeToApply = isMuted ? MUTED_VOLUME_DB : volumeDb;
+                gainControl.setValue(volumeToApply);
             }
 
             musicClip.loop(Clip.LOOP_CONTINUOUSLY);
@@ -53,6 +61,33 @@ public class AudioManager {
             musicClip.close();
             musicClip = null;
         }
+    }
+    
+    /**
+     * Toggles mute state. When muted, volume is set very low.
+     * When unmuted, original volume is restored.
+     */
+    public static void toggleMute() {
+        isMuted = !isMuted;
+        if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gain = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
+            float volumeToApply = isMuted ? MUTED_VOLUME_DB : originalVolumeDb;
+            gain.setValue(volumeToApply);
+        }
+    }
+    
+    /**
+     * Gets the current mute state.
+     */
+    public static boolean isMuted() {
+        return isMuted;
+    }
+    
+    /**
+     * Gets the original volume (before muting).
+     */
+    public static float getOriginalVolume() {
+        return originalVolumeDb;
     }
 
     public static void playSound(String filename) {
@@ -83,13 +118,15 @@ public class AudioManager {
     }
 
     public static void setMusicVolume(float volumeDb) {
+        // Always update the stored volume
+        originalVolumeDb = volumeDb;
+        
+        // Apply the volume to the active music clip if it exists
         if (musicClip != null && musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
             FloatControl gain = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
             float clamped = Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), volumeDb));
-            gain.setValue(clamped);
+            float volumeToApply = isMuted ? MUTED_VOLUME_DB : clamped;
+            gain.setValue(volumeToApply);
         }
     }
-
-
-
 }

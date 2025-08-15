@@ -23,7 +23,7 @@ public class Archer extends Entity {
     private static final int ATTACK_DURATION_TICKS = 8;
     private static final int ARROW_TRAVEL_TICKS = 30;
 
-    private static final int TICKS_PER_SECOND = 30;
+    private static final int TICKS_PER_SECOND = 60;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
     private static final int HURT_FLASH_TICKS = 6;

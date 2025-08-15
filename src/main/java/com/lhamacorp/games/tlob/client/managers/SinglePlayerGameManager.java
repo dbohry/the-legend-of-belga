@@ -300,7 +300,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
             // Reset game state
             state = GameState.PLAYING;
             enemiesAtLevelStart = enemies.size();
-            animTick30 = 0;
+            animTick60 = 0;
             simTick = 0;
             
             // Update camera
