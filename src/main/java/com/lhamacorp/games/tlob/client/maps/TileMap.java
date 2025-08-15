@@ -17,6 +17,7 @@ public class TileMap {
     public static final int FLOOR_GRASS = FLOOR;
     public static final int FLOOR_DIRT = 3;
     public static final int FLOOR_PLANTS = 4;
+    public static final int FLOOR_MEADOW_FLOWERS = 24;
     
     // Forest biome tiles
     public static final int FLOOR_FOREST_GROUND = 5;
@@ -57,6 +58,7 @@ public class TileMap {
     /** Returns true if the given tile id should hide the player from enemies. */
     public static boolean isHidingTileId(int tileId) {
         return tileId == FLOOR_PLANTS || 
+               tileId == FLOOR_MEADOW_FLOWERS ||
                tileId == FLOOR_FOREST_LEAVES || 
                tileId == FLOOR_FOREST_MUSHROOMS ||
                tileId == WALL_CAVE_CRYSTAL_FORMATION ||
@@ -211,8 +213,10 @@ public class TileMap {
      */
     private BufferedImage getBiomeFloorTexture(int tileId, int tick60) {
         return switch (tileId) {
-            case FLOOR_DIRT -> TextureManager.getDirtTexture();
-            case FLOOR_PLANTS -> TextureManager.getPlantsTexture();
+            case FLOOR_GRASS -> getGrassTextureForBiome(tick60);
+            case FLOOR_DIRT -> TextureManager.getMeadowDirtTexture();
+            case FLOOR_PLANTS -> TextureManager.getMeadowPlantsTexture();
+            case FLOOR_MEADOW_FLOWERS -> TextureManager.getMeadowFlowersTexture();
             case FLOOR_FOREST_GROUND -> TextureManager.getForestGroundTexture();
             case FLOOR_FOREST_LEAVES -> TextureManager.getForestLeavesTexture();
             case FLOOR_FOREST_MUSHROOMS -> TextureManager.getForestMushroomsTexture();
@@ -225,7 +229,21 @@ public class TileMap {
             case FLOOR_VULCAN_ROCK -> TextureManager.getVulcanRockTexture();
             case FLOOR_VULCAN_LAVA -> TextureManager.getVulcanLavaTexture();
             case FLOOR_VULCAN_ASH -> TextureManager.getVulcanAshTexture();
-            default -> TextureManager.getGrassTextureFrame(tick60); // Default grass texture
+            default -> getGrassTextureForBiome(tick60); // Default to appropriate grass texture
+        };
+    }
+    
+    /**
+     * Gets the appropriate grass texture based on the current biome.
+     * Meadows use the original grass texture, other biomes use their specific textures.
+     */
+    private BufferedImage getGrassTextureForBiome(int tick60) {
+        return switch (biome) {
+            case MEADOWS -> TextureManager.getGrassTextureFrame(tick60); // Original animated grass
+            case FOREST -> TextureManager.getForestGroundTexture(); // Forest-specific ground
+            case CAVE -> TextureManager.getCaveStoneTexture(); // Cave stone
+            case DESERT -> TextureManager.getDesertSandTexture(); // Desert sand
+            case VULCAN -> TextureManager.getVulcanRockTexture(); // Vulcan rock
         };
     }
 

@@ -133,6 +133,23 @@ public class MapGenerator {
                 }
             }
         }
+        
+        // Scatter flower patches
+        int flowerPatches = Math.max(2, (int) ((width * height) * biome.getFeatureDensity() / 800));
+        for (int k = 0; k < flowerPatches; k++) {
+            int cx = rng.nextInt(width);
+            int cy = rng.nextInt(height);
+            int radius = 1 + rng.nextInt(2);
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx <= 0 || ny <= 0 || nx >= width - 1 || ny >= height - 1) continue;
+                    if (tiles[nx][ny] == TileMap.FLOOR_GRASS && (dx * dx + dy * dy) <= radius * radius) {
+                        if (rng.nextDouble() < 0.7) tiles[nx][ny] = TileMap.FLOOR_MEADOW_FLOWERS;
+                    }
+                }
+            }
+        }
     }
 
     private void decorateForestFloors(int[][] tiles) {

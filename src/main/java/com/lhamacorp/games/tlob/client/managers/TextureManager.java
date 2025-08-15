@@ -12,8 +12,13 @@ import java.util.Map;
 
 public final class TextureManager {
 
-    // ===== Existing assets (grass/stone unchanged) =====
+    // ===== Asset directory =====
     private static final String ASSETS_DIR = "assets";
+    
+    // ===== Biome-specific texture file patterns =====
+    private static final String BIOME_TEXTURE_PATTERN = ASSETS_DIR + "/%s_%s.png";
+    
+    // ===== Legacy texture files (for backward compatibility) =====
     private static final String GRASS_FILE = ASSETS_DIR + "/grass.png";
     private static final String STONE_FILE = ASSETS_DIR + "/stone.png";
     // Treat these as sprite sheets now (4x4). If only a single frame exists, we degrade gracefully.
@@ -38,6 +43,12 @@ public final class TextureManager {
     private static BufferedImage swordTexture;
     
     // ===== Biome-specific textures =====
+    
+    // Meadows biome textures
+    private static BufferedImage meadowGrassTexture;
+    private static BufferedImage meadowDirtTexture;
+    private static BufferedImage meadowPlantsTexture;
+    private static BufferedImage meadowFlowersTexture;
     
     // Forest biome textures
     private static BufferedImage forestTreeTexture;
@@ -105,6 +116,27 @@ public final class TextureManager {
     }
     
     // ===== Biome-specific texture getters =====
+    
+    // Meadows biome textures
+    public static BufferedImage getMeadowGrassTexture() {
+        ensureLoaded();
+        return meadowGrassTexture;
+    }
+    
+    public static BufferedImage getMeadowDirtTexture() {
+        ensureLoaded();
+        return meadowDirtTexture;
+    }
+    
+    public static BufferedImage getMeadowPlantsTexture() {
+        ensureLoaded();
+        return meadowPlantsTexture;
+    }
+    
+    public static BufferedImage getMeadowFlowersTexture() {
+        ensureLoaded();
+        return meadowFlowersTexture;
+    }
     
     // Forest biome textures
     public static BufferedImage getForestTreeTexture() {
@@ -268,17 +300,24 @@ public final class TextureManager {
 
         ClassLoader cl = TextureManager.class.getClassLoader();
 
-        // Grass & Stone: keep exactly as-is (existing behavior + fallback gen)
-        grassTexture = tryLoad(cl.getResourceAsStream(GRASS_FILE));
-        stoneTexture = tryLoad(cl.getResourceAsStream(STONE_FILE));
-
+        // Grass & Stone: now use biome-specific naming for meadows biome
+        // Try to load meadows-specific textures first, fall back to legacy names
+        grassTexture = tryLoad(cl.getResourceAsStream(getBiomeTextureFilename("meadows", "grass")));
+        if (grassTexture == null) {
+            grassTexture = tryLoad(cl.getResourceAsStream(GRASS_FILE));
+        }
         if (grassTexture == null) {
             grassTexture = generateGrassTexture(32, 32);
-            tryWrite(GRASS_FILE, grassTexture);
+            tryWrite(getBiomeTextureFilename("meadows", "grass"), grassTexture);
+        }
+        
+        stoneTexture = tryLoad(cl.getResourceAsStream(getBiomeTextureFilename("meadows", "stone")));
+        if (stoneTexture == null) {
+            stoneTexture = tryLoad(cl.getResourceAsStream(STONE_FILE));
         }
         if (stoneTexture == null) {
             stoneTexture = generateStoneTexture(32, 32);
-            tryWrite(STONE_FILE, stoneTexture);
+            tryWrite(getBiomeTextureFilename("meadows", "stone"), stoneTexture);
         }
 
         // Procedural textures for floor variants (no external files required)
@@ -410,6 +449,40 @@ public final class TextureManager {
             ImageIO.write(img, "png", f);
         } catch (IOException ignored) {
         }
+    }
+    
+    /**
+     * Generates a biome-specific texture filename.
+     * @param biome The biome name (lowercase)
+     * @param textureType The texture type (e.g., "grass", "stone", "dirt")
+     * @return The filename for the biome texture
+     */
+    private static String getBiomeTextureFilename(String biome, String textureType) {
+        return String.format(BIOME_TEXTURE_PATTERN, biome, textureType);
+    }
+    
+    /**
+     * Tries to load a biome-specific texture, falling back to generation if not found.
+     * @param biome The biome name (lowercase)
+     * @param textureType The texture type (e.g., "grass", "stone", "dirt")
+     * @param generator Function to generate the texture if loading fails
+     * @return The loaded or generated texture
+     */
+    private static BufferedImage loadOrGenerateBiomeTexture(String biome, String textureType, 
+                                                           java.util.function.Supplier<BufferedImage> generator) {
+        String filename = getBiomeTextureFilename(biome, textureType);
+        
+        // Try to load from file first
+        BufferedImage texture = tryLoad(TextureManager.class.getClassLoader().getResourceAsStream(filename));
+        
+        if (texture == null) {
+            // Generate if not found
+            texture = generator.get();
+            // Save the generated texture
+            tryWrite(filename, texture);
+        }
+        
+        return texture;
     }
 
     // ===== Unchanged grass/stone generation =====
@@ -869,34 +942,41 @@ public final class TextureManager {
     // ===== Biome texture generation =====
     
     /**
-     * Generates all biome-specific textures procedurally.
+     * Generates all biome-specific textures using the new biome-specific file naming system.
+     * Textures are saved as {biome}_{texture}.png files for easy management.
      */
     private static void generateBiomeTextures() {
+        // Meadows biome textures - reuse existing grass and stone textures
+        meadowGrassTexture = grassTexture; // Reuse the legacy grass texture
+        meadowDirtTexture = loadOrGenerateBiomeTexture("meadows", "dirt", () -> generateMeadowDirtTexture(32, 32));
+        meadowPlantsTexture = loadOrGenerateBiomeTexture("meadows", "plants", () -> generateMeadowPlantsTexture(32, 32));
+        meadowFlowersTexture = loadOrGenerateBiomeTexture("meadows", "flowers", () -> generateMeadowFlowersTexture(32, 32));
+        
         // Forest biome textures
-        forestTreeTexture = generateForestTreeTexture(32, 32);
-        forestLogTexture = generateForestLogTexture(32, 32);
-        forestGroundTexture = generateForestGroundTexture(32, 32);
-        forestLeavesTexture = generateForestLeavesTexture(32, 32);
-        forestMushroomsTexture = generateForestMushroomsTexture(32, 32);
+        forestTreeTexture = loadOrGenerateBiomeTexture("forest", "tree", () -> generateForestTreeTexture(32, 32));
+        forestLogTexture = loadOrGenerateBiomeTexture("forest", "log", () -> generateForestLogTexture(32, 32));
+        forestGroundTexture = loadOrGenerateBiomeTexture("forest", "ground", () -> generateForestGroundTexture(32, 32));
+        forestLeavesTexture = loadOrGenerateBiomeTexture("forest", "leaves", () -> generateForestLeavesTexture(32, 32));
+        forestMushroomsTexture = loadOrGenerateBiomeTexture("forest", "mushrooms", () -> generateForestMushroomsTexture(32, 32));
         
         // Cave biome textures
-        caveStoneTexture = generateCaveStoneTexture(32, 32);
-        caveCrystalTexture = generateCaveCrystalTexture(32, 32);
-        caveWaterTexture = generateCaveWaterTexture(32, 32);
-        caveStalagmiteTexture = generateCaveStalagmiteTexture(32, 32);
-        caveCrystalFormationTexture = generateCaveCrystalFormationTexture(32, 32);
+        caveStoneTexture = loadOrGenerateBiomeTexture("cave", "stone", () -> generateCaveStoneTexture(32, 32));
+        caveCrystalTexture = loadOrGenerateBiomeTexture("cave", "crystal", () -> generateCaveCrystalTexture(32, 32));
+        caveWaterTexture = loadOrGenerateBiomeTexture("cave", "water", () -> generateCaveWaterTexture(32, 32));
+        caveStalagmiteTexture = loadOrGenerateBiomeTexture("cave", "stalagmite", () -> generateCaveStalagmiteTexture(32, 32));
+        caveCrystalFormationTexture = loadOrGenerateBiomeTexture("cave", "crystal_formation", () -> generateCaveCrystalFormationTexture(32, 32));
         
         // Desert biome textures
-        desertSandTexture = generateDesertSandTexture(32, 32);
-        desertRockTexture = generateDesertRockTexture(32, 32);
-        desertCactusTexture = generateDesertCactusTexture(32, 32);
-        desertRockFormationTexture = generateDesertRockFormationTexture(32, 32);
+        desertSandTexture = loadOrGenerateBiomeTexture("desert", "sand", () -> generateDesertSandTexture(32, 32));
+        desertRockTexture = loadOrGenerateBiomeTexture("desert", "rock", () -> generateDesertRockTexture(32, 32));
+        desertCactusTexture = loadOrGenerateBiomeTexture("desert", "cactus", () -> generateDesertCactusTexture(32, 32));
+        desertRockFormationTexture = loadOrGenerateBiomeTexture("desert", "rock_formation", () -> generateDesertRockFormationTexture(32, 32));
         
         // Vulcan biome textures
-        vulcanRockTexture = generateVulcanRockTexture(32, 32);
-        vulcanLavaTexture = generateVulcanLavaTexture(32, 32);
-        vulcanAshTexture = generateVulcanAshTexture(32, 32);
-        vulcanCrystalTexture = generateVulcanCrystalTexture(32, 32);
+        vulcanRockTexture = loadOrGenerateBiomeTexture("vulcan", "rock", () -> generateVulcanRockTexture(32, 32));
+        vulcanLavaTexture = loadOrGenerateBiomeTexture("vulcan", "lava", () -> generateVulcanLavaTexture(32, 32));
+        vulcanAshTexture = loadOrGenerateBiomeTexture("vulcan", "ash", () -> generateVulcanAshTexture(32, 32));
+        vulcanCrystalTexture = loadOrGenerateBiomeTexture("vulcan", "crystal", () -> generateVulcanCrystalTexture(32, 32));
     }
     
     // Forest texture generators
@@ -1224,6 +1304,79 @@ public final class TextureManager {
                 new int[]{y - 3, y + 2, y + 2},
                 3
             );
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    // Meadows texture generators
+    private static BufferedImage generateMeadowGrassTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(80, 140, 80));
+        g.fillRect(0, 0, w, h);
+        
+        // Grass blade details
+        g.setColor(new Color(100, 160, 100));
+        for (int i = 0; i < w * h / 25; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 1);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateMeadowDirtTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(120, 100, 80));
+        g.fillRect(0, 0, w, h);
+        
+        // Dirt texture details
+        g.setColor(new Color(100, 80, 60));
+        for (int i = 0; i < w * h / 30; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 3, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateMeadowPlantsTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(70, 130, 70));
+        g.fillRect(0, 0, w, h);
+        
+        // Plant details
+        g.setColor(new Color(90, 150, 90));
+        for (int i = 0; i < w * h / 20; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 3);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateMeadowFlowersTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(90, 140, 90));
+        g.fillRect(0, 0, w, h);
+        
+        // Flower details
+        g.setColor(new Color(255, 200, 200));
+        for (int i = 0; i < w * h / 40; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 4, 4);
         }
         
         g.dispose();

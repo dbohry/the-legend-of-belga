@@ -18,21 +18,52 @@ import java.util.Random;
  */
 public class BiomeEnemySpawner extends SpawnManager {
     
-    // Biome-specific enemy spawn weights (for regular enemies only)
-    private static final double MEADOWS_SOLDIER_WEIGHT = 0.8;
-    private static final double MEADOWS_ARCHER_WEIGHT = 0.2;
+    /**
+     * Enemy type enumeration for consistent weight management
+     */
+    public enum EnemyType {
+        SOLDIER,
+        ARCHER,
+        GOLEN
+    }
     
-    private static final double FOREST_SOLDIER_WEIGHT = 0.4;
-    private static final double FOREST_ARCHER_WEIGHT = 0.6;
+    /**
+     * Biome-specific enemy spawn weights matrix.
+     * Each biome has weights for each enemy type.
+     * Weights are relative probabilities (higher = more likely).
+     * 
+     * Format: [BIOME][ENEMY_TYPE] = weight
+     */
+    private static final double[][] BIOME_ENEMY_WEIGHTS = {
+        // MEADOWS biome weights
+        {8.0, 2.0, 0.0},  // Soldier: 8, Archer: 2, Golen: 0 (disabled in meadows)
+        
+        // FOREST biome weights  
+        {4.0, 6.0, 0.0},  // Soldier: 4, Archer: 6, Golen: 0 (disabled in forest)
+        
+        // CAVE biome weights
+        {6.0, 4.0, 0.0},  // Soldier: 6, Archer: 4, Golen: 0 (disabled in cave)
+        
+        // DESERT biome weights
+        {5.0, 5.0, 0.0},  // Soldier: 5, Archer: 5, Golen: 0 (disabled in desert)
+        
+        // VULCAN biome weights
+        {7.0, 3.0, 0.0}   // Soldier: 7, Archer: 3, Golen: 0 (disabled in vulcan)
+    };
     
-    private static final double CAVE_SOLDIER_WEIGHT = 0.6;
-    private static final double CAVE_ARCHER_WEIGHT = 0.4;
+    /**
+     * Biome-specific enemy count multipliers.
+     * These affect the total number of enemies spawned in each biome.
+     */
+    private static final double[] BIOME_ENEMY_MULTIPLIERS = {
+        1.0,   // MEADOWS: standard count
+        1.2,   // FOREST: more enemies
+        0.8,   // CAVE: fewer enemies  
+        1.1,   // DESERT: slightly more
+        1.3    // VULCAN: more enemies (challenging)
+    };
     
-    private static final double DESERT_SOLDIER_WEIGHT = 0.5;
-    private static final double DESERT_ARCHER_WEIGHT = 0.5;
-    
-    private static final double VULCAN_SOLDIER_WEIGHT = 0.7;
-    private static final double VULCAN_ARCHER_WEIGHT = 0.3;
+    // Golen spawning configuration - using parent class constants
     
     public BiomeEnemySpawner(Weapon enemyWeapon) {
         super(enemyWeapon);
@@ -97,13 +128,8 @@ public class BiomeEnemySpawner extends SpawnManager {
      * Applies biome-specific adjustments to enemy count.
      */
     private int applyBiomeAdjustments(int baseCount, Biome biome) {
-        return switch (biome) {
-            case FOREST -> (int) (baseCount * 1.2); // More enemies in forest
-            case CAVE -> (int) (baseCount * 0.8);   // Fewer enemies in cave
-            case DESERT -> (int) (baseCount * 1.1); // Slightly more in desert
-            case VULCAN -> (int) (baseCount * 1.3); // More enemies in vulcan (challenging)
-            default -> baseCount; // MEADOWS
-        };
+        double multiplier = BIOME_ENEMY_MULTIPLIERS[biome.ordinal()];
+        return Math.max(1, (int) (baseCount * multiplier));
     }
     
     /**
@@ -112,24 +138,28 @@ public class BiomeEnemySpawner extends SpawnManager {
     private Entity spawnBiomeEnemy(Biome biome, double x, double y) {
         // Choose enemy type based on biome weights
         double rand = rng.nextDouble();
-        double soldierWeight = getSoldierWeight(biome);
+        double soldierWeight = getEnemyTypeWeightInternal(biome, EnemyType.SOLDIER);
+        double archerWeight = getEnemyTypeWeightInternal(biome, EnemyType.ARCHER);
         
-        if (rand < soldierWeight) {
+        // Normalize weights to probabilities
+        double totalWeight = soldierWeight + archerWeight;
+        double soldierProb = soldierWeight / totalWeight;
+        
+        if (rand < soldierProb) {
             return new Soldier(x, y, getEnemyWeapon());
         } else {
             return new Archer(x, y, getEnemyWeapon());
         }
     }
     
-    private double getSoldierWeight(Biome biome) {
-        return switch (biome) {
-            case FOREST -> FOREST_SOLDIER_WEIGHT;
-            case CAVE -> CAVE_SOLDIER_WEIGHT;
-            case DESERT -> DESERT_SOLDIER_WEIGHT;
-            case VULCAN -> VULCAN_SOLDIER_WEIGHT;
-            default -> MEADOWS_SOLDIER_WEIGHT;
-        };
+    /**
+     * Gets the weight for a specific enemy type in a specific biome.
+     */
+    private double getEnemyTypeWeightInternal(Biome biome, EnemyType enemyType) {
+        return BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()];
     }
+    
+
     
     /**
      * Gets the enemy weapon for spawning.
@@ -138,5 +168,55 @@ public class BiomeEnemySpawner extends SpawnManager {
         // This is a workaround since we can't access the private field
         // In a real implementation, we'd need to make this field protected in SpawnManager
         return new com.lhamacorp.games.tlob.client.weapons.Sword(2, 28, 12, 10, 16);
+    }
+    
+    // ===== Configuration methods for easy tweaking =====
+    
+    /**
+     * Updates the weight for a specific enemy type in a specific biome.
+     * Useful for runtime configuration or difficulty adjustments.
+     */
+    public static void setEnemyTypeWeight(Biome biome, EnemyType enemyType, double weight) {
+        BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()] = Math.max(0.0, weight);
+    }
+    
+    /**
+     * Updates the enemy count multiplier for a specific biome.
+     */
+    public static void setBiomeEnemyMultiplier(Biome biome, double multiplier) {
+        BIOME_ENEMY_MULTIPLIERS[biome.ordinal()] = Math.max(0.1, multiplier);
+    }
+    
+    /**
+     * Gets the current weight for a specific enemy type in a specific biome.
+     */
+    public static double getEnemyTypeWeight(Biome biome, EnemyType enemyType) {
+        return BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()];
+    }
+    
+    /**
+     * Gets the current enemy count multiplier for a specific biome.
+     */
+    public static double getBiomeEnemyMultiplier(Biome biome) {
+        return BIOME_ENEMY_MULTIPLIERS[biome.ordinal()];
+    }
+    
+    /**
+     * Resets all weights to their default values.
+     */
+    public static void resetToDefaults() {
+        // Reset biome enemy weights
+        BIOME_ENEMY_WEIGHTS[0] = new double[]{8.0, 2.0, 0.0}; // MEADOWS
+        BIOME_ENEMY_WEIGHTS[1] = new double[]{4.0, 6.0, 0.0}; // FOREST
+        BIOME_ENEMY_WEIGHTS[2] = new double[]{6.0, 4.0, 0.0}; // CAVE
+        BIOME_ENEMY_WEIGHTS[3] = new double[]{5.0, 5.0, 0.0}; // DESERT
+        BIOME_ENEMY_WEIGHTS[4] = new double[]{7.0, 3.0, 0.0}; // VULCAN
+        
+        // Reset biome multipliers
+        BIOME_ENEMY_MULTIPLIERS[0] = 1.0;  // MEADOWS
+        BIOME_ENEMY_MULTIPLIERS[1] = 1.2;  // FOREST
+        BIOME_ENEMY_MULTIPLIERS[2] = 0.8;  // CAVE
+        BIOME_ENEMY_MULTIPLIERS[3] = 1.1;  // DESERT
+        BIOME_ENEMY_MULTIPLIERS[4] = 1.3;  // VULCAN
     }
 }

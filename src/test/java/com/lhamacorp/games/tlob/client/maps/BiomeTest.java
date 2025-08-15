@@ -168,4 +168,66 @@ public class BiomeTest {
         assertTrue(TileMap.isHidingTileId(TileMap.FLOOR_VULCAN_ASH), "Vulcan ash should be hiding tile");
         assertTrue(TileMap.isHidingTileId(TileMap.WALL_VULCAN_CRYSTAL), "Vulcan crystal should be hiding tile");
     }
+    
+    @Test
+    public void testMeadowBiomeMapGeneration() {
+        Random rng = new Random(42L); // Fixed seed for deterministic testing
+        MapGenerator generator = new MapGenerator(20, 15, Biome.MEADOWS, rng);
+        int[][] tiles = generator.generate();
+        
+        assertNotNull(tiles, "Generated meadow tiles should not be null");
+        assertEquals(20, tiles.length, "Should have correct width");
+        assertEquals(15, tiles[0].length, "Should have correct height");
+        
+        // Check that edge walls are present
+        for (int x = 0; x < 20; x++) {
+            assertEquals(TileMap.EDGE_WALL, tiles[x][0], "Top edge should be wall");
+            assertEquals(TileMap.EDGE_WALL, tiles[x][14], "Bottom edge should be wall");
+        }
+        for (int y = 0; y < 15; y++) {
+            assertEquals(TileMap.EDGE_WALL, tiles[0][y], "Left edge should be wall");
+            assertEquals(TileMap.EDGE_WALL, tiles[19][y], "Right edge should be wall");
+        }
+        
+        // Check that meadow-specific tiles are present
+        boolean hasMeadowTiles = false;
+        for (int x = 1; x < 19; x++) {
+            for (int y = 1; y < 14; y++) {
+                if (tiles[x][y] == TileMap.FLOOR_GRASS || 
+                    tiles[x][y] == TileMap.FLOOR_DIRT || 
+                    tiles[x][y] == TileMap.FLOOR_PLANTS ||
+                    tiles[x][y] == TileMap.FLOOR_MEADOW_FLOWERS) {
+                    hasMeadowTiles = true;
+                    break;
+                }
+            }
+        }
+        assertTrue(hasMeadowTiles, "Meadow biome should generate meadow-specific tiles");
+    }
+    
+    @Test
+    public void testMeadowTileMapWithBiome() {
+        int[][] tiles = new int[10][10];
+        // Fill with meadow tiles
+        for (int x = 0; x < 10; x++) {
+            for (int y = 0; y < 10; y++) {
+                if (x == 0 || y == 0 || x == 9 || y == 9) {
+                    tiles[x][y] = TileMap.EDGE_WALL;
+                } else {
+                    tiles[x][y] = TileMap.FLOOR_MEADOW_FLOWERS;
+                }
+            }
+        }
+        
+        Random rng = new Random(42L);
+        TileMap tileMap = new TileMap(tiles, Biome.MEADOWS, rng);
+        
+        assertEquals(Biome.MEADOWS, tileMap.getBiome(), "TileMap should have correct meadow biome");
+        assertFalse(tileMap.isWall(5, 5), "Center should not be wall");
+        assertTrue(tileMap.isWall(0, 0), "Corner should be wall");
+        
+        // Test meadow-specific tile hiding
+        assertTrue(TileMap.isHidingTileId(TileMap.FLOOR_PLANTS), "Meadow plants should be hiding tile");
+        assertTrue(TileMap.isHidingTileId(TileMap.FLOOR_MEADOW_FLOWERS), "Meadow flowers should be hiding tile");
+    }
 }
