@@ -172,7 +172,7 @@ public class SpawnManager {
      */
     public int getMaxPerksPerEnemy(int completedMaps) {
         if (completedMaps <= 0) return 0;
-        return Math.min(MAX_PERKS_PER_ENEMY, 1 + (completedMaps / 3));
+        return Math.min(MAX_PERKS_PER_ENEMY, 1 + (completedMaps / 2));
     }
     
     /**
@@ -188,7 +188,7 @@ public class SpawnManager {
      * @return the maximum Golen count
      */
     public static int getMaxGolenPerMap() {
-        return 4;
+        return 8;
     }
     
     /**
@@ -196,7 +196,7 @@ public class SpawnManager {
      * @return the replacement ratio (10 regular enemies per Golen)
      */
     public static int getGolenReplacementRatio() {
-        return 10;
+        return 20;
     }
     
     /**
