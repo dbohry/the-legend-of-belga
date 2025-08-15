@@ -519,15 +519,14 @@ public class Player extends Entity {
             }
         }
 
-        // Handle sprinting (only if not dashing and has stamina)
-        if (shiftPressed && stamina >= 1.0 && !dashTriggered && dashMovementTimer == 0) {
+        // Handle sprinting (only if not dashing, not blocking, and has stamina)
+        if (shiftPressed && stamina >= 1.0 && !dashTriggered && dashMovementTimer == 0 && !isBlocking) {
             sprinting = true;
             speed = speedBase * 2.0;
             if (++staminaDrainCounter >= STAMINA_DRAIN_INTERVAL) {
                 stamina = Math.max(0, stamina - 1.0);
                 staminaDrainCounter = 0;
             }
-            staminaRegenCounter = 0;
         } else {
             speed = speedBase;
             if (!wasSprinting) {

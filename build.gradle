@@ -12,19 +12,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Build optimizations
 compileJava {
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-Xlint:unchecked', '-Xlint:deprecation']
 }
-
-// Memory settings for better performance
-applicationDefaultJvmArgs = [
-    '-Xms256m',
-    '-Xmx1g',
-    '-XX:+UseG1GC',
-    '-XX:+OptimizeStringConcat'
-]
 
 repositories {
     mavenCentral()
@@ -43,7 +34,6 @@ application {
     mainClass = 'com.lhamacorp.games.tlob.client.Game'
 }
 
-// Additional run task for headless core (no UI)
 tasks.register('runCore', JavaExec) {
     group = 'application'
     description = 'Runs the headless core game (no UI)'
@@ -53,7 +43,6 @@ tasks.register('runCore', JavaExec) {
     args = project.hasProperty('appArgs') ? project.appArgs.split(',') : []
 }
 
-// Run the multiplayer server from Gradle
 tasks.register('runServer', JavaExec) {
     group = 'application'
     description = 'Runs the multiplayer game server'
@@ -126,12 +115,12 @@ graalvmNative {
             buildArgs.add('--report-unsupported-elements-at-runtime')
             buildArgs.add('--allow-incomplete-classpath')
             buildArgs.add('--no-server')
-            
+
             // Platform-specific configurations
             if (System.getProperty('os.name').toLowerCase().contains('windows')) {
                 buildArgs.add('--windows-console-mode=auto')
             }
-            
+
             // Resource handling
             buildArgs.add('--include-resources=assets/.*')
             buildArgs.add('--include-resources=version.properties')
@@ -139,31 +128,11 @@ graalvmNative {
     }
 }
 
-// Custom native build tasks
-tasks.register('buildNativeWindows', Exec) {
-    group = 'native'
-    description = 'Builds native Windows executable'
-    dependsOn 'nativeCompile'
-    
-    commandLine 'cmd', '/c', 'copy', 
-        "${buildDir}/native/nativeCompile/TheLegendOfBelga.exe",
-        "${buildDir}/TheLegendOfBelga-Windows.exe"
-}
-
-tasks.register('buildNativeLinux', Exec) {
-    group = 'native'
-    description = 'Builds native Linux executable'
-    dependsOn 'nativeCompile'
-    
-    commandLine 'bash', '-c', 
-        "cp ${buildDir}/native/nativeCompile/TheLegendOfBelga ${buildDir}/TheLegendOfBelga-Linux"
-}
-
 tasks.register('buildNativeMac', Exec) {
     group = 'native'
     description = 'Builds native macOS executable'
     dependsOn 'nativeCompile'
-    
-    commandLine 'bash', '-c', 
-        "cp ${buildDir}/native/nativeCompile/TheLegendOfBelga ${buildDir}/TheLegendOfBelga-macOS"
+
+    commandLine 'bash', '-c',
+            "cp ${buildDir}/native/nativeCompile/TheLegendOfBelga ${buildDir}/TheLegendOfBelga-macOS"
 }
