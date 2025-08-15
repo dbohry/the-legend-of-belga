@@ -69,7 +69,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     private Random spawnsRoot;
 
     protected LevelManager levelManager;
-    protected SpawnManager enemySpawner;
+    protected BiomeEnemySpawner enemySpawner;
 
     protected Player player;
     protected final List<Entity> enemies = new ArrayList<>();
@@ -213,8 +213,8 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
         this.mapsRoot = new Random(rootRng.nextLong());
         this.spawnsRoot = new Random(rootRng.nextLong());
 
-        levelManager = new LevelManager(80, 60, 0.45, 2500, mapsRoot);
-        enemySpawner = new SpawnManager(new Sword(2, 28, 12, 10, 16), new Random(spawnsRoot.nextLong()));
+        levelManager = new LevelManager(80, 60, mapsRoot);
+        enemySpawner = new BiomeEnemySpawner(new Sword(2, 28, 12, 10, 16), new Random(spawnsRoot.nextLong()));
 
         TileMap map = levelManager.map();
         int[] spawn = map.findSpawnTile();

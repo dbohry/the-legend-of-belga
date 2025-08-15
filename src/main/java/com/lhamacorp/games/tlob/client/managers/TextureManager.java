@@ -36,6 +36,28 @@ public final class TextureManager {
     private static BufferedImage dirtTexture;
     private static BufferedImage plantsTexture;
     private static BufferedImage swordTexture;
+    
+    // ===== Biome-specific textures =====
+    
+    // Forest biome textures
+    private static BufferedImage forestTreeTexture;
+    private static BufferedImage forestLogTexture;
+    private static BufferedImage forestGroundTexture;
+    private static BufferedImage forestLeavesTexture;
+    private static BufferedImage forestMushroomsTexture;
+    
+    // Cave biome textures
+    private static BufferedImage caveStoneTexture;
+    private static BufferedImage caveCrystalTexture;
+    private static BufferedImage caveWaterTexture;
+    private static BufferedImage caveStalagmiteTexture;
+    private static BufferedImage caveCrystalFormationTexture;
+    
+    // Desert biome textures
+    private static BufferedImage desertSandTexture;
+    private static BufferedImage desertRockTexture;
+    private static BufferedImage desertCactusTexture;
+    private static BufferedImage desertRockFormationTexture;
 
     // For legacy compatibility (first frame, idle/down)
     private static BufferedImage playerFirstFrame;
@@ -74,6 +96,81 @@ public final class TextureManager {
     public static BufferedImage getSwordTexture() {
         ensureLoaded();
         return swordTexture;
+    }
+    
+    // ===== Biome-specific texture getters =====
+    
+    // Forest biome textures
+    public static BufferedImage getForestTreeTexture() {
+        ensureLoaded();
+        return forestTreeTexture;
+    }
+    
+    public static BufferedImage getForestLogTexture() {
+        ensureLoaded();
+        return forestLogTexture;
+    }
+    
+    public static BufferedImage getForestGroundTexture() {
+        ensureLoaded();
+        return forestGroundTexture;
+    }
+    
+    public static BufferedImage getForestLeavesTexture() {
+        ensureLoaded();
+        return forestLeavesTexture;
+    }
+    
+    public static BufferedImage getForestMushroomsTexture() {
+        ensureLoaded();
+        return forestMushroomsTexture;
+    }
+    
+    // Cave biome textures
+    public static BufferedImage getCaveStoneTexture() {
+        ensureLoaded();
+        return caveStoneTexture;
+    }
+    
+    public static BufferedImage getCaveCrystalTexture() {
+        ensureLoaded();
+        return caveCrystalTexture;
+    }
+    
+    public static BufferedImage getCaveWaterTexture() {
+        ensureLoaded();
+        return caveWaterTexture;
+    }
+    
+    public static BufferedImage getCaveStalagmiteTexture() {
+        ensureLoaded();
+        return caveStalagmiteTexture;
+    }
+    
+    public static BufferedImage getCaveCrystalFormationTexture() {
+        ensureLoaded();
+        return caveCrystalFormationTexture;
+    }
+    
+    // Desert biome textures
+    public static BufferedImage getDesertSandTexture() {
+        ensureLoaded();
+        return desertSandTexture;
+    }
+    
+    public static BufferedImage getDesertRockTexture() {
+        ensureLoaded();
+        return desertRockTexture;
+    }
+    
+    public static BufferedImage getDesertCactusTexture() {
+        ensureLoaded();
+        return desertCactusTexture;
+    }
+    
+    public static BufferedImage getDesertRockFormationTexture() {
+        ensureLoaded();
+        return desertRockFormationTexture;
     }
 
     // Legacy getters (return idle/down frame)
@@ -161,6 +258,9 @@ public final class TextureManager {
         dirtTexture = generateDirtTexture(32, 32);
         plantsTexture = generatePlantsTexture(32, 32);
         swordTexture = generateSwordTexture(48, 16);
+        
+        // Generate biome-specific textures
+        generateBiomeTextures();
 
         // Player / Enemy: sprite sheets (4x4). Fallback to procedural generation if missing.
         BufferedImage playerSheet = null;
@@ -737,6 +837,287 @@ public final class TextureManager {
         ensureLoaded();
         SpriteAnimation a = enemyAnimations.get(new Key(motion, dir));
         return (a != null && a.length() > 0) ? a.frameAt(timeMs) : enemyFirstFrame;
+    }
+    
+    // ===== Biome texture generation =====
+    
+    /**
+     * Generates all biome-specific textures procedurally.
+     */
+    private static void generateBiomeTextures() {
+        // Forest biome textures
+        forestTreeTexture = generateForestTreeTexture(32, 32);
+        forestLogTexture = generateForestLogTexture(32, 32);
+        forestGroundTexture = generateForestGroundTexture(32, 32);
+        forestLeavesTexture = generateForestLeavesTexture(32, 32);
+        forestMushroomsTexture = generateForestMushroomsTexture(32, 32);
+        
+        // Cave biome textures
+        caveStoneTexture = generateCaveStoneTexture(32, 32);
+        caveCrystalTexture = generateCaveCrystalTexture(32, 32);
+        caveWaterTexture = generateCaveWaterTexture(32, 32);
+        caveStalagmiteTexture = generateCaveStalagmiteTexture(32, 32);
+        caveCrystalFormationTexture = generateCaveCrystalFormationTexture(32, 32);
+        
+        // Desert biome textures
+        desertSandTexture = generateDesertSandTexture(32, 32);
+        desertRockTexture = generateDesertRockTexture(32, 32);
+        desertCactusTexture = generateDesertCactusTexture(32, 32);
+        desertRockFormationTexture = generateDesertRockFormationTexture(32, 32);
+    }
+    
+    // Forest texture generators
+    private static BufferedImage generateForestTreeTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(40, 80, 40));
+        g.fillRect(0, 0, w, h);
+        
+        // Tree trunk
+        g.setColor(new Color(80, 50, 30));
+        g.fillRect(w/2 - 3, h/2, 6, h/2);
+        
+        // Tree foliage
+        g.setColor(new Color(60, 120, 60));
+        g.fillOval(w/2 - 8, 2, 16, 16);
+        g.setColor(new Color(80, 140, 80));
+        g.fillOval(w/2 - 6, 4, 12, 12);
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateForestLogTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(100, 70, 40));
+        g.fillRect(0, 0, w, h);
+        
+        // Log rings
+        g.setColor(new Color(80, 50, 30));
+        for (int i = 0; i < 3; i++) {
+            int y = h/4 + i * h/4;
+            g.drawLine(2, y, w-2, y);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateForestGroundTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(60, 100, 60));
+        g.fillRect(0, 0, w, h);
+        
+        // Forest floor details
+        g.setColor(new Color(50, 80, 50));
+        for (int i = 0; i < w * h / 20; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateForestLeavesTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(70, 120, 70));
+        g.fillRect(0, 0, w, h);
+        
+        // Leaf patterns
+        g.setColor(new Color(90, 140, 90));
+        for (int i = 0; i < w * h / 15; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 3, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateForestMushroomsTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(60, 100, 60));
+        g.fillRect(0, 0, w, h);
+        
+        // Mushrooms
+        g.setColor(new Color(200, 100, 100));
+        g.fillOval(w/2 - 4, h/2 - 2, 8, 4);
+        g.setColor(new Color(150, 80, 80));
+        g.fillRect(w/2 - 1, h/2 + 2, 2, 4);
+        
+        g.dispose();
+        return img;
+    }
+    
+    // Cave texture generators
+    private static BufferedImage generateCaveStoneTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(80, 80, 90));
+        g.fillRect(0, 0, w, h);
+        
+        // Cave stone details
+        g.setColor(new Color(60, 60, 70));
+        for (int i = 0; i < w * h / 12; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateCaveCrystalTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(80, 80, 90));
+        g.fillRect(0, 0, w, h);
+        
+        // Crystal formation
+        g.setColor(new Color(150, 200, 255));
+        g.fillPolygon(
+            new int[]{w/2, w/2 - 3, w/2 + 3},
+            new int[]{h/2 - 4, h/2 + 2, h/2 + 2},
+            3
+        );
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateCaveWaterTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(60, 80, 120));
+        g.fillRect(0, 0, w, h);
+        
+        // Water ripples
+        g.setColor(new Color(80, 100, 160));
+        for (int i = 0; i < 3; i++) {
+            int y = h/4 + i * h/4;
+            g.drawLine(2, y, w-2, y);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateCaveStalagmiteTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(80, 80, 90));
+        g.fillRect(0, 0, w, h);
+        
+        // Stalagmite
+        g.setColor(new Color(100, 100, 110));
+        g.fillPolygon(
+            new int[]{w/2, w/2 - 4, w/2 + 4},
+            new int[]{h, h/2, h/2},
+            3
+        );
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateCaveCrystalFormationTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(80, 80, 90));
+        g.fillRect(0, 0, w, h);
+        
+        // Crystal cluster
+        g.setColor(new Color(150, 200, 255));
+        for (int i = 0; i < 5; i++) {
+            int x = w/2 + (i - 2) * 3;
+            int y = h/2 + (i % 2) * 2;
+            g.fillPolygon(
+                new int[]{x, x - 2, x + 2},
+                new int[]{y - 3, y + 2, y + 2},
+                3
+            );
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    // Desert texture generators
+    private static BufferedImage generateDesertSandTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(240, 220, 180));
+        g.fillRect(0, 0, w, h);
+        
+        // Sand texture
+        g.setColor(new Color(220, 200, 160));
+        for (int i = 0; i < w * h / 25; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 1, 1);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateDesertRockTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(200, 180, 160));
+        g.fillRect(0, 0, w, h);
+        
+        // Rock details
+        g.setColor(new Color(180, 160, 140));
+        for (int i = 0; i < w * h / 20; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateDesertCactusTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(240, 220, 180));
+        g.fillRect(0, 0, w, h);
+        
+        // Cactus
+        g.setColor(new Color(80, 120, 80));
+        g.fillRect(w/2 - 2, h/2 - 6, 4, 12);
+        g.fillRect(w/2 - 4, h/2, 8, 4);
+        
+        g.dispose();
+        return img;
+    }
+    
+    private static BufferedImage generateDesertRockFormationTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(200, 180, 160));
+        g.fillRect(0, 0, w, h);
+        
+        // Rock formation
+        g.setColor(new Color(180, 160, 140));
+        g.fillPolygon(
+            new int[]{w/2, w/2 - 6, w/2 + 6},
+            new int[]{h, h/2, h/2},
+            3
+        );
+        
+        g.dispose();
+        return img;
     }
 
 }

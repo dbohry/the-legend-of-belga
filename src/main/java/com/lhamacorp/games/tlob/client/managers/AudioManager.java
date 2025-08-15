@@ -10,9 +10,10 @@ public class AudioManager {
     private static Clip musicClip = null;
     private static final String SOUND_ASSETS_DIR = "/assets/sfx/";
     private static final String[] PLAYLIST = {
-        "background-ruined-seles.wav",
-        "background-world-map.wav",
-        "background-lloyds-theme.wav"
+        "music-adventurer.wav",
+        "music-adventurer2.wav",
+        // "music-bossfight.wav",
+        "music-upbeat.wav"
     };
 
     public static void playRandomMusic(float volumeDb) {

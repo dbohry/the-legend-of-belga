@@ -14,7 +14,7 @@ import java.util.Random;
 public class SpawnManager {
 
     private final Weapon enemyWeapon;
-    private Random rng;
+    protected Random rng;
 
     // Enemy perk system constants
     private static final double PERK_CHANCE_BASE = 0.0; // 0% chance at map 0
@@ -44,7 +44,7 @@ public class SpawnManager {
 
     /**
      * Spawns enemies on the map based on completion level.
-     * Golen enemies only spawn on maps with more than 80 foes and replace some regular enemies.
+     * Golen enemies only spawn on maps with more than 60 foes and replace some regular enemies.
      */
     public void spawn(TileMap map, Player player, List<Entity> out, int completedMaps, int tileSize) {
         out.clear();
@@ -99,7 +99,7 @@ public class SpawnManager {
      * Applies perks to an enemy based on map completion level.
      * Higher map completion = more perks and stronger perks.
      */
-    private void applyEnemyPerks(Entity enemy, int completedMaps) {
+    protected void applyEnemyPerks(Entity enemy, int completedMaps) {
         if (completedMaps <= 0) return; // No perks for first map
         
         // Calculate perk chance based on map completion
@@ -180,7 +180,7 @@ public class SpawnManager {
      * @return the minimum enemy count required for Golen to spawn
      */
     public static int getGolenSpawnThreshold() {
-        return 80;
+        return 60;
     }
     
     /**
