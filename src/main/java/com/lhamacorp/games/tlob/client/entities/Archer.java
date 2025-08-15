@@ -1,10 +1,12 @@
 package com.lhamacorp.games.tlob.client.entities;
 
 import com.lhamacorp.games.tlob.client.managers.GameConfig;
+import com.lhamacorp.games.tlob.client.managers.TextureManager;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -579,22 +581,20 @@ public class Archer extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        // Temporarily force custom drawing to see our blue archer design
-        // BufferedImage tex = TextureManager.getEnemyTexture();
-        // if (tex != null) {
-        //     int px = (int) Math.round(x - width / 2.0) - camX;
-        //     int py = (int) Math.round(y - height / 2.0) - camY;
-        //     
-        //     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.8f));
-        //     g2.drawImage(tex, px, py, null);
-        //     
-        //     g2.setColor(new Color(0, 200, 0, 80));
-        //     g2.fillRect(px, py, width, height);
-        //     g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
-        // } else {
-        // Draw a more detailed archer enemy instead of just a green square
-        drawArcherEnemy(g2, camX, camY);
-        // }
+        // Use the specialized archer sprite
+        BufferedImage tex = TextureManager.getArcherFrame(
+            TextureManager.convertEntityDirection(facing), 
+            TextureManager.convertEntityMotion(movedThisTick), 
+            animTimeMs
+        );
+        if (tex != null) {
+            int px = (int) Math.round(x - width / 2.0) - camX;
+            int py = (int) Math.round(y - height / 2.0) - camY;
+            g2.drawImage(tex, px, py, null);
+        } else {
+            // Fallback to custom drawing if sprite is not available
+            drawArcherEnemy(g2, camX, camY);
+        }
 
         if (hurtTimer > 0) {
             int alpha = (int) (255 * (double) hurtTimer / HURT_FLASH_TICKS);

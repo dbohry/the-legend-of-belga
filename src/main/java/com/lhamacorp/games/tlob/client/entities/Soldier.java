@@ -523,13 +523,18 @@ public class Soldier extends Entity {
     public void draw(Graphics2D g2, int camX, int camY) {
         if (!isAlive()) return;
 
-        BufferedImage tex = TextureManager.getEnemyTexture();
+        // Use the specialized soldier sprite
+        BufferedImage tex = TextureManager.getSoldierFrame(
+            TextureManager.convertEntityDirection(facing), 
+            TextureManager.convertEntityMotion(movedThisTick), 
+            animTimeMs
+        );
         if (tex != null) {
             int px = (int) Math.round(x - width / 2.0) - camX;
             int py = (int) Math.round(y - height / 2.0) - camY;
             g2.drawImage(tex, px, py, null);
         } else {
-            // Draw a more detailed soldier enemy instead of just a red circle
+            // Fallback to custom drawing if sprite is not available
             drawSoldierEnemy(g2, camX, camY);
         }
 

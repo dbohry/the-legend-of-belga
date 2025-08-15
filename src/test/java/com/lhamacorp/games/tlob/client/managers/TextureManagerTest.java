@@ -46,8 +46,10 @@ public class TextureManagerTest {
         BufferedImage genericDirt = TextureManager.getDirtTexture();
         BufferedImage genericPlants = TextureManager.getPlantsTexture();
         
-        // Meadow textures should be different from generic ones
-        assertNotEquals(meadowGrass, genericGrass, "Meadow grass should be different from generic grass");
+        // Meadow grass reuses generic grass texture (correct for caching)
+        assertEquals(meadowGrass, genericGrass, "Meadow grass should reuse generic grass texture");
+        
+        // Meadow dirt, plants, and flowers should be different from generic ones
         assertNotEquals(meadowDirt, genericDirt, "Meadow dirt should be different from generic dirt");
         assertNotEquals(meadowPlants, genericPlants, "Meadow plants should be different from generic plants");
         

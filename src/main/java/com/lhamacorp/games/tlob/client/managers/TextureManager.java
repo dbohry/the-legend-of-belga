@@ -14,13 +14,14 @@ public final class TextureManager {
 
     // ===== Asset directory =====
     private static final String ASSETS_DIR = "assets";
+    private static final String RESOURCES_ASSETS_DIR = "assets"; // Resources folder path
     
     // ===== Biome-specific texture file patterns =====
-    private static final String BIOME_TEXTURE_PATTERN = ASSETS_DIR + "/%s_%s.png";
+    private static final String BIOME_TEXTURE_PATTERN = RESOURCES_ASSETS_DIR + "/%s_%s.png";
     
-    // ===== Legacy texture files (for backward compatibility) =====
-    private static final String GRASS_FILE = ASSETS_DIR + "/grass.png";
-    private static final String STONE_FILE = ASSETS_DIR + "/stone.png";
+    // ===== Legacy texture files (now using resources) =====
+    private static final String GRASS_FILE = RESOURCES_ASSETS_DIR + "/grass.png";
+    private static final String STONE_FILE = RESOURCES_ASSETS_DIR + "/stone.png";
     // Treat these as sprite sheets now (4x4). If only a single frame exists, we degrade gracefully.
 
     // ===== Tile sizes (keep your existing sizes) =====
@@ -79,12 +80,21 @@ public final class TextureManager {
     // For legacy compatibility (first frame, idle/down)
     private static BufferedImage playerFirstFrame;
     private static BufferedImage enemyFirstFrame;
+    private static BufferedImage soldierFirstFrame;
+    private static BufferedImage archerFirstFrame;
 
     // Animation caches
     private static Map<Key, SpriteAnimation> playerAnimations;
     private static Map<Key, SpriteAnimation> enemyAnimations;
+    private static Map<Key, SpriteAnimation> soldierAnimations;
+    private static Map<Key, SpriteAnimation> archerAnimations;
 
     private static boolean loaded;
+    
+    // ===== Cache tracking to avoid regeneration =====
+    private static boolean spritesGenerated = false;
+    private static boolean biomeTexturesGenerated = false;
+    private static boolean basicTexturesGenerated = false;
 
     private TextureManager() {
     }
@@ -300,7 +310,9 @@ public final class TextureManager {
 
         ClassLoader cl = TextureManager.class.getClassLoader();
 
-        // Grass & Stone: now use biome-specific naming for meadows biome
+        // Basic textures (grass, stone, dirt, plants, sword) - only generate once
+        if (!basicTexturesGenerated) {
+            // Grass & Stone: now use biome-specific naming for meadows biome
         // Try to load meadows-specific textures first, fall back to legacy names
         grassTexture = tryLoad(cl.getResourceAsStream(getBiomeTextureFilename("meadows", "grass")));
         if (grassTexture == null) {
@@ -308,7 +320,7 @@ public final class TextureManager {
         }
         if (grassTexture == null) {
             grassTexture = generateGrassTexture(32, 32);
-            tryWrite(getBiomeTextureFilename("meadows", "grass"), grassTexture);
+            tryWrite("src/main/resources/" + getBiomeTextureFilename("meadows", "grass"), grassTexture);
         }
         
         stoneTexture = tryLoad(cl.getResourceAsStream(getBiomeTextureFilename("meadows", "stone")));
@@ -317,34 +329,67 @@ public final class TextureManager {
         }
         if (stoneTexture == null) {
             stoneTexture = generateStoneTexture(32, 32);
-            tryWrite(getBiomeTextureFilename("meadows", "stone"), stoneTexture);
+            tryWrite("src/main/resources/" + getBiomeTextureFilename("meadows", "stone"), stoneTexture);
         }
 
-        // Procedural textures for floor variants (no external files required)
-        dirtTexture = generateDirtTexture(32, 32);
-        plantsTexture = generatePlantsTexture(32, 32);
-        swordTexture = generateSwordTexture(48, 16);
+        // Procedural textures for floor variants (now cached and saved to resources)
+        dirtTexture = tryLoad(cl.getResourceAsStream(RESOURCES_ASSETS_DIR + "/dirt.png"));
+        if (dirtTexture == null) {
+            dirtTexture = generateDirtTexture(32, 32);
+            tryWrite("src/main/resources/" + RESOURCES_ASSETS_DIR + "/dirt.png", dirtTexture);
+        }
         
-        // Generate biome-specific textures
-        generateBiomeTextures();
-
-        // Player / Enemy: sprite sheets (4x4). Fallback to procedural generation if missing.
-        BufferedImage playerSheet = null;
-        BufferedImage enemySheet = null;
-
-        if (playerSheet == null || !looksLikeSheet(playerSheet, PLAYER_W, PLAYER_H)) {
-            playerSheet = generatePlayerSheet(PLAYER_W, PLAYER_H, ROWS_PER_SHEET, FRAMES_PER_ROW);
+        plantsTexture = tryLoad(cl.getResourceAsStream(RESOURCES_ASSETS_DIR + "/plants.png"));
+        if (plantsTexture == null) {
+            plantsTexture = generatePlantsTexture(32, 32);
+            tryWrite("src/main/resources/" + RESOURCES_ASSETS_DIR + "/plants.png", plantsTexture);
         }
-        if (enemySheet == null || !looksLikeSheet(enemySheet, ENEMY_W, ENEMY_H)) {
-            enemySheet = generateEnemySheet(ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW);
+        
+        swordTexture = tryLoad(cl.getResourceAsStream(RESOURCES_ASSETS_DIR + "/sword.png"));
+        if (swordTexture == null) {
+            swordTexture = generateSwordTexture(48, 16);
+            tryWrite("src/main/resources/" + RESOURCES_ASSETS_DIR + "/sword.png", swordTexture);
+        }
+        
+        basicTexturesGenerated = true;
+        }
+        
+        // Generate biome-specific textures (only once)
+        if (!biomeTexturesGenerated) {
+            generateBiomeTextures();
+            biomeTexturesGenerated = true;
         }
 
-        playerAnimations = sliceIntoAnimations(playerSheet, PLAYER_W, PLAYER_H);
-        enemyAnimations = sliceIntoAnimations(enemySheet, ENEMY_W, ENEMY_H);
+        // Player / Enemy: sprite sheets (4x4). Generate and save as PNG files (only once).
+        if (!spritesGenerated) {
+            BufferedImage playerSheet = loadOrGenerateSpriteSheet("player", PLAYER_W, PLAYER_H, ROWS_PER_SHEET, FRAMES_PER_ROW, 
+                                                                 () -> generatePlayerSheet(PLAYER_W, PLAYER_H, ROWS_PER_SHEET, FRAMES_PER_ROW));
+            BufferedImage enemySheet = loadOrGenerateSpriteSheet("enemy", ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW, 
+                                                                () -> generateEnemySheet(ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW));
+            
+            // Generate specialized enemy sprites
+            BufferedImage soldierSheet = loadOrGenerateSpriteSheet("soldier", ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW, 
+                                                                  () -> generateSoldierSheet(ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW));
+            BufferedImage archerSheet = loadOrGenerateSpriteSheet("archer", ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW, 
+                                                                 () -> generateArcherSheet(ENEMY_W, ENEMY_H, ROWS_PER_SHEET, FRAMES_PER_ROW));
+            
+            // Create soldier and archer animations
+            soldierAnimations = sliceIntoAnimations(soldierSheet, ENEMY_W, ENEMY_H);
+            archerAnimations = sliceIntoAnimations(archerSheet, ENEMY_W, ENEMY_H);
 
-        // Legacy first frame = idle/down (row 0, col 0)
-        playerFirstFrame = playerAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
-        enemyFirstFrame = enemyAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+            playerAnimations = sliceIntoAnimations(playerSheet, PLAYER_W, PLAYER_H);
+            enemyAnimations = sliceIntoAnimations(enemySheet, ENEMY_W, ENEMY_H);
+
+            // Legacy first frame = idle/down (row 0, col 0)
+            playerFirstFrame = playerAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+            enemyFirstFrame = enemyAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+            soldierFirstFrame = soldierAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+            archerFirstFrame = archerAnimations.get(new Key(Motion.IDLE, Direction.DOWN)).frames()[0];
+            
+            spritesGenerated = true;
+        }
+        
+
 
         // Build animated grass frames only if enabled
         if (ANIMATE_GRASS && grassFrames == null) {
@@ -470,19 +515,49 @@ public final class TextureManager {
      */
     private static BufferedImage loadOrGenerateBiomeTexture(String biome, String textureType, 
                                                            java.util.function.Supplier<BufferedImage> generator) {
-        String filename = getBiomeTextureFilename(biome, textureType);
+        String resourcePath = getBiomeTextureFilename(biome, textureType);
         
-        // Try to load from file first
-        BufferedImage texture = tryLoad(TextureManager.class.getClassLoader().getResourceAsStream(filename));
+        // Try to load from resources first (JAR-safe)
+        BufferedImage texture = tryLoad(TextureManager.class.getClassLoader().getResourceAsStream(resourcePath));
         
         if (texture == null) {
             // Generate if not found
             texture = generator.get();
-            // Save the generated texture
-            tryWrite(filename, texture);
+            // Save the generated texture to resources folder for future use
+            String resourcesPath = "src/main/resources/" + resourcePath;
+            tryWrite(resourcesPath, texture);
         }
         
         return texture;
+    }
+    
+        /**
+     * Tries to load a sprite sheet from resources, falling back to generation if not found.
+     * @param spriteType The sprite type (e.g., "player", "enemy")
+     * @param frameWidth The width of each frame
+     * @param frameHeight The height of each frame
+     * @param rows The number of rows (directions)
+     * @param cols The number of columns (animation frames)
+     * @param generator Function to generate the sprite sheet if loading fails
+     * @return The loaded or generated sprite sheet
+     */
+    private static BufferedImage loadOrGenerateSpriteSheet(String spriteType, int frameWidth, int frameHeight,
+                                                           int rows, int cols,
+                                                           java.util.function.Supplier<BufferedImage> generator) {
+        // First try to load from resources (JAR-safe)
+        String resourcePath = RESOURCES_ASSETS_DIR + "/" + spriteType + ".png";
+        BufferedImage spriteSheet = tryLoad(TextureManager.class.getClassLoader().getResourceAsStream(resourcePath));
+
+        if (spriteSheet == null || !looksLikeSheet(spriteSheet, frameWidth, frameHeight)) {
+            // Generate if not found or invalid format
+            spriteSheet = generator.get();
+            
+            // Save to resources folder for future use
+            String resourcesPath = "src/main/resources/" + resourcePath;
+            tryWrite(resourcesPath, spriteSheet);
+        }
+
+        return spriteSheet;
     }
 
     // ===== Unchanged grass/stone generation =====
@@ -913,6 +988,224 @@ public final class TextureManager {
         g.dispose();
         return sheet;
     }
+    
+    /**
+     * Generates a soldier enemy sprite sheet (4x4).
+     * Soldiers are heavily armored melee fighters with swords and shields.
+     */
+    private static BufferedImage generateSoldierSheet(int fw, int fh, int rows, int cols) {
+        BufferedImage sheet = new BufferedImage(fw * cols, fh * rows, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = sheet.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // Soldier color palette - heavy armor theme
+        Color armorDark = new Color(60, 60, 70);      // Dark steel
+        Color armorMid = new Color(100, 100, 110);    // Medium steel
+        Color armorLight = new Color(140, 140, 150);  // Light steel
+        Color armorAccent = new Color(80, 90, 100);   // Accent color
+        Color skin = new Color(180, 140, 100);        // Skin tone
+        Color eyeW = new Color(250, 250, 250);        // Eye white
+        Color eyeB = new Color(20, 20, 20);          // Eye black
+        Color weaponDark = new Color(80, 60, 40);     // Weapon dark
+        Color weaponLight = new Color(120, 100, 80);  // Weapon light
+        Color shieldDark = new Color(100, 80, 60);    // Shield dark
+        Color shieldLight = new Color(140, 120, 100); // Shield light
+
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                int x0 = c * fw, y0 = r * fh;
+                BufferedImage frame = new BufferedImage(fw, fh, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D f = frame.createGraphics();
+                f.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+                int step = c % 4;
+                int wobble = (step == 0 || step == 2) ? 0 : 1;
+
+                // Shadow
+                f.setColor(new Color(0, 0, 0, 70));
+                f.fillOval(3, fh - 6, fw - 6, 4);
+
+                // Body (heavy armor)
+                f.setColor(armorDark);
+                f.fillRoundRect(2, 6 + wobble, fw - 4, fh - 12, 6, 6);
+                
+                // Armor highlights
+                f.setColor(armorMid);
+                f.fillRoundRect(3, 7 + wobble, fw - 6, fh - 14, 4, 4);
+                
+                // Armor details - chest plate
+                f.setColor(armorLight);
+                f.fillRect(4, 8 + wobble, fw - 8, 2);
+                f.fillRect(4, 12 + wobble, fw - 8, 2);
+                
+                // Armor shoulder plates
+                f.setColor(armorAccent);
+                f.fillRect(2, 8 + wobble, 3, 4);
+                f.fillRect(fw - 5, 8 + wobble, 3, 4);
+
+                // Head
+                f.setColor(skin);
+                f.fillOval(4, 2 + wobble, fw - 8, 8);
+                
+                // Helmet (full face covering)
+                f.setColor(armorDark);
+                f.fillOval(3, 1 + wobble, fw - 6, 10);
+                f.setColor(armorMid);
+                f.fillOval(4, 2 + wobble, fw - 8, 8);
+                
+                // Helmet visor slit
+                f.setColor(armorDark);
+                f.fillRect(6, 4 + wobble, fw - 12, 2);
+
+                // Eyes (menacing red glow)
+                f.setColor(new Color(200, 0, 0));
+                f.fillOval(6, 5 + wobble, 3, 3);
+                f.fillOval(fw - 9, 5 + wobble, 3, 3);
+                f.setColor(new Color(255, 0, 0));
+                f.fillOval(7, 6 + wobble, 1, 1);
+                f.fillOval(fw - 8, 6 + wobble, 1, 1);
+
+                // Sword (right hand)
+                f.setColor(weaponDark);
+                f.fillRect(fw - 2, fh/2 - 3, 6, 6);
+                f.setColor(weaponLight);
+                f.fillRect(fw - 1, fh/2 - 2, 4, 4);
+                
+                // Shield (left hand) - larger and more prominent
+                f.setColor(shieldDark);
+                f.fillOval(0, fh/2 - 5, 10, 10);
+                f.setColor(shieldLight);
+                f.fillOval(1, fh/2 - 4, 8, 8);
+                
+                // Shield boss (center decoration)
+                f.setColor(armorAccent);
+                f.fillOval(3, fh/2 - 2, 4, 4);
+
+                // Legs (armored)
+                f.setColor(armorDark);
+                f.fillRect(5, fh - 8 + wobble, 3, 6);
+                f.fillRect(fw - 8, fh - 8 - wobble, 3, 6);
+                
+                // Boots (heavy)
+                f.setColor(armorDark);
+                f.fillRect(4, fh - 4 + wobble, 5, 2);
+                f.fillRect(fw - 9, fh - 4 - wobble, 5, 2);
+
+                f.dispose();
+                g.drawImage(frame, x0, y0, null);
+            }
+        }
+
+        g.dispose();
+        return sheet;
+    }
+    
+    /**
+     * Generates an archer enemy sprite sheet (4x4).
+     * Archers are lighter armored ranged fighters with bows.
+     */
+    private static BufferedImage generateArcherSheet(int fw, int fh, int rows, int cols) {
+        BufferedImage sheet = new BufferedImage(fw * cols, fh * rows, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = sheet.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // Archer color palette - lighter armor theme
+        Color armorDark = new Color(80, 70, 60);      // Dark leather
+        Color armorMid = new Color(120, 110, 100);    // Medium leather
+        Color armorLight = new Color(160, 150, 140);  // Light leather
+        Color armorAccent = new Color(100, 80, 60);   // Accent color
+        Color skin = new Color(180, 140, 100);        // Skin tone
+        Color eyeW = new Color(250, 250, 250);        // Eye white
+        Color eyeB = new Color(20, 20, 20);          // Eye black
+        Color bowDark = new Color(80, 60, 40);        // Bow dark
+        Color bowLight = new Color(120, 100, 80);     // Bow light
+        Color quiverDark = new Color(60, 50, 40);     // Quiver dark
+        Color quiverLight = new Color(100, 90, 80);   // Quiver light
+
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                int x0 = c * fw, y0 = r * fh;
+                BufferedImage frame = new BufferedImage(fw, fh, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D f = frame.createGraphics();
+                f.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+                int step = c % 4;
+                int wobble = (step == 0 || step == 2) ? 0 : 1;
+
+                // Shadow
+                f.setColor(new Color(0, 0, 0, 70));
+                f.fillOval(3, fh - 6, fw - 6, 4);
+
+                // Body (leather armor)
+                f.setColor(armorDark);
+                f.fillRoundRect(3, 6 + wobble, fw - 6, fh - 12, 4, 4);
+                
+                // Armor highlights
+                f.setColor(armorMid);
+                f.fillRoundRect(4, 7 + wobble, fw - 8, fh - 14, 2, 2);
+                
+                // Armor details - straps
+                f.setColor(armorAccent);
+                f.fillRect(6, 9 + wobble, fw - 12, 1);
+                f.fillRect(6, 13 + wobble, fw - 12, 1);
+
+                // Head
+                f.setColor(skin);
+                f.fillOval(5, 2 + wobble, fw - 10, 8);
+                
+                // Hood (archer's cap)
+                f.setColor(armorDark);
+                f.fillOval(4, 1 + wobble, fw - 8, 10);
+                f.setColor(armorMid);
+                f.fillOval(5, 2 + wobble, fw - 10, 8);
+                
+                // Hood detail
+                f.setColor(armorAccent);
+                f.fillRect(6, 3 + wobble, fw - 12, 2);
+
+                // Eyes (sharp and focused)
+                f.setColor(eyeW);
+                f.fillOval(7, 5 + wobble, 2, 2);
+                f.fillOval(fw - 9, 5 + wobble, 2, 2);
+                f.setColor(eyeB);
+                f.fillOval(7, 5 + wobble, 1, 1);
+                f.fillOval(fw - 9, 5 + wobble, 1, 1);
+
+                // Bow (right hand)
+                f.setColor(bowDark);
+                f.fillOval(fw - 4, fh/2 - 2, 4, 4);
+                f.setColor(bowLight);
+                f.fillOval(fw - 3, fh/2 - 1, 2, 2);
+                
+                // Quiver (left side)
+                f.setColor(quiverDark);
+                f.fillOval(2, fh/2 - 3, 6, 6);
+                f.setColor(quiverLight);
+                f.fillOval(3, fh/2 - 2, 4, 4);
+                
+                // Arrows in quiver
+                f.setColor(bowDark);
+                f.fillRect(4, fh/2 - 1, 2, 2);
+                f.fillRect(4, fh/2 + 1, 2, 2);
+
+                // Legs (leather)
+                f.setColor(armorDark);
+                f.fillRect(6, fh - 8 + wobble, 3, 6);
+                f.fillRect(fw - 9, fh - 8 - wobble, 3, 6);
+                
+                // Boots (light)
+                f.setColor(armorDark);
+                f.fillRect(5, fh - 4 + wobble, 5, 2);
+                f.fillRect(fw - 10, fh - 4 - wobble, 5, 2);
+
+                f.dispose();
+                g.drawImage(frame, x0, y0, null);
+            }
+        }
+
+        g.dispose();
+        return sheet;
+    }
 
     // ===== Optional utility: flip image horizontally (if you ever want to derive RIGHT from LEFT) =====
     @SuppressWarnings("unused")
@@ -939,11 +1232,53 @@ public final class TextureManager {
         return (a != null && a.length() > 0) ? a.frameAt(timeMs) : enemyFirstFrame;
     }
     
+    /**
+     * Gets a frame from the soldier sprite sheet.
+     */
+    public static BufferedImage getSoldierFrame(Direction dir, Motion motion, long timeMs) {
+        ensureLoaded();
+        SpriteAnimation a = soldierAnimations.get(new Key(motion, dir));
+        return (a != null && a.length() > 0) ? a.frameAt(timeMs) : soldierFirstFrame;
+    }
+    
+    /**
+     * Gets a frame from the archer sprite sheet.
+     */
+    public static BufferedImage getArcherFrame(Direction dir, Motion motion, long timeMs) {
+        ensureLoaded();
+        SpriteAnimation a = archerAnimations.get(new Key(motion, dir));
+        return (a != null && a.length() > 0) ? a.frameAt(timeMs) : archerFirstFrame;
+    }
+    
+    /**
+     * Converts Entity.Direction to TextureManager.Direction for sprite rendering.
+     */
+    public static Direction convertEntityDirection(com.lhamacorp.games.tlob.client.entities.Entity.Direction entityDir) {
+        return switch (entityDir) {
+            case DOWN -> Direction.DOWN;
+            case LEFT -> Direction.LEFT;
+            case RIGHT -> Direction.RIGHT;
+            case UP -> Direction.UP;
+            case UP_LEFT -> Direction.LEFT;  // Use LEFT for diagonal
+            case UP_RIGHT -> Direction.RIGHT; // Use RIGHT for diagonal
+            case DOWN_LEFT -> Direction.LEFT; // Use LEFT for diagonal
+            case DOWN_RIGHT -> Direction.RIGHT; // Use RIGHT for diagonal
+        };
+    }
+    
+    /**
+     * Converts Entity.Motion to TextureManager.Motion for sprite rendering.
+     */
+    public static Motion convertEntityMotion(boolean isMoving) {
+        return isMoving ? Motion.WALK : Motion.IDLE;
+    }
+    
     // ===== Biome texture generation =====
     
     /**
      * Generates all biome-specific textures using the new biome-specific file naming system.
      * Textures are saved as {biome}_{texture}.png files for easy management.
+     * This method is cached and only runs once per application lifecycle.
      */
     private static void generateBiomeTextures() {
         // Meadows biome textures - reuse existing grass and stone textures
