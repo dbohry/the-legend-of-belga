@@ -58,6 +58,12 @@ public final class TextureManager {
     private static BufferedImage desertRockTexture;
     private static BufferedImage desertCactusTexture;
     private static BufferedImage desertRockFormationTexture;
+    
+    // Vulcan biome textures
+    private static BufferedImage vulcanRockTexture;
+    private static BufferedImage vulcanLavaTexture;
+    private static BufferedImage vulcanAshTexture;
+    private static BufferedImage vulcanCrystalTexture;
 
     // For legacy compatibility (first frame, idle/down)
     private static BufferedImage playerFirstFrame;
@@ -171,6 +177,27 @@ public final class TextureManager {
     public static BufferedImage getDesertRockFormationTexture() {
         ensureLoaded();
         return desertRockFormationTexture;
+    }
+    
+    // Vulcan biome textures
+    public static BufferedImage getVulcanRockTexture() {
+        ensureLoaded();
+        return vulcanRockTexture;
+    }
+    
+    public static BufferedImage getVulcanLavaTexture() {
+        ensureLoaded();
+        return vulcanLavaTexture;
+    }
+    
+    public static BufferedImage getVulcanAshTexture() {
+        ensureLoaded();
+        return vulcanAshTexture;
+    }
+    
+    public static BufferedImage getVulcanCrystalTexture() {
+        ensureLoaded();
+        return vulcanCrystalTexture;
     }
 
     // Legacy getters (return idle/down frame)
@@ -864,6 +891,12 @@ public final class TextureManager {
         desertRockTexture = generateDesertRockTexture(32, 32);
         desertCactusTexture = generateDesertCactusTexture(32, 32);
         desertRockFormationTexture = generateDesertRockFormationTexture(32, 32);
+        
+        // Vulcan biome textures
+        vulcanRockTexture = generateVulcanRockTexture(32, 32);
+        vulcanLavaTexture = generateVulcanLavaTexture(32, 32);
+        vulcanAshTexture = generateVulcanAshTexture(32, 32);
+        vulcanCrystalTexture = generateVulcanCrystalTexture(32, 32);
     }
     
     // Forest texture generators
@@ -1120,4 +1153,80 @@ public final class TextureManager {
         return img;
     }
 
+    // Vulcan texture generators
+    private static BufferedImage generateVulcanRockTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(100, 100, 100));
+        g.fillRect(0, 0, w, h);
+        
+        // Rock details
+        g.setColor(new Color(80, 80, 80));
+        for (int i = 0; i < w * h / 15; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 2, 2);
+        }
+        
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generateVulcanLavaTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(200, 0, 0));
+        g.fillRect(0, 0, w, h);
+        
+        // Lava flow
+        g.setColor(new Color(255, 0, 0));
+        for (int i = 0; i < w * h / 100; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 1, 1);
+        }
+        
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generateVulcanAshTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(150, 150, 150));
+        g.fillRect(0, 0, w, h);
+        
+        // Ash particles
+        g.setColor(new Color(100, 100, 100));
+        for (int i = 0; i < w * h / 100; i++) {
+            int x = (int) (Math.random() * w);
+            int y = (int) (Math.random() * h);
+            g.fillOval(x, y, 1, 1);
+        }
+        
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage generateVulcanCrystalTexture(int w, int h) {
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(150, 200, 255));
+        g.fillRect(0, 0, w, h);
+        
+        // Crystal formation
+        g.setColor(new Color(200, 255, 255));
+        for (int i = 0; i < 5; i++) {
+            int x = w/2 + (i - 2) * 3;
+            int y = h/2 + (i % 2) * 2;
+            g.fillPolygon(
+                new int[]{x, x - 2, x + 2},
+                new int[]{y - 3, y + 2, y + 2},
+                3
+            );
+        }
+        
+        g.dispose();
+        return img;
+    }
 }

@@ -31,6 +31,9 @@ public class BiomeEnemySpawner extends SpawnManager {
     private static final double DESERT_SOLDIER_WEIGHT = 0.5;
     private static final double DESERT_ARCHER_WEIGHT = 0.5;
     
+    private static final double VULCAN_SOLDIER_WEIGHT = 0.7;
+    private static final double VULCAN_ARCHER_WEIGHT = 0.3;
+    
     public BiomeEnemySpawner(Weapon enemyWeapon) {
         super(enemyWeapon);
     }
@@ -98,6 +101,7 @@ public class BiomeEnemySpawner extends SpawnManager {
             case FOREST -> (int) (baseCount * 1.2); // More enemies in forest
             case CAVE -> (int) (baseCount * 0.8);   // Fewer enemies in cave
             case DESERT -> (int) (baseCount * 1.1); // Slightly more in desert
+            case VULCAN -> (int) (baseCount * 1.3); // More enemies in vulcan (challenging)
             default -> baseCount; // MEADOWS
         };
     }
@@ -122,6 +126,7 @@ public class BiomeEnemySpawner extends SpawnManager {
             case FOREST -> FOREST_SOLDIER_WEIGHT;
             case CAVE -> CAVE_SOLDIER_WEIGHT;
             case DESERT -> DESERT_SOLDIER_WEIGHT;
+            case VULCAN -> VULCAN_SOLDIER_WEIGHT;
             default -> MEADOWS_SOLDIER_WEIGHT;
         };
     }

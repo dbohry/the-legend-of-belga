@@ -8,7 +8,8 @@ public enum Biome {
     MEADOWS("meadows", 0.45, 2500, 0.6, 0.3, 0.1),
     FOREST("forest", 0.55, 3000, 0.7, 0.4, 0.2),
     CAVE("cave", 0.35, 2000, 0.4, 0.1, 0.05),
-    DESERT("desert", 0.30, 1800, 0.3, 0.05, 0.02);
+    DESERT("desert", 0.30, 1800, 0.3, 0.05, 0.02),
+    VULCAN("vulcan", 0.40, 2200, 0.2, 0.15, 0.25);
     
     private final String name;
     private final double wallDensity;

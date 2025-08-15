@@ -88,6 +88,7 @@ public class MapGenerator {
             case FOREST -> decorateForestFloors(tiles);
             case CAVE -> decorateCaveFloors(tiles);
             case DESERT -> decorateDesertFloors(tiles);
+            case VULCAN -> decorateVulcanFloors(tiles);
         }
     }
 
@@ -272,11 +273,57 @@ public class MapGenerator {
         }
     }
 
+    private void decorateVulcanFloors(int[][] tiles) {
+        // Start with vulcan rock (but preserve edge walls)
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                if (tiles[x][y] != getBiomeWallTile() && tiles[x][y] != TileMap.EDGE_WALL) {
+                    tiles[x][y] = TileMap.FLOOR_VULCAN_ROCK;
+                }
+            }
+        }
+
+        // Add lava pools
+        int lavaPools = Math.max(2, (int) ((width * height) * biome.getFeatureDensity() / 800));
+        for (int k = 0; k < lavaPools; k++) {
+            int cx = rng.nextInt(width);
+            int cy = rng.nextInt(height);
+            int radius = 2 + rng.nextInt(3);
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx <= 0 || ny <= 0 || nx >= width - 1 || ny >= height - 1) continue;
+                    if (tiles[nx][ny] == TileMap.FLOOR_VULCAN_ROCK && (dx * dx + dy * dy) <= radius * radius) {
+                        tiles[nx][ny] = TileMap.FLOOR_VULCAN_LAVA;
+                    }
+                }
+            }
+        }
+
+        // Add ash patches
+        int ashPatches = Math.max(4, (int) ((width * height) * biome.getPlantDensity() / 500));
+        for (int k = 0; k < ashPatches; k++) {
+            int cx = rng.nextInt(width);
+            int cy = rng.nextInt(height);
+            int radius = 1 + rng.nextInt(2);
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx <= 0 || ny <= 0 || nx >= width - 1 || ny >= height - 1) continue;
+                    if (tiles[nx][ny] == TileMap.FLOOR_VULCAN_ROCK && (dx * dx + dy * dy) <= radius * radius) {
+                        if (rng.nextDouble() < 0.7) tiles[nx][ny] = TileMap.FLOOR_VULCAN_ASH;
+                    }
+                }
+            }
+        }
+    }
+
     private int getBiomeWallTile() {
         return switch (biome) {
             case FOREST -> TileMap.WALL_FOREST_TREE;
             case CAVE -> TileMap.WALL_CAVE_STALAGMITE;
             case DESERT -> TileMap.WALL_DESERT_ROCK_FORMATION;
+            case VULCAN -> TileMap.WALL_VULCAN_ROCK;
             default -> TileMap.WALL; // MEADOWS
         };
     }
@@ -286,6 +333,7 @@ public class MapGenerator {
             case FOREST -> TileMap.FLOOR_FOREST_GROUND;
             case CAVE -> TileMap.FLOOR_CAVE_STONE;
             case DESERT -> TileMap.FLOOR_DESERT_SAND;
+            case VULCAN -> TileMap.FLOOR_VULCAN_ROCK;
             default -> TileMap.FLOOR_GRASS; // MEADOWS
         };
     }

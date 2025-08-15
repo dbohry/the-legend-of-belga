@@ -37,6 +37,13 @@ public class TileMap {
     public static final int FLOOR_DESERT_ROCK = 16;
     public static final int FLOOR_DESERT_CACTUS = 17;
     public static final int WALL_DESERT_ROCK_FORMATION = 18;
+    
+    // Vulcan biome tiles
+    public static final int FLOOR_VULCAN_ROCK = 19;
+    public static final int FLOOR_VULCAN_LAVA = 20;
+    public static final int FLOOR_VULCAN_ASH = 21;
+    public static final int WALL_VULCAN_ROCK = 22;
+    public static final int WALL_VULCAN_CRYSTAL = 23;
 
     private final int width;
     private final int height;
@@ -52,7 +59,9 @@ public class TileMap {
         return tileId == FLOOR_PLANTS || 
                tileId == FLOOR_FOREST_LEAVES || 
                tileId == FLOOR_FOREST_MUSHROOMS ||
-               tileId == WALL_CAVE_CRYSTAL_FORMATION;
+               tileId == WALL_CAVE_CRYSTAL_FORMATION ||
+               tileId == FLOOR_VULCAN_ASH ||
+               tileId == WALL_VULCAN_CRYSTAL;
     }
     
     /**
@@ -63,7 +72,9 @@ public class TileMap {
                tileId == WALL_FOREST_TREE || 
                tileId == WALL_FOREST_LOG ||
                tileId == WALL_CAVE_STALAGMITE ||
-               tileId == WALL_DESERT_ROCK_FORMATION;
+               tileId == WALL_DESERT_ROCK_FORMATION ||
+               tileId == WALL_VULCAN_ROCK ||
+               tileId == WALL_VULCAN_CRYSTAL;
     }
 
     /**
@@ -211,6 +222,9 @@ public class TileMap {
             case FLOOR_DESERT_SAND -> TextureManager.getDesertSandTexture();
             case FLOOR_DESERT_ROCK -> TextureManager.getDesertRockTexture();
             case FLOOR_DESERT_CACTUS -> TextureManager.getDesertCactusTexture();
+            case FLOOR_VULCAN_ROCK -> TextureManager.getVulcanRockTexture();
+            case FLOOR_VULCAN_LAVA -> TextureManager.getVulcanLavaTexture();
+            case FLOOR_VULCAN_ASH -> TextureManager.getVulcanAshTexture();
             default -> TextureManager.getGrassTextureFrame(tick60); // Default grass texture
         };
     }
