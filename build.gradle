@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.lhamacorp.games'
-version = '0.0.75'
+version = '0.0.76'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
