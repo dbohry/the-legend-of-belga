@@ -23,7 +23,7 @@ public class Soldier extends Entity {
     private static final int ATTACK_RANGE = 30;
 
     // --- timing base (60Hz for consistent simulation) ---
-    private static final int TICKS_PER_SECOND = 60;
+    private static final int TICKS_PER_SECOND = 30;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
     private static final int ATTACK_COOLDOWN_TICKS = 60;
