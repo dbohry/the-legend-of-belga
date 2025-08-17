@@ -156,6 +156,7 @@ public class SinglePlayerGameManager extends BaseGameManager {
         if (name.contains("Mana Regen")) return "MANA_REGEN";
         if (name.contains("Weapon Damage")) return "WEAPON_DAMAGE";
         if (name.contains("Weapon Range")) return "WEAPON_RANGE";
+        if (name.contains("Attack Damage")) return "ATTACK_DAMAGE";
         if (name.contains("Max Armor")) return "ARMOR";
         return null;
     }
@@ -246,6 +247,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
                 break;
             case "WEAPON_RANGE":
                 player.increaseWeaponRangeByPercent(value);
+                break;
+            case "ATTACK_DAMAGE":
+                player.increaseBaseDamage(value);
                 break;
             case "ARMOR":
                 player.increaseArmor(1.0);

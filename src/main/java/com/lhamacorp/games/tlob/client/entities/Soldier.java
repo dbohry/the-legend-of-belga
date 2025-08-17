@@ -1,10 +1,10 @@
 package com.lhamacorp.games.tlob.client.entities;
 
+import com.lhamacorp.games.tlob.client.entities.skills.Skills;
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
 import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
-import com.lhamacorp.games.tlob.core.Constants;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -135,6 +135,9 @@ public class Soldier extends Entity {
         }
 
         pickNewWanderDir();
+        
+        // Set primary skill
+        setPrimarySkill(Skills.TACKLE);
     }
 
     @Override
@@ -152,6 +155,9 @@ public class Soldier extends Entity {
         }
 
         if (hurtTimer > 0) hurtTimer--;
+        // Update skills system
+        updateSkills();
+        
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
         if (postAttackSlowdownTimer > 0) postAttackSlowdownTimer--;
@@ -162,11 +168,16 @@ public class Soldier extends Entity {
 
         boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
 
-        if (!playerHidden && distToP <= ATTACK_RANGE && attackCooldown == 0 && attackTimer == 0) {
+        if (!playerHidden && distToP <= ATTACK_RANGE && isPrimarySkillReady()) {
+            // Use the primary skill (Tackle)
+            usePrimarySkill();
+            
             attackTimer = baseAttackDuration;
             attackCooldown = baseAttackCooldown;
             postAttackSlowdownTimer = POST_ATTACK_SLOWDOWN_TICKS;
-            player.damage(1.0);
+            
+            double damage = getPrimarySkillDamage();
+            player.damage(damage);
             player.applyKnockback(x, y);
         }
 

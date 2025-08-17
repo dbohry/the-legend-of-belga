@@ -1,5 +1,6 @@
 package com.lhamacorp.games.tlob.client.entities;
 
+import com.lhamacorp.games.tlob.client.entities.skills.Skills;
 import com.lhamacorp.games.tlob.client.managers.GameConfig;
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
@@ -20,7 +21,6 @@ public class Archer extends Entity {
 
     private static final int ATTACK_RANGE = 120;
     private static final int MIN_ATTACK_RANGE = 60;
-    private static final double ARROW_DAMAGE = 0.5;
     private static final int ATTACK_COOLDOWN_TICKS = 90;
     private static final int ATTACK_DURATION_TICKS = 8;
     private static final int ARROW_TRAVEL_TICKS = 30;
@@ -134,6 +134,9 @@ public class Archer extends Entity {
         precisionLevel = 0.5 + 0.5 * rand01();
 
         pickNewWanderDir();
+        
+        // Set primary skill
+        setPrimarySkill(Skills.ARROW_ATTACK);
     }
 
     @Override
@@ -150,6 +153,9 @@ public class Archer extends Entity {
             nearbyAllies = findNearbyAllies(enemies);
         }
 
+        // Update skills system
+        updateSkills();
+        
         if (hurtTimer > 0) hurtTimer--;
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
@@ -164,7 +170,8 @@ public class Archer extends Entity {
             double arrowToPlayerDist = Math.hypot(currentArrowX - player.getX(), currentArrowY - player.getY());
 
             if (arrowToPlayerDist <= 25) {
-                player.damage(ARROW_DAMAGE);
+                double damage = getPrimarySkillDamage();
+                player.damage(damage);
                 player.applyKnockback(arrowX, arrowY);
                 arrowTimer = 0;
             }
@@ -177,8 +184,11 @@ public class Archer extends Entity {
         boolean playerHidden = map.isHidingAtWorld(player.getX(), player.getY());
 
         if (!playerHidden && distToP <= ATTACK_RANGE && distToP >= MIN_ATTACK_RANGE &&
-            attackCooldown == 0 && attackTimer == 0 && arrowTimer == 0) {
+            isPrimarySkillReady() && arrowTimer == 0) {
 
+            // Use the primary skill (Arrow Attack)
+            usePrimarySkill();
+            
             attackTimer = baseAttackDuration;
             attackCooldown = baseAttackCooldown;
 

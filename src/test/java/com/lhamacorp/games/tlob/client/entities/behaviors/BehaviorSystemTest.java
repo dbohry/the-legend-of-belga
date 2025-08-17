@@ -76,6 +76,9 @@ public class BehaviorSystemTest {
         behaviorManager.addBehavior(movementBehavior);
         behaviorManager.addBehavior(attackBehavior);
         
+        // Position player within attack range so AttackBehavior can execute
+        testPlayer.setPosition(110, 100); // 10 units away from entity (within 30 unit range)
+        
         // Attack behavior should have higher priority and be executed first
         behaviorManager.update(testPlayer, testMap, null);
         assertEquals("Attack", behaviorManager.getCurrentBehaviorName());

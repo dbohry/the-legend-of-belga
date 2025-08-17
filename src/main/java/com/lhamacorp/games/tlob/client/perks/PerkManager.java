@@ -208,7 +208,7 @@ public class PerkManager {
         });
 
         register("ATTACK_DAMAGE", Rarity.UNCOMMON, r -> {
-            double p = pct(r, 0.10, 0.20);
+            double p = pct(r, 0.20, 0.30);
             String label = "Attack Damage";
             String desc = String.format("Increases attack damage (+%d%%).", (int) Math.round(p * 100));
             return new Perk(label, desc, Rarity.UNCOMMON, entity -> entity.increaseAttackDamageByPercent(p));

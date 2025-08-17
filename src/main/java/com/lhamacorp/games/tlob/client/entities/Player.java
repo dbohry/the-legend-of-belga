@@ -1,5 +1,6 @@
 package com.lhamacorp.games.tlob.client.entities;
 
+import com.lhamacorp.games.tlob.client.entities.skills.Slash;
 import com.lhamacorp.games.tlob.client.managers.AudioManager;
 import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
 import com.lhamacorp.games.tlob.client.managers.KeyManager;
@@ -104,6 +105,7 @@ public class Player extends Entity {
      */
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, 0, weapon, "Player", Alignment.NEUTRAL);
+        setPrimarySkill(new Slash(1.0, 30, 3, 40));
     }
 
     /**
@@ -136,7 +138,9 @@ public class Player extends Entity {
         this.shield = Math.max(0.0, Math.min(sh, maxShield));
     }
 
-    /** Maps server octant (0..7) to local facing enum + angle. 0=→, 1=↘, 2=↓, 3=↙, 4=←, 5=↖, 6=↑, 7=↗ */
+    /**
+     * Maps server octant (0..7) to local facing enum + angle. 0=→, 1=↘, 2=↓, 3=↙, 4=←, 5=↖, 6=↑, 7=↗
+     */
     public void setFacingOctant(int octant) {
         int o = ((octant % 8) + 8) % 8;      // wrap to [0..7]
         int signed = (o <= 4) ? o : o - 8;   // [-4..4] for the same switch map we use below
@@ -146,6 +150,7 @@ public class Player extends Entity {
 
     /**
      * Updates facing direction based on angle octant
+     *
      * @param octant signed octant value [-4..4]
      */
     private void updateFacingFromAngle(int octant) {
@@ -270,6 +275,7 @@ public class Player extends Entity {
 
     /**
      * Checks if the player is currently blocking.
+     *
      * @return true if the player is blocking, false otherwise
      */
     public boolean isBlocking() {
@@ -278,6 +284,7 @@ public class Player extends Entity {
 
     /**
      * Checks if the player can currently block a specific damage amount (has enough stamina).
+     *
      * @param damage the incoming damage amount
      * @return true if the player can block, false otherwise
      */
@@ -287,6 +294,7 @@ public class Player extends Entity {
 
     /**
      * Checks if the player can currently block (has enough stamina).
+     *
      * @return true if the player can block, false otherwise
      */
     public boolean canBlock() {
@@ -329,7 +337,7 @@ public class Player extends Entity {
                 public boolean defense() {
                     return is.defense;
                 }
-                
+
                 public boolean dash() {
                     return is.dash;
                 }
@@ -363,7 +371,7 @@ public class Player extends Entity {
                 public boolean defense() {
                     return km.defense;
                 }
-                
+
                 public boolean dash() {
                     return km.dash;
                 }
@@ -397,7 +405,7 @@ public class Player extends Entity {
                 public boolean defense() {
                     return false;
                 }
-                
+
                 public boolean dash() {
                     return false;
                 }
@@ -577,6 +585,9 @@ public class Player extends Entity {
         }
 
         // --- Attack ---
+        // Update skills system
+        updateSkills();
+
         if (attackCooldown > 0) attackCooldown--;
         if (attackTimer > 0) attackTimer--;
 
@@ -622,10 +633,15 @@ public class Player extends Entity {
             }
         }
 
-        if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0 && !isBlocking) {
+        if (input.attack() && isPrimarySkillReady() && stamina > 0 && !isBlocking) {
             stamina -= 0.5;
+
+            // Use the primary skill (Slash)
+            usePrimarySkill();
+
+            // Set attack timer to trigger the attack animation
+            // This ensures the old Player attack animation plays when using the Slash skill
             attackTimer = scaleFrom60(weapon.getDuration());
-            attackCooldown = scaleFrom60(weapon.getCooldown());
 
             // Initialize attack swing animation
             attackSwingPhase = ATTACK_SWING_DURATION;
@@ -635,7 +651,7 @@ public class Player extends Entity {
             Shape swing = getSwordSwingShape();
             boolean hitSomething = false;
 
-            double dmg = getEffectiveAttackDamage();
+            double dmg = getPrimarySkillDamage();
             for (Entity e : enemies) {
                 if (e.isAlive() && swing.intersects(e.getBounds())) {
                     e.damage(dmg);
@@ -953,9 +969,9 @@ public class Player extends Entity {
         if (screenShakeTimer <= 0) {
             return "No screen shake active";
         }
-        return "Screen shake active: Timer=" + screenShakeTimer + 
-               "/" + SCREEN_SHAKE_DURATION + 
-               ", Intensity=" + String.format("%.2f", (double) screenShakeTimer / SCREEN_SHAKE_DURATION);
+        return "Screen shake active: Timer=" + screenShakeTimer +
+            "/" + SCREEN_SHAKE_DURATION +
+            ", Intensity=" + String.format("%.2f", (double) screenShakeTimer / SCREEN_SHAKE_DURATION);
     }
 
     @Override

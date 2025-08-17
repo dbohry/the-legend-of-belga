@@ -1,5 +1,6 @@
 package com.lhamacorp.games.tlob.client.entities;
 
+import com.lhamacorp.games.tlob.client.entities.skills.Skill;
 import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
@@ -35,6 +36,14 @@ public abstract class Entity {
     protected double speedMultiplier = 1.0;
     protected double staminaRegenRateMult = 1.0;
     protected double manaRegenRateMult = 1.0;
+    
+    // Entity attributes that modify skill performance
+    protected double attackSpeed = 1.0;  // Multiplier for attack speed (higher = faster attacks)
+    protected double baseDamage = 1.0;   // Base damage bonus (added to skill base damage)
+    
+    // Skills system
+    protected SkillManager skillManager;
+    protected Skill primarySkill;
 
     // Armor system
     protected double armor;
@@ -88,6 +97,9 @@ public abstract class Entity {
         this.armor = maxArmor;
         this.name = name;
         this.alignment = alignment;
+        
+        // Initialize skills system
+        this.skillManager = new SkillManager();
     }
 
     /**
@@ -316,6 +328,56 @@ public abstract class Entity {
             return weapon.getDamage() * damageMultiplier;
         }
         return 0.0;
+    }
+
+    // ===== Entity Attribute Methods =====
+
+    /**
+     * Gets the current attack speed multiplier.
+     * @return The attack speed multiplier (higher = faster attacks)
+     */
+    public double getAttackSpeed() {
+        return attackSpeed;
+    }
+
+    /**
+     * Sets the attack speed multiplier.
+     * @param attackSpeed The new attack speed multiplier
+     */
+    public void setAttackSpeed(double attackSpeed) {
+        this.attackSpeed = Math.max(0.1, attackSpeed); // Minimum 0.1x speed
+    }
+
+    /**
+     * Increases attack speed by the specified percentage.
+     * @param pct The percentage increase (0.1 = 10% increase)
+     */
+    public void increaseAttackSpeedByPercent(double pct) {
+        this.attackSpeed *= (1.0 + pct);
+    }
+
+    /**
+     * Gets the current base damage bonus.
+     * @return The base damage bonus (added to skill base damage)
+     */
+    public double getBaseDamage() {
+        return baseDamage;
+    }
+
+    /**
+     * Sets the base damage bonus.
+     * @param baseDamage The new base damage bonus
+     */
+    public void setBaseDamage(double baseDamage) {
+        this.baseDamage = Math.max(0.0, baseDamage); // Minimum 0.0
+    }
+
+    /**
+     * Increases base damage by the specified amount.
+     * @param amount The amount to increase base damage by
+     */
+    public void increaseBaseDamage(double amount) {
+        this.baseDamage += amount;
     }
 
     // ===== Perk Information Getters =====
@@ -668,5 +730,77 @@ public abstract class Entity {
      */
     public Alignment getAlignment() {
         return alignment;
+    }
+    
+    // ===== Skills System Methods =====
+    
+    /**
+     * Sets the primary skill for this entity.
+     * 
+     * @param skill The skill to set as primary
+     */
+    public void setPrimarySkill(Skill skill) {
+        this.primarySkill = skill;
+    }
+    
+    /**
+     * Gets the primary skill for this entity.
+     * 
+     * @return The primary skill, or null if none set
+     */
+    public Skill getPrimarySkill() {
+        return primarySkill;
+    }
+    
+    /**
+     * Gets the skill manager for this entity.
+     * 
+     * @return The skill manager
+     */
+    public SkillManager getSkillManager() {
+        return skillManager;
+    }
+    
+    /**
+     * Checks if the primary skill is ready to use.
+     * 
+     * @return true if the skill is ready, false otherwise
+     */
+    public boolean isPrimarySkillReady() {
+        return primarySkill != null && skillManager.isSkillReady(primarySkill);
+    }
+    
+    /**
+     * Uses the primary skill if it's ready.
+     * 
+     * @return true if the skill was used, false otherwise
+     */
+    public boolean usePrimarySkill() {
+        if (isPrimarySkillReady()) {
+            skillManager.useSkill(primarySkill);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Gets the effective damage for the primary skill.
+     * 
+     * @return The effective damage, or 0 if no primary skill
+     */
+    public double getPrimarySkillDamage() {
+        if (primarySkill != null) {
+            return primarySkill.getEffectiveDamage(this);
+        }
+        return 0.0;
+    }
+    
+    /**
+     * Updates the skills system. Should be called every tick.
+     */
+    public void updateSkills() {
+        if (skillManager != null) {
+            skillManager.update();
+        }
     }
 }
