@@ -3,25 +3,37 @@ name: Build & Release JAR
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch to deploy (e.g., main, develop, feature/x)"
+        required: true
+        default: "main"
+        type: string
 
 permissions:
   contents: write
 
 # Avoid double-runs if multiple pushes happen quickly
 concurrency:
-  group: release-${{ github.ref }}
+  # Use the selected branch when manually dispatched; otherwise use the event ref
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.target_branch || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   build-and-release:
-    # Do nothing on the automated bump commit
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    # Only skip on push events with "[skip ci]"; allow manual runs regardless
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
+    env:
+      # Branch we’ll operate on (used by checkout)
+      TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.target_branch || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.TARGET_REF }}
 
       - name: Set up Java
         uses: actions/setup-java@v4
