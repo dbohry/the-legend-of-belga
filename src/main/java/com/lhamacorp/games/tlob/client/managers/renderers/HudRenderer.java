@@ -62,6 +62,7 @@ public final class HudRenderer {
         int nextY = drawHpShieldBar(g2, player, x, y);
         nextY = drawStaminaBar(g2, player, x, nextY);
         nextY = drawManaBar(g2, player, x, nextY);
+        nextY = drawXPLevelBar(g2, player, x, nextY);
         
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_DEFAULT);
@@ -308,6 +309,82 @@ public final class HudRenderer {
         }
         
         return y + BAR_HEIGHT + BAR_SPACING;
+    }
+
+    private int drawXPLevelBar(Graphics2D g2, Player player, int x, int y) {
+        int level = player.getCurrentLevel();
+        int xp = player.getCurrentXP();
+        int xpToNext = player.getXPToNextLevel();
+        
+        // Calculate XP progress for current level
+        int xpForCurrentLevel = getXPRequiredForLevel(level);
+        int xpProgress = xp - xpForCurrentLevel;
+        int xpNeeded = xpToNext - xpForCurrentLevel;
+        double progress = xpNeeded > 0 ? (double) xpProgress / xpNeeded : 0.0;
+        
+        RoundRectangle2D background = new RoundRectangle2D.Double(
+            x, y, BAR_WIDTH, BAR_HEIGHT, CORNER_RADIUS, CORNER_RADIUS
+        );
+        
+        // XP bar background
+        g2.setColor(new Color(40, 20, 40, 180));
+        g2.fill(background);
+        
+        g2.setColor(new Color(80, 40, 80));
+        g2.setStroke(new BasicStroke(BORDER_WIDTH));
+        g2.draw(background);
+        
+        // XP progress fill
+        if (xpNeeded > 0) {
+            int xpWidth = (int) (progress * BAR_WIDTH);
+            if (xpWidth > 0) {
+                Color xpColor = new Color(150, 100, 255);
+                drawGradientFill(g2, x, y, xpWidth, BAR_HEIGHT,
+                               xpColor, xpColor.darker(), CORNER_RADIUS);
+            }
+        }
+        
+        // Level and XP text
+        g2.setColor(Color.WHITE);
+        g2.setFont(bodyFont.deriveFont(Font.BOLD, 12f));
+        
+        String levelText = "Lv." + level;
+        String xpText = String.format("%d/%d", xpProgress, xpNeeded);
+        
+        FontMetrics fm = g2.getFontMetrics();
+        
+        // Draw level on the left
+        int levelX = x + 5;
+        int textY = y + (BAR_HEIGHT + fm.getAscent()) / 2;
+        
+        g2.setColor(new Color(0, 0, 0, 100));
+        g2.drawString(levelText, levelX + 1, textY + 1);
+        g2.setColor(Color.WHITE);
+        g2.drawString(levelText, levelX, textY);
+        
+        // Draw XP progress on the right
+        int xpTextX = x + BAR_WIDTH - fm.stringWidth(xpText) - 5;
+        
+        g2.setColor(new Color(0, 0, 0, 100));
+        g2.drawString(xpText, xpTextX + 1, textY + 1);
+        g2.setColor(Color.WHITE);
+        g2.drawString(xpText, xpTextX, textY);
+        
+        return y + BAR_HEIGHT + BAR_SPACING;
+    }
+
+    /**
+     * Gets the total XP required to reach a specific level.
+     * This matches the calculation in the Player class.
+     */
+    private int getXPRequiredForLevel(int level) {
+        if (level <= 1) return 0;
+        
+        int totalXP = 0;
+        for (int i = 2; i <= level; i++) {
+            totalXP += (int) (100 * Math.pow(1.5, i - 2));
+        }
+        return totalXP;
     }
 
     private void drawGradientFill(Graphics2D g2, int x, int y, int width, int height, 

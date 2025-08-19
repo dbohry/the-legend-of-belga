@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-public abstract class BaseGameManager extends JPanel implements Runnable {
+public abstract class BaseGameManager extends JPanel implements Runnable, Player.LevelUpListener {
 
     public static final int TILE_SIZE = 32;
     public static final int SCREEN_WIDTH = 1280;
@@ -74,6 +74,10 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
     protected Player player;
     protected final List<Entity> enemies = new ArrayList<>();
     protected int enemiesAtLevelStart = 0;
+
+    // Level-up perk selection state
+    protected boolean hasLevelUpPerk = false;
+    protected int pendingLevelUp = 0;
 
     protected boolean musicMuted = false;
     protected float musicVolumeDb = -12.0f;
@@ -229,6 +233,10 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             spawn[1] * TILE_SIZE + TILE_SIZE / 2.0,
             sword
         );
+        
+        // Set up level-up listener for perk selection
+        player.setLevelUpListener(this);
+        
         try {
             if (player.getName() == null || player.getName().isEmpty()) player.setName("Hero");
         } catch (Exception ignored) {
@@ -256,11 +264,27 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
 
     protected void enterVictory() {
         state = GameState.VICTORY;
-        perkManager.rollChoicesFor(player);
-        victoryRenderer.setChoices(perkManager.getChoices());
-        victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
-        AudioManager.stopMusic();
-        AudioManager.playSound("map-complete.wav");
+        
+        // Check if player should get perk choices (either from level up or map completion)
+        if (shouldShowPerkChoices()) {
+            perkManager.rollChoicesFor(player);
+            victoryRenderer.setChoices(perkManager.getChoices());
+            victoryRenderer.setPerkChoiceReason(getPerkChoiceReason());
+            victoryRenderer.setPlayerProgress(player.getCurrentXP(), player.getCurrentLevel(), player.getXPToNextLevel());
+            victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+            AudioManager.stopMusic();
+            
+            if (hasLevelUpPerk) {
+                // Level-up perk - play level-up sound
+                AudioManager.playSound("level-up.wav", -10.0f);
+            } else {
+                // Map completion perk - play map complete sound
+                AudioManager.playSound("map-complete.wav");
+            }
+        } else {
+            // No perks to choose, go directly to next level
+            startNextLevel();
+        }
     }
 
     protected void pauseGame() {
@@ -321,7 +345,30 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
             // Auto-save immediately after applying perk (before starting next level)
             // This ensures the enhanced stats are captured in the save
             autoSave();
-            startNextLevel();
+            
+            if (hasLevelUpPerk) {
+                // This was a level-up perk, check if we also need to show map completion perk
+                hasLevelUpPerk = false;
+                pendingLevelUp = 0;
+                
+                // Check if we should show map completion perk
+                if (enemies.isEmpty()) {
+                    // Still have map completion perk to show
+                    perkManager.rollChoicesFor(player);
+                    victoryRenderer.setChoices(perkManager.getChoices());
+                    victoryRenderer.setPerkChoiceReason("Map Complete! Choose a perk:");
+                    victoryRenderer.setPlayerProgress(player.getCurrentXP(), player.getCurrentLevel(), player.getXPToNextLevel());
+                    victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+                    AudioManager.playSound("map-complete.wav");
+                } else {
+                    // No map completion perk, just resume the game
+                    state = GameState.PLAYING;
+                    requestFocusInWindow();
+                }
+            } else {
+                // This was a map completion perk, go to next level
+                startNextLevel();
+            }
         }
     }
 
@@ -632,5 +679,59 @@ public abstract class BaseGameManager extends JPanel implements Runnable {
                 }
             }
         }
+    }
+
+    /**
+     * Handles level-up events from the player
+     * @param newLevel the new level the player reached
+     */
+    @Override
+    public void onLevelUp(int newLevel) {
+        // Mark that we have a level-up perk to give
+        hasLevelUpPerk = true;
+        pendingLevelUp = newLevel;
+        
+        // Only change state if we're not already in VICTORY state
+        if (state != GameState.VICTORY) {
+            // Pause the game and show perk selection
+            state = GameState.VICTORY;
+            perkManager.rollChoicesFor(player);
+            victoryRenderer.setChoices(perkManager.getChoices());
+            victoryRenderer.setPerkChoiceReason("Level " + newLevel + "! Choose a perk:");
+            victoryRenderer.setPlayerProgress(player.getCurrentXP(), player.getCurrentLevel(), player.getXPToNextLevel());
+            victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+            // Play level-up sound at reduced volume (-10dB) and don't stop background music
+            AudioManager.playSound("level-up.wav", -10.0f);
+        } else {
+            // We're already in VICTORY state, update the display for the level-up perk
+            perkManager.rollChoicesFor(player);
+            victoryRenderer.setChoices(perkManager.getChoices());
+            victoryRenderer.setPerkChoiceReason("Level " + newLevel + "! Choose a perk:");
+            victoryRenderer.setPlayerProgress(player.getCurrentXP(), player.getCurrentLevel(), player.getXPToNextLevel());
+            victoryRenderer.layout(SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
+    }
+
+    /**
+     * Checks if the player should be shown perk choices.
+     * This happens when:
+     * 1. The player completes a map (always gives 1 perk)
+     * 2. The player levels up (gives perk choices)
+     * @return true if perk choices should be shown
+     */
+    protected boolean shouldShowPerkChoices() {
+        // Always show perks - either from level-up or map completion
+        return true;
+    }
+
+    /**
+     * Gets the reason why perks are being shown.
+     * @return a description of why perks are available
+     */
+    protected String getPerkChoiceReason() {
+        if (hasLevelUpPerk) {
+            return "Level " + pendingLevelUp + "! Choose a perk:";
+        }
+        return "Map Complete! Choose a perk:";
     }
 }

@@ -58,6 +58,10 @@ public abstract class Entity {
     protected static final int KNOCKBACK_DURATION = 8;
     protected static final double KNOCKBACK_FORCE = 8.0;
 
+    // Death notification system
+    private boolean wasAlive = true;
+    private DeathListener deathListener;
+
     public enum Direction {UP, DOWN, LEFT, RIGHT, UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT}
 
     /**
@@ -517,10 +521,11 @@ public abstract class Entity {
     }
 
     /**
-     * Applies damage to the entity, applying armor reduction first, then absorbing with shield.
+     * Applies damage to this entity, applying armor reduction first, then absorbing with shield.
+     * @param amount the amount of damage to apply
      */
     public void damage(double amount) {
-        if (!alive) return;
+        if (!alive || amount <= 0) return;
 
         if (armor > 0) {
             double cappedArmor = Math.min(armor, 10); // Cap at 10 for 100%
@@ -543,7 +548,15 @@ public abstract class Entity {
         if (health <= 0) {
             health = 0;
             alive = false;
+            
+            // Notify death listener if this is a new death
+            if (wasAlive && deathListener != null) {
+                deathListener.onEntityDied(this);
+            }
         }
+        
+        // Update wasAlive state
+        wasAlive = alive;
     }
 
     /**
@@ -668,5 +681,20 @@ public abstract class Entity {
      */
     public Alignment getAlignment() {
         return alignment;
+    }
+
+    /**
+     * Interface for entities that want to be notified when this entity dies.
+     */
+    public interface DeathListener {
+        void onEntityDied(Entity entity);
+    }
+
+    /**
+     * Sets the death listener for this entity.
+     * @param listener the listener to notify when this entity dies
+     */
+    public void setDeathListener(DeathListener listener) {
+        this.deathListener = listener;
     }
 }

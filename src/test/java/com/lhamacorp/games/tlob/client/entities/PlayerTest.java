@@ -417,4 +417,123 @@ class PlayerTest {
         assertEquals(0, shakeOffset.x);
         assertEquals(0, shakeOffset.y);
     }
+
+    @Test
+    public void testXPRequirements() {
+        // Test XP requirements for different levels
+        // The formula is: each level requires 100 * 1.5^(level-2) XP
+        assertEquals(0, Player.getXPRequiredForLevel(1), "Level 1 should require 0 XP");
+        assertEquals(100, Player.getXPRequiredForLevel(2), "Level 2 should require 100 XP");
+        assertEquals(250, Player.getXPRequiredForLevel(3), "Level 3 should require 250 XP");
+        assertEquals(475, Player.getXPRequiredForLevel(4), "Level 4 should require 475 XP");
+        assertEquals(812, Player.getXPRequiredForLevel(5), "Level 5 should require 812 XP");
+    }
+
+    @Test
+    public void testEnemyKillXP() {
+        Player player = new Player(100, 100, new Sword(2, 28, 12, 10, 16));
+        
+        // Player starts with 0 XP
+        assertEquals(0, player.getCurrentXP(), "Player should start with 0 XP");
+        
+        // Test base XP gain - create enemy with 0 perks
+        Entity mockEnemy = new Soldier(200, 200, new Sword(1, 30, 20, 500, 1000));
+        mockEnemy.setDeathListener(player::onEnemyKilled);
+        assertEquals(0, player.getCurrentXP(), "Player should still have 0 XP before enemy death");
+        
+        // Kill the enemy by setting health to 0
+        // 0 perks: 10 × (1 + 0) = 10 XP
+        mockEnemy.damage(mockEnemy.getMaxHealth());
+        assertEquals(10, player.getCurrentXP(), "Player should have 10 XP after enemy with 0 perks dies");
+        
+        // Test enemy with 1 perk: 10 × (1 + 1) = 20 XP
+        Entity onePerkEnemy = new Soldier(200, 200, new Sword(1, 30, 20, 500, 1000));
+        onePerkEnemy.increaseMaxHealthByPercent(0.1); // Add 1 perk
+        onePerkEnemy.setDeathListener(player::onEnemyKilled);
+        onePerkEnemy.damage(onePerkEnemy.getMaxHealth());
+        assertEquals(30, player.getCurrentXP(), "Player should have 30 XP after enemy with 1 perk dies");
+        
+        // Test enemy with 2 perks: 10 × (1 + 2) = 30 XP
+        Entity twoPerkEnemy = new Soldier(200, 200, new Sword(1, 30, 20, 500, 1000));
+        twoPerkEnemy.increaseMaxHealthByPercent(0.1);      // Health perk
+        twoPerkEnemy.increaseMaxStaminaByPercent(0.1);     // Stamina perk
+        twoPerkEnemy.setDeathListener(player::onEnemyKilled);
+        twoPerkEnemy.damage(twoPerkEnemy.getMaxHealth());
+        assertEquals(60, player.getCurrentXP(), "Player should have 60 XP after enemy with 2 perks dies");
+        
+        // Test enemy with 3 perks: 10 × (1 + 3) = 40 XP
+        Entity threePerkEnemy = new Soldier(200, 200, new Sword(1, 30, 20, 500, 1000));
+        threePerkEnemy.increaseMaxHealthByPercent(0.1);      // Health perk
+        threePerkEnemy.increaseMaxStaminaByPercent(0.1);     // Stamina perk
+        threePerkEnemy.increaseMaxManaByPercent(0.1);        // Mana perk
+        threePerkEnemy.setDeathListener(player::onEnemyKilled);
+        threePerkEnemy.damage(threePerkEnemy.getMaxHealth());
+        assertEquals(100, player.getCurrentXP(), "Player should have 100 XP after enemy with 3 perks dies");
+        
+        // Test enemy with 6 perks: 10 × (1 + 6) = 70 XP
+        Entity sixPerkEnemy = new Soldier(200, 200, new Sword(1, 30, 20, 500, 1000));
+        sixPerkEnemy.increaseMaxHealthByPercent(0.1);      // Health perk
+        sixPerkEnemy.increaseMaxStaminaByPercent(0.1);     // Stamina perk
+        sixPerkEnemy.increaseMaxManaByPercent(0.1);        // Mana perk
+        sixPerkEnemy.increaseMoveSpeedByPercent(0.1);      // Speed perk
+        sixPerkEnemy.increaseAttackDamageByPercent(0.1);   // Damage perk
+        sixPerkEnemy.increaseWeaponRangeByPercent(0.1);    // Range perk
+        sixPerkEnemy.setDeathListener(player::onEnemyKilled);
+        sixPerkEnemy.damage(sixPerkEnemy.getMaxHealth());
+        assertEquals(170, player.getCurrentXP(), "Player should have 170 XP after enemy with 6 perks dies");
+    }
+
+    @Test
+    public void testSetXPAndLevel() {
+        Player player = new Player(100, 100, new Sword(2, 28, 12, 10, 16));
+        
+        // Set custom XP and level
+        player.setXPAndLevel(150, 3);
+        assertEquals(3, player.getCurrentLevel(), "Player level should be set to 3");
+        assertEquals(150, player.getCurrentXP(), "Player XP should be set to 150");
+        assertEquals(475, player.getXPToNextLevel(), "Player should need 475 XP for level 4");
+        
+        // Test boundary conditions
+        player.setXPAndLevel(-10, 0);
+        assertEquals(1, player.getCurrentLevel(), "Player level should be clamped to minimum 1");
+        assertEquals(0, player.getCurrentXP(), "Player XP should be clamped to minimum 0");
+    }
+
+    @Test
+    public void testMultipleLevelUps() {
+        Player player = new Player(100, 100, new Sword(2, 28, 12, 10, 16));
+        
+        // Add enough XP to level up multiple times
+        boolean leveledUp = player.addXP(500);
+        assertTrue(leveledUp, "Player should level up with 500 XP");
+        
+        // Should be level 4 (100 + 150 + 250 = 500 XP)
+        assertEquals(4, player.getCurrentLevel(), "Player should be level 4");
+        assertEquals(500, player.getCurrentXP(), "Player should have 500 XP");
+        assertEquals(812, player.getXPToNextLevel(), "Player should need 812 XP for level 5");
+    }
+
+    @Test
+    void testLevelUpListener() {
+        Player player = new Player(100, 100, new Sword(2, 28, 12, 10, 16));
+        
+        // Create a mock level-up listener
+        final boolean[] listenerCalled = {false};
+        final int[] newLevel = {0};
+        
+        Player.LevelUpListener mockListener = level -> {
+            listenerCalled[0] = true;
+            newLevel[0] = level;
+        };
+        
+        player.setLevelUpListener(mockListener);
+        
+        // Give enough XP to level up
+        boolean leveledUp = player.addXP(100);
+        
+        assertTrue(leveledUp);
+        assertTrue(listenerCalled[0]);
+        assertEquals(2, newLevel[0]);
+        assertEquals(2, player.getCurrentLevel());
+    }
 }

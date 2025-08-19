@@ -5,8 +5,10 @@ import com.lhamacorp.games.tlob.client.save.SaveState;
 import com.lhamacorp.games.tlob.client.save.ActivePerks;
 import com.lhamacorp.games.tlob.client.save.AppliedPerk;
 import com.lhamacorp.games.tlob.client.perks.Perk;
+import com.lhamacorp.games.tlob.client.entities.Entity;
 
 import java.awt.*;
+import java.util.Random;
 
 public class SinglePlayerGameManager extends BaseGameManager {
 
@@ -27,6 +29,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
         // now populate SP enemies
         enemySpawner.spawn(levelManager.map(), player, enemies, levelManager.completed(), TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
+        
+        // Set up death notifications for initial enemies
+        setupDeathNotifications();
     }
 
     /**
@@ -38,6 +43,12 @@ public class SinglePlayerGameManager extends BaseGameManager {
         this.saveManager = new SaveManager();
         this.activePerks = new ActivePerks();
         initWorld(saveState.getWorldSeed());
+        
+        // Set up level-up listener for perk selection
+        player.setLevelUpListener(this);
+        
+        // Restore player XP and level from save
+        player.setXPAndLevel(saveState.getPlayerXP(), saveState.getPlayerLevel());
         
         // Set the completed maps count from save
         for (int i = 0; i < saveState.getCompletedMaps(); i++) {
@@ -56,6 +67,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
         // Spawn enemies for the current level
         enemySpawner.spawn(levelManager.map(), player, enemies, levelManager.completed(), TILE_SIZE);
         enemiesAtLevelStart = enemies.size();
+        
+        // Set up death notifications for XP gain
+        setupDeathNotifications();
     }
 
     /**
@@ -101,7 +115,8 @@ public class SinglePlayerGameManager extends BaseGameManager {
      * @return true if save was successful, false otherwise
      */
     public boolean saveGameState() {
-        SaveState saveState = new SaveState(worldSeed, levelManager.completed(), activePerks);
+        SaveState saveState = new SaveState(worldSeed, levelManager.completed(), activePerks, 
+                                         player.getCurrentXP(), player.getCurrentLevel());
         boolean success = saveManager.saveGame(saveState);
         if (success) {
             saveIndicatorTicks = SAVE_INDICATOR_DURATION;
@@ -132,10 +147,12 @@ public class SinglePlayerGameManager extends BaseGameManager {
                 activePerks.addPerk(appliedPerk);
             }
             
-            // Auto-save immediately after applying perk (before starting next level)
+            // Auto-save immediately after applying perk
             // This ensures the active perks are captured in the save
             autoSave();
-            startNextLevel();
+            
+            // Call the parent method to handle the distinction between level-up and map completion perks
+            super.applyPerkAndContinue(index);
         }
     }
 
@@ -297,6 +314,9 @@ public class SinglePlayerGameManager extends BaseGameManager {
                 levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
             }
             
+            // Restore player XP and level from save
+            player.setXPAndLevel(saveState.getPlayerXP(), saveState.getPlayerLevel());
+            
             // Reset game state
             state = GameState.PLAYING;
             enemiesAtLevelStart = enemies.size();
@@ -312,5 +332,65 @@ public class SinglePlayerGameManager extends BaseGameManager {
             // If no save exists, fall back to regular restart
             super.restartGame();
         }
+    }
+
+    /**
+     * Sets up death notifications for all enemies so the player can gain XP when they die.
+     */
+    private void setupDeathNotifications() {
+        for (Entity enemy : enemies) {
+            enemy.setDeathListener(player::onEnemyKilled);
+        }
+    }
+
+    /**
+     * Spawns new enemies and sets up death notifications for XP gain.
+     */
+    private void spawnEnemiesWithDeathNotifications() {
+        enemySpawner.spawn(levelManager.map(), player, enemies, levelManager.completed(), TILE_SIZE);
+        enemiesAtLevelStart = enemies.size();
+        
+        // Set up death notifications for new enemies
+        setupDeathNotifications();
+    }
+
+    @Override
+    protected void startNextLevel() {
+        enemySpawner.reseed(new Random(new Random(worldSeed).nextLong()));
+        levelManager.nextLevel(player, enemySpawner, enemies, TILE_SIZE);
+        state = GameState.PLAYING;
+        
+        // Spawn enemies and set up death notifications
+        spawnEnemiesWithDeathNotifications();
+        
+        animTick60 = 0;
+        simTick = 0;
+
+        int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+        int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+        camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+        requestFocusInWindow();
+        
+        // Auto-save when advancing to next level
+        autoSave();
+        AudioManager.playRandomMusic(musicVolumeDb);
+    }
+
+    @Override
+    protected void restartGame() {
+        state = GameState.PLAYING;
+        enemySpawner.reseed(new Random(new Random(worldSeed).nextLong()));
+        levelManager.restart(player, enemySpawner, enemies, TILE_SIZE);
+        
+        // Spawn enemies and set up death notifications
+        spawnEnemiesWithDeathNotifications();
+        
+        animTick60 = 0;
+        simTick = 0;
+
+        int mapWpx = levelManager.map().getWidth() * TILE_SIZE;
+        int mapHpx = levelManager.map().getHeight() * TILE_SIZE;
+        camera.follow(player.getX(), player.getY(), mapWpx, mapHpx, SCREEN_WIDTH, SCREEN_HEIGHT);
+        requestFocusInWindow();
     }
 }

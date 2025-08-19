@@ -26,6 +26,11 @@ public class Player extends Entity {
     private static final double PLAYER_MAX_SHIELD = 0;
     private static final double PLAYER_SPEED_PPS = 90.0;
 
+    // XP and Level system constants
+    private static final int XP_PER_ENEMY_KILL = 10;
+    private static final int XP_PER_LEVEL_BASE = 100;
+    private static final double XP_SCALING_FACTOR = 1.5; // Each level requires 50% more XP than the previous
+
     private static final int TICKS_PER_SECOND = 60;
     private static final int TICK_MS = 1000 / TICKS_PER_SECOND;
 
@@ -46,6 +51,14 @@ public class Player extends Entity {
     private int manaRegenCounter = 0;
     private boolean wasSprinting = false;
     private double facingAngle = 0.0;
+
+    // XP and Level system fields
+    private int currentXP = 0;
+    private int currentLevel = 1;
+    private int xpToNextLevel;
+
+    // Level up listener for perk selection
+    private LevelUpListener levelUpListener;
 
     private boolean wasDashPressed = false;
     private boolean dashTriggered = false;
@@ -104,6 +117,7 @@ public class Player extends Entity {
      */
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, 0, weapon, "Player", Alignment.NEUTRAL);
+        calculateXPToNextLevel();
     }
 
     /**
@@ -291,6 +305,155 @@ public class Player extends Entity {
      */
     public boolean canBlock() {
         return stamina > 0; // Can always attempt to block if they have any stamina
+    }
+
+    /**
+     * Gets the current XP of the player.
+     * @return the current XP
+     */
+    public int getCurrentXP() {
+        return currentXP;
+    }
+
+    /**
+     * Gets the current level of the player.
+     * @return the current level
+     */
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
+
+    /**
+     * Gets the XP required to reach the next level.
+     * @return the XP required for next level
+     */
+    public int getXPToNextLevel() {
+        return xpToNextLevel;
+    }
+
+    /**
+     * Gets the XP progress towards the next level as a percentage (0.0 to 1.0).
+     * @return the progress percentage
+     */
+    public double getLevelProgress() {
+        if (currentLevel == 1 && currentXP == 0) return 0.0;
+        
+        int xpForCurrentLevel = getXPRequiredForLevel(currentLevel);
+        int xpProgress = currentXP - xpForCurrentLevel;
+        int xpNeeded = xpToNextLevel - xpForCurrentLevel;
+        
+        return Math.min(1.0, Math.max(0.0, (double) xpProgress / xpNeeded));
+    }
+
+    /**
+     * Interface for listening to level-up events
+     */
+    public interface LevelUpListener {
+        void onLevelUp(int newLevel);
+    }
+
+    /**
+     * Sets the level-up listener
+     * @param listener the listener to notify when leveling up
+     */
+    public void setLevelUpListener(LevelUpListener listener) {
+        this.levelUpListener = listener;
+    }
+
+    /**
+     * Gets the current level-up listener
+     * @return the current level-up listener, or null if none is set
+     */
+    public LevelUpListener getLevelUpListener() {
+        return levelUpListener;
+    }
+
+    /**
+     * Adds XP to the player and handles level ups.
+     * @param xp the XP to add
+     * @return true if the player leveled up, false otherwise
+     */
+    public boolean addXP(int xp) {
+        if (xp <= 0) return false;
+        
+        currentXP += xp;
+        boolean leveledUp = false;
+        
+        // Check for level ups
+        while (currentXP >= xpToNextLevel) {
+            currentLevel++;
+            leveledUp = true;
+            calculateXPToNextLevel();
+            
+            // Play level up sound
+            AudioManager.playSound("level-up.wav", -10.0f);
+            
+            // Notify level-up listener
+            if (levelUpListener != null) {
+                levelUpListener.onLevelUp(currentLevel);
+            }
+        }
+        
+        return leveledUp;
+    }
+
+    /**
+     * Grants XP for killing an enemy.
+     * @param enemy the enemy that was killed
+     */
+    public void onEnemyKilled(Entity enemy) {
+        if (enemy == null) return;
+        
+        // Base XP for any enemy
+        int xpGained = XP_PER_ENEMY_KILL;
+        
+        // XP is multiplied by the number of perks the enemy has
+        // Formula: XP = base XP × (1 + perk count)
+        // This means:
+        // - 0 perks: 10 × (1 + 0) = 10 XP
+        // - 1 perk: 10 × (1 + 1) = 20 XP
+        // - 2 perks: 10 × (1 + 2) = 30 XP
+        // - 3 perks: 10 × (1 + 3) = 40 XP
+        // - etc.
+        int perkCount = enemy.getPerkCount();
+        xpGained *= (1 + perkCount);
+        
+        addXP(xpGained);
+    }
+
+    /**
+     * Calculates the XP required to reach the next level.
+     */
+    private void calculateXPToNextLevel() {
+        xpToNextLevel = getXPRequiredForLevel(currentLevel + 1);
+    }
+
+    /**
+     * Gets the total XP required to reach a specific level.
+     * @param level the target level
+     * @return the total XP required
+     */
+    public static int getXPRequiredForLevel(int level) {
+        if (level <= 1) return 0;
+        
+        // Progressive XP requirement: each level requires more XP than the previous
+        // Level 2: 100 XP, Level 3: 250 XP, Level 4: 400 XP, etc.
+        int totalXP = 0;
+        for (int i = 2; i <= level; i++) {
+            totalXP += (int) (XP_PER_LEVEL_BASE * Math.pow(XP_SCALING_FACTOR, i - 2));
+        }
+        return totalXP;
+    }
+
+    /**
+     * Sets the player's XP and level (used for loading save games).
+     * @param xp the XP to set
+     * @param level the level to set
+     */
+    public void setXPAndLevel(int xp, int level) {
+        this.currentXP = Math.max(0, xp);
+        this.currentLevel = Math.max(1, level);
+        calculateXPToNextLevel();
     }
 
     @Override
