@@ -2,6 +2,9 @@ package com.lhamacorp.games.tlob.client.weapons;
 
 public class Weapon {
 
+    public static final int MAX_WEAPON_RANGE = 60;
+    public static final int MAX_WEAPON_WIDTH = 10;
+    
     protected String name;
     protected WeaponType type;
     protected int reach;
@@ -15,10 +18,10 @@ public class Weapon {
     }
 
     /**
-     * Sets the weapon's reach.
+     * Sets the weapon's reach, capped at MAX_WEAPON_RANGE.
      */
     public void setReach(int reach) {
-        this.reach = reach;
+        this.reach = Math.min(reach, MAX_WEAPON_RANGE);
     }
 
     /**
@@ -29,10 +32,10 @@ public class Weapon {
     }
 
     /**
-     * Sets the weapon's width.
+     * Sets the weapon's width, capped at MAX_WEAPON_WIDTH.
      */
     public void setWidth(int width) {
-        this.width = width;
+        this.width = Math.min(width, MAX_WEAPON_WIDTH);
     }
 
     /**

@@ -9,8 +9,8 @@ public class Sword extends Weapon {
         super.name = "Sword";
         super.type = WeaponType.SWORD;
         super.damage = damage;
-        super.reach = reach;
-        super.width = width;
+        super.setReach(reach);
+        super.setWidth(width);
         super.duration = duration;
         super.cooldown = cooldown;
     }
