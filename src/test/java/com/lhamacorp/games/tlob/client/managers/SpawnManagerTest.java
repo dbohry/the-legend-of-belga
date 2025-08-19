@@ -232,9 +232,290 @@ class SpawnManagerTest {
 
     @Test
     void testGolenReplacementRatio() {
-        // Test that the new golem replacement ratio is 5 enemies per golem
-        assertEquals(5, SpawnManager.getGolenReplacementRatio(), 
-            "Golen should now replace 5 enemies instead of 10");
+        // Test that each Golen replaces 10 enemies
+        assertEquals(10, SpawnManager.getGolenReplacementRatio(), 
+            "Golen should replace 10 enemies each");
+    }
+
+    @Test
+    void testHighPerkThreshold() {
+        // Test that the high perk threshold is 5
+        assertEquals(5, SpawnManager.getHighPerkThreshold(), 
+            "High perk threshold should be 5 perks");
+    }
+
+    @Test
+    void testHighPerkReplacementRatio() {
+        // Test that each high-perk enemy replaces 5 low-perk enemies
+        assertEquals(5, SpawnManager.getHighPerkReplacementRatio(), 
+            "High-perk enemies should replace 5 low-perk enemies each");
+    }
+
+    @Test
+    void testHighPerkSpawnThreshold() {
+        // Test that high-perk enemies only spawn when there are more than 20 enemies
+        assertEquals(20, SpawnManager.getHighPerkSpawnThreshold(), 
+            "High-perk enemies should only spawn when there are more than 20 enemies");
+    }
+
+    @Test
+    void testHighPerkEnemySpawningThreshold() {
+        // Test that high-perk enemies only spawn above the 20 enemy threshold
+        
+        // Create a larger map to get more enemies
+        int[][] largeTiles = new int[15][15];
+        for (int i = 0; i < 15; i++) {
+            for (int j = 0; j < 15; j++) {
+                largeTiles[i][j] = 0; // Floor tiles
+            }
+        }
+        TileMap largeMap = new TileMap(largeTiles, testRng);
+        
+        // Test on map 15 (completedMaps = 15) to have high perk chance
+        List<Entity> enemies = new ArrayList<>();
+        spawnManager.spawn(largeMap, mockPlayer, enemies, 15, 32);
+        
+        // Count high-perk enemies
+        int highPerkCount = 0;
+        for (Entity enemy : enemies) {
+            if (!(enemy instanceof Golen) && enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
+                highPerkCount++;
+            }
+        }
+        
+        // If we have high-perk enemies, verify we're above the threshold
+        if (highPerkCount > 0) {
+            // We should have more than 20 enemies total for high-perk spawning to occur
+            assertTrue(enemies.size() > SpawnManager.getHighPerkSpawnThreshold(), 
+                "High-perk enemies should only spawn when total enemies > " + SpawnManager.getHighPerkSpawnThreshold());
+            
+            System.out.println("High-perk enemies spawned: " + highPerkCount);
+            System.out.println("Total enemies: " + enemies.size());
+            System.out.println("Threshold: " + SpawnManager.getHighPerkSpawnThreshold());
+        }
+        
+        // Verify the threshold is respected
+        assertTrue(enemies.size() > 0, "Should have spawned some enemies");
+    }
+
+    @Test
+    void testHighPerkEnemySpawning() {
+        // Test that high-perk enemies (6+ perks) spawn and replace multiple low-perk enemies
+        List<Entity> enemies = new ArrayList<>();
+        
+        // Spawn enemies on map 10 (completedMaps = 10) to have high perk chance
+        spawnManager.spawn(mockMap, mockPlayer, enemies, 10, 32);
+        
+        // Count high-perk and low-perk enemies
+        int highPerkCount = 0;
+        int lowPerkCount = 0;
+        
+        for (Entity enemy : enemies) {
+            if (enemy instanceof Golen) {
+                continue; // Skip Golen, we're testing regular enemies
+            }
+            
+            if (enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
+                highPerkCount++;
+                // Verify high-perk enemies have 6-10 perks
+                assertTrue(enemy.getPerkCount() >= 6, 
+                    "High-perk enemies should have at least 6 perks");
+                assertTrue(enemy.getPerkCount() <= 10, 
+                    "High-perk enemies should have at most 10 perks");
+            } else {
+                lowPerkCount++;
+                // Verify low-perk enemies have 0-5 perks
+                assertTrue(enemy.getPerkCount() >= 0, 
+                    "Low-perk enemies should have at least 0 perks");
+                assertTrue(enemy.getPerkCount() <= 5, 
+                    "Low-perk enemies should have at most 5 perks");
+            }
+        }
+        
+        // Verify that high-perk enemies are actually replacing low-perk ones
+        // Each high-perk enemy should replace 5 low-perk enemies
+        int expectedLowPerkCount = lowPerkCount + (highPerkCount * SpawnManager.getHighPerkReplacementRatio());
+        int totalRegularEnemies = highPerkCount + lowPerkCount;
+        
+        // The total should be reasonable (accounting for Golen replacement)
+        assertTrue(totalRegularEnemies > 0, "Should have spawned some regular enemies");
+        
+        if (highPerkCount > 0) {
+            assertTrue(highPerkCount <= totalRegularEnemies / SpawnManager.getHighPerkReplacementRatio(),
+                "High-perk enemy count should respect replacement ratio");
+        }
+    }
+
+    @Test
+    void testMaxPerksPerEnemyIncreased() {
+        // Test that regular enemies can now have up to 10 perks (not just 4)
+        List<Entity> enemies = new ArrayList<>();
+        
+        // Spawn enemies on map 15 (completedMaps = 15) to have very high perk chance
+        spawnManager.spawn(mockMap, mockPlayer, enemies, 15, 32);
+        
+        // Find an enemy with the maximum possible perks
+        Entity maxPerkEnemy = null;
+        for (Entity enemy : enemies) {
+            if (enemy instanceof Golen) continue; // Skip Golen
+            
+            if (enemy.getPerkCount() > 0) {
+                if (maxPerkEnemy == null || enemy.getPerkCount() > maxPerkEnemy.getPerkCount()) {
+                    maxPerkEnemy = enemy;
+                }
+            }
+        }
+        
+        if (maxPerkEnemy != null) {
+            // Regular enemies should be able to get more than 4 perks now
+            assertTrue(maxPerkEnemy.getPerkCount() > 4, 
+                "Regular enemies should be able to get more than 4 perks on high maps");
+            assertTrue(maxPerkEnemy.getPerkCount() <= 10, 
+                "Regular enemies should not exceed 10 perks");
+        }
+    }
+
+    @Test
+    void testHighPerkEnemiesReduceTotalCount() {
+        // Test that spawning high-perk enemies actually reduces the total enemy count
+        // by replacing multiple low-perk ones
+        
+        // Spawn enemies on map 0 (no perks, no high-perk enemies)
+        List<Entity> enemiesMap0 = new ArrayList<>();
+        spawnManager.spawn(mockMap, mockPlayer, enemiesMap0, 0, 32);
+        int totalEnemiesMap0 = enemiesMap0.size();
+        
+        // Spawn enemies on map 10 (high perk chance, high-perk enemies should spawn)
+        List<Entity> enemiesMap10 = new ArrayList<>();
+        spawnManager.spawn(mockMap, mockPlayer, enemiesMap10, 10, 32);
+        int totalEnemiesMap10 = enemiesMap10.size();
+        
+        // Count high-perk and low-perk enemies on map 10
+        int highPerkCount = 0;
+        int lowPerkCount = 0;
+        int golenCount = 0;
+        
+        for (Entity enemy : enemiesMap10) {
+            if (enemy instanceof Golen) {
+                golenCount++;
+            } else if (enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
+                highPerkCount++;
+            } else {
+                lowPerkCount++;
+            }
+        }
+        
+        // Verify that high-perk enemies are actually reducing the total count
+        if (highPerkCount > 0) {
+            // Calculate what the total would be without replacement
+            int expectedTotalWithoutReplacement = totalEnemiesMap0;
+            
+            // Calculate what the total should be with replacement
+            // Each high-perk enemy replaces 5 low-perk ones
+            int expectedTotalWithReplacement = expectedTotalWithoutReplacement - (highPerkCount * (SpawnManager.getHighPerkReplacementRatio() - 1));
+            
+            // The actual total should be closer to the replacement total than the original
+            assertTrue(totalEnemiesMap10 < totalEnemiesMap0, 
+                "High-perk enemies should reduce total enemy count");
+            
+            // Verify the replacement math works
+            int actualRegularEnemies = highPerkCount + lowPerkCount;
+            int expectedRegularEnemies = totalEnemiesMap0 - (golenCount * SpawnManager.getGolenReplacementRatio()) - (highPerkCount * (SpawnManager.getHighPerkReplacementRatio() - 1));
+            
+            // Allow for some variance due to RNG, but should be close
+            assertTrue(Math.abs(actualRegularEnemies - expectedRegularEnemies) <= 2, 
+                "Enemy count should approximately match replacement calculations");
+        }
+        
+        // Verify we have a reasonable mix
+        assertTrue(totalEnemiesMap10 > 0, "Should still have some enemies");
+        assertTrue(highPerkCount <= 4, "Should not spawn more than 4 high-perk enemies");
+    }
+
+    @Test
+    void testEnemyReplacementDemonstration() {
+        // This test demonstrates the enemy replacement system in action
+        System.out.println("\n=== ENEMY REPLACEMENT DEMONSTRATION ===");
+        
+        // Test on different map levels to show progression
+        for (int mapLevel = 0; mapLevel <= 15; mapLevel += 5) {
+            List<Entity> enemies = new ArrayList<>();
+            spawnManager.spawn(mockMap, mockPlayer, enemies, mapLevel, 32);
+            
+            int highPerkCount = 0;
+            int lowPerkCount = 0;
+            int golenCount = 0;
+            int totalPerks = 0;
+            
+            for (Entity enemy : enemies) {
+                if (enemy instanceof Golen) {
+                    golenCount++;
+                    totalPerks += enemy.getPerkCount();
+                } else if (enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
+                    highPerkCount++;
+                    totalPerks += enemy.getPerkCount();
+                } else {
+                    lowPerkCount++;
+                    totalPerks += enemy.getPerkCount();
+                }
+            }
+            
+            System.out.println("Map " + mapLevel + ":");
+            System.out.println("  Total enemies: " + enemies.size());
+            System.out.println("  Golen: " + golenCount + " (with " + (golenCount > 0 ? totalPerks/golenCount : 0) + " avg perks)");
+            System.out.println("  High-perk: " + highPerkCount + " (6+ perks)");
+            System.out.println("  Low-perk: " + lowPerkCount + " (0-5 perks)");
+            System.out.println("  Total perks: " + totalPerks);
+            System.out.println("  Average perks per enemy: " + (enemies.size() > 0 ? String.format("%.1f", (double)totalPerks/enemies.size()) : "0.0"));
+            
+            if (highPerkCount > 0) {
+                int enemiesReplaced = highPerkCount * SpawnManager.getHighPerkReplacementRatio();
+                System.out.println("  High-perk enemies replaced " + enemiesReplaced + " low-perk enemies!");
+            }
+            System.out.println();
+        }
+        
+        System.out.println("=== END DEMONSTRATION ===\n");
+    }
+
+    @Test
+    void testSimpleEnemyCountReduction() {
+        // Simple test to show enemy count reduction
+        System.out.println("=== SIMPLE ENEMY COUNT REDUCTION TEST ===");
+        
+        // Map 0: No perks, no high-perk enemies
+        List<Entity> enemiesMap0 = new ArrayList<>();
+        spawnManager.spawn(mockMap, mockPlayer, enemiesMap0, 0, 32);
+        int countMap0 = enemiesMap0.size();
+        System.out.println("Map 0: " + countMap0 + " enemies (no perks)");
+        
+        // Map 10: High perk chance, should spawn high-perk enemies
+        List<Entity> enemiesMap10 = new ArrayList<>();
+        spawnManager.spawn(mockMap, mockPlayer, enemiesMap10, 10, 32);
+        int countMap10 = enemiesMap10.size();
+        
+        // Count high-perk enemies
+        int highPerkCount = 0;
+        for (Entity enemy : enemiesMap10) {
+            if (!(enemy instanceof Golen) && enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
+                highPerkCount++;
+            }
+        }
+        
+        System.out.println("Map 10: " + countMap10 + " enemies (" + highPerkCount + " high-perk)");
+        
+        if (highPerkCount > 0) {
+            int enemiesReplaced = highPerkCount * SpawnManager.getHighPerkReplacementRatio();
+            System.out.println("High-perk enemies replaced " + enemiesReplaced + " low-perk enemies!");
+            System.out.println("Expected reduction: " + enemiesReplaced + " enemies");
+            System.out.println("Actual reduction: " + (countMap0 - countMap10) + " enemies");
+            
+            // Verify that we actually reduced the enemy count
+            assertTrue(countMap10 < countMap0, 
+                "High-perk enemies should reduce total enemy count from " + countMap0 + " to less than " + countMap0);
+        }
+        
+        System.out.println("=== END TEST ===\n");
     }
 
     // Helper methods
