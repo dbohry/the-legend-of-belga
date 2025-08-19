@@ -214,11 +214,11 @@ class SpawnManagerTest {
         for (Entity enemy : enemies) {
             if (enemy instanceof Golen) {
                 foundGolen = true;
-                // Golen should have perks (up to 5 unique types, but may be less due to duplicates)
+                // Golen should have perks (up to 10 unique types, but may be less due to duplicates)
                 assertTrue(enemy.getPerkCount() > 0, 
                     "Golen should have at least 1 perk to be elite enemies");
-                assertTrue(enemy.getPerkCount() <= 5, 
-                    "Golen should have at most 5 unique perk types");
+                assertTrue(enemy.getPerkCount() <= 10, 
+                    "Golen should have at most 10 unique perk types");
                 break;
             }
         }
@@ -239,16 +239,16 @@ class SpawnManagerTest {
 
     @Test
     void testHighPerkThreshold() {
-        // Test that the high perk threshold is 5
-        assertEquals(5, SpawnManager.getHighPerkThreshold(), 
-            "High perk threshold should be 5 perks");
+        // Test that the high perk threshold is 10
+        assertEquals(10, SpawnManager.getHighPerkThreshold(), 
+            "High perk threshold should be 10 perks");
     }
 
     @Test
     void testHighPerkReplacementRatio() {
-        // Test that each high-perk enemy replaces 5 low-perk enemies
-        assertEquals(5, SpawnManager.getHighPerkReplacementRatio(), 
-            "High-perk enemies should replace 5 low-perk enemies each");
+        // Test that each high-perk enemy replaces 20 low-perk enemies
+        assertEquals(20, SpawnManager.getHighPerkReplacementRatio(), 
+            "High-perk enemies should replace 20 low-perk enemies each");
     }
 
     @Test
@@ -317,23 +317,23 @@ class SpawnManagerTest {
             
             if (enemy.getPerkCount() > SpawnManager.getHighPerkThreshold()) {
                 highPerkCount++;
-                // Verify high-perk enemies have 6-10 perks
-                assertTrue(enemy.getPerkCount() >= 6, 
-                    "High-perk enemies should have at least 6 perks");
-                assertTrue(enemy.getPerkCount() <= 10, 
-                    "High-perk enemies should have at most 10 perks");
+                // Verify high-perk enemies have 11+ perks
+                assertTrue(enemy.getPerkCount() >= 11, 
+                    "High-perk enemies should have at least 11 perks");
+                assertTrue(enemy.getPerkCount() <= 20, 
+                    "High-perk enemies should have at most 20 perks");
             } else {
                 lowPerkCount++;
-                // Verify low-perk enemies have 0-5 perks
+                // Verify low-perk enemies have 0-10 perks
                 assertTrue(enemy.getPerkCount() >= 0, 
                     "Low-perk enemies should have at least 0 perks");
-                assertTrue(enemy.getPerkCount() <= 5, 
-                    "Low-perk enemies should have at most 5 perks");
+                assertTrue(enemy.getPerkCount() <= 10, 
+                    "Low-perk enemies should have at most 10 perks");
             }
         }
         
         // Verify that high-perk enemies are actually replacing low-perk ones
-        // Each high-perk enemy should replace 5 low-perk enemies
+        // Each high-perk enemy should replace 20 low-perk enemies
         int expectedLowPerkCount = lowPerkCount + (highPerkCount * SpawnManager.getHighPerkReplacementRatio());
         int totalRegularEnemies = highPerkCount + lowPerkCount;
         
@@ -411,7 +411,7 @@ class SpawnManagerTest {
             int expectedTotalWithoutReplacement = totalEnemiesMap0;
             
             // Calculate what the total should be with replacement
-            // Each high-perk enemy replaces 5 low-perk ones
+            // Each high-perk enemy replaces 20 low-perk ones
             int expectedTotalWithReplacement = expectedTotalWithoutReplacement - (highPerkCount * (SpawnManager.getHighPerkReplacementRatio() - 1));
             
             // The actual total should be closer to the replacement total than the original

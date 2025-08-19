@@ -16,11 +16,11 @@ public class SpawnManager {
     private static final double PERK_CHANCE_BASE = 0.20; // 0% chance at map 0
     private static final double PERK_CHANCE_SCALING = 0.20; // +20% per map completed
     private static final double MAX_PERK_CHANCE = 0.8; // Cap at 80% chance
-    private static final int MAX_PERKS_PER_ENEMY = 10; // Maximum perks per enemy (increased from 10 to allow full 10)
-    private static final int GOLEN_PERK_COUNT = 5; // Golen get 5 perks by default
-    private static final int HIGH_PERK_THRESHOLD = 5; // Enemies with more than this many perks are considered "high-perk"
-    private static final int HIGH_PERK_REPLACEMENT_RATIO = 5; // Each high-perk enemy replaces this many low-perk enemies
-    private static final int HIGH_PERK_SPAWN_THRESHOLD = 20; // Minimum enemies required to start spawning high-perk enemies
+    private static final int MAX_PERKS_PER_ENEMY = 50; // Maximum perks per enemy (increased from 10 to allow full 10)
+    private static final int GOLEN_PERK_COUNT = 50; // Golen get 5 perks by default
+    private static final int HIGH_PERK_THRESHOLD = 15; // Enemies with more than this many perks are considered "high-perk"
+    private static final int HIGH_PERK_REPLACEMENT_RATIO = 20; // Each high-perk enemy replaces this many low-perk enemies
+    private static final int HIGH_PERK_SPAWN_THRESHOLD = 50; // Minimum enemies required to start spawning high-perk enemies
 
     /**
      * Creates a spawn manager with non-deterministic random number generation.
@@ -47,7 +47,7 @@ public class SpawnManager {
     /**
      * Spawns enemies on the map based on completion level.
      * Golen enemies only spawn on maps with more than 60 foes and replace some regular enemies.
-     * High-perk enemies (with more than 5 perks) replace multiple low-perk enemies.
+     * High-perk enemies (with more than 10 perks) replace 20 low-perk enemies each.
      */
     public void spawn(TileMap map, Player player, List<Entity> out, int completedMaps, int tileSize) {
         out.clear();
@@ -74,13 +74,13 @@ public class SpawnManager {
         }
 
         // Calculate how many high-perk enemies we can spawn
-        // Each high-perk enemy replaces 5 low-perk enemies, so we need to calculate
+        // Each high-perk enemy replaces 20 low-perk enemies, so we need to calculate
         // how many we can afford to replace while maintaining a minimum enemy count
         int highPerkEnemyCount = calculateHighPerkEnemyCount(regularEnemyCount, completedMaps);
         
         // Calculate how many low-perk enemies we can spawn after replacements
-        // If we spawn 2 high-perk enemies, they replace 10 low-perk enemies
-        // So we can only spawn (regularEnemyCount - 10) low-perk enemies
+        // If we spawn 2 high-perk enemies, they replace 40 low-perk enemies
+        // So we can only spawn (regularEnemyCount - 40) low-perk enemies
         int lowPerkEnemyCount = Math.max(0, regularEnemyCount - (highPerkEnemyCount * HIGH_PERK_REPLACEMENT_RATIO));
         
 
@@ -213,7 +213,7 @@ public class SpawnManager {
         if (completedMaps <= 0) return; // No perks for first map
 
         // High-perk enemies get 6-10 perks to make them elite
-        // They replace 5 low-perk enemies, so they should be significantly stronger
+        // They replace 20 low-perk enemies, so they should be significantly stronger
         int perkCount = HIGH_PERK_THRESHOLD + 1 + rng.nextInt(5); // 6-10 perks
         
         // Apply the perks
@@ -245,7 +245,7 @@ public class SpawnManager {
      * @return the minimum enemy count required for Golen to spawn
      */
     public static int getGolenSpawnThreshold() {
-        return 60;
+        return 50;
     }
 
     /**
@@ -254,7 +254,7 @@ public class SpawnManager {
      * @return the maximum Golen count
      */
     public static int getMaxGolenPerMap() {
-        return 10;
+        return 100;
     }
 
     /**
@@ -269,7 +269,7 @@ public class SpawnManager {
     /**
      * Gets the perk threshold above which enemies are considered "high-perk".
      *
-     * @return the high perk threshold (5 perks)
+     * @return the high perk threshold (10 perks)
      */
     public static int getHighPerkThreshold() {
         return HIGH_PERK_THRESHOLD;
@@ -278,7 +278,7 @@ public class SpawnManager {
     /**
      * Gets the number of low-perk enemies each high-perk enemy replaces.
      *
-     * @return the replacement ratio (5 low-perk enemies per high-perk enemy)
+     * @return the replacement ratio (20 low-perk enemies per high-perk enemy)
      */
     public static int getHighPerkReplacementRatio() {
         return HIGH_PERK_REPLACEMENT_RATIO;
@@ -333,9 +333,9 @@ public class SpawnManager {
         if (totalEnemyCount <= HIGH_PERK_SPAWN_THRESHOLD) return 0; // Need more than 20 enemies to consider high-perk spawning
 
         // Calculate how many high-perk enemies can spawn based on available enemies
-        // Each high-perk enemy replaces 5 low-perk enemies
-        // We need to ensure we keep at least 5 enemies as low-perk
-        int minLowPerkEnemies = 5;
+        // Each high-perk enemy replaces 20 low-perk enemies
+        // We need to ensure we keep at least 20 enemies as low-perk
+        int minLowPerkEnemies = 20;
         int availableEnemiesForReplacement = totalEnemyCount - minLowPerkEnemies;
         
         // Calculate max high-perk enemies we can afford
