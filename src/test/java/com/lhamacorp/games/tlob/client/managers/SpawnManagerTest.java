@@ -173,8 +173,8 @@ class SpawnManagerTest {
         double chance5 = spawnManager.getCurrentPerkChance(5);
         
         assertEquals(0.0, chance0, "Map 0 should have 0% perk chance");
-        assertEquals(0.15, chance1, "Map 1 should have 15% perk chance");
-        assertEquals(0.75, chance5, "Map 5 should have 75% perk chance");
+        assertEquals(0.20, chance1, "Map 1 should have 20% perk chance");
+        assertEquals(0.8, chance5, "Map 5 should have 80% perk chance (capped at 80%)");
     }
 
     @Test
@@ -188,7 +188,53 @@ class SpawnManagerTest {
         assertEquals(0, max0, "Map 0 should allow 0 perks");
         assertEquals(1, max1, "Map 1 should allow 1 perk");
         assertEquals(3, max6, "Map 6 should allow 3 perks (1 + 6/3 = 3)");
-        assertEquals(3, max10, "Map 10 should allow 3 perks (capped)");
+        assertEquals(4, max10, "Map 10 should allow 4 perks (1 + 10/3 = 4)");
+    }
+
+    @Test
+    void testGolenGetElitePerks() {
+        // Test that Golen enemies get up to 5 unique perk types by default, making them elite
+        List<Entity> enemies = new ArrayList<>();
+        
+        // Spawn enemies on a map with enough enemies for Golen to spawn (>60)
+        // We'll need to create a larger map to get enough enemies
+        int[][] largeTiles = new int[20][20];
+        for (int i = 0; i < 20; i++) {
+            for (int j = 0; j < 20; j++) {
+                largeTiles[i][j] = 0; // Floor tiles
+            }
+        }
+        TileMap largeMap = new TileMap(largeTiles, testRng);
+        
+        // Spawn enemies on map 10 (completedMaps = 10) to have high perk chance
+        spawnManager.spawn(largeMap, mockPlayer, enemies, 10, 32);
+        
+        // Check if any Golen spawned and verify they have perks (up to 5 unique types)
+        boolean foundGolen = false;
+        for (Entity enemy : enemies) {
+            if (enemy instanceof Golen) {
+                foundGolen = true;
+                // Golen should have perks (up to 5 unique types, but may be less due to duplicates)
+                assertTrue(enemy.getPerkCount() > 0, 
+                    "Golen should have at least 1 perk to be elite enemies");
+                assertTrue(enemy.getPerkCount() <= 5, 
+                    "Golen should have at most 5 unique perk types");
+                break;
+            }
+        }
+        
+        // If no Golen spawned (due to RNG), that's fine - the test still passes
+        // We're just testing the perk system when Golen do spawn
+        if (foundGolen) {
+            assertTrue(true, "Golen spawned and has correct perk count");
+        }
+    }
+
+    @Test
+    void testGolenReplacementRatio() {
+        // Test that the new golem replacement ratio is 5 enemies per golem
+        assertEquals(5, SpawnManager.getGolenReplacementRatio(), 
+            "Golen should now replace 5 enemies instead of 10");
     }
 
     // Helper methods

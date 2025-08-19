@@ -89,7 +89,7 @@ public class BiomeEnemySpawner extends SpawnManager {
         
         // Determine Golen spawning logic
         int golenCount = calculateGolenSpawnCount(totalCount);
-        // Each Golen replaces 10 regular enemies
+        // Each Golen replaces 5 regular enemies
         int regularEnemyCount = totalCount - (golenCount * getGolenReplacementRatio());
         
         // Spawn Golen enemies first (if any)
@@ -101,7 +101,8 @@ public class BiomeEnemySpawner extends SpawnManager {
                 double y = pos[1] * tileSize + tileSize / 2.0;
                 
                 Entity golen = new Golen(x, y, getEnemyWeapon());
-                applyEnemyPerks(golen, completedMaps);
+                // Golen get 5 perks by default to make them elite enemies
+                applyGolenPerks(golen, completedMaps);
                 out.add(golen);
             }
         }
