@@ -89,7 +89,7 @@ public class BiomeEnemySpawner extends SpawnManager {
         
         // Determine Golen spawning logic
         int golenCount = calculateGolenSpawnCount(totalCount);
-        // Each Golen replaces 5 regular enemies
+        // Each Golen replaces 10 regular enemies
         int regularEnemyCount = totalCount - (golenCount * getGolenReplacementRatio());
         
         // Spawn Golen enemies first (if any)

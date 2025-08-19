@@ -51,12 +51,9 @@ public class SpawnManager {
         double mult = Math.pow(1.4, completedMaps);
         int totalCount = Math.max(1, (int) (base * mult));
 
-        // Determine Golen spawning logic
         int golenCount = calculateGolenSpawnCount(totalCount);
-        // Each Golen replaces 5 regular enemies
-        int regularEnemyCount = totalCount - (golenCount * 5);
+        int regularEnemyCount = totalCount - (golenCount * 10);
 
-        // Spawn Golen enemies first (if any)
         for (int i = 0; i < golenCount; i++) {
             int[] pos = map.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * tileSize);
             if (pos == null) pos = map.getRandomFloorTile();
@@ -163,7 +160,6 @@ public class SpawnManager {
      * Golen enemies get 5 perks by default.
      */
     protected void applyGolenPerks(Entity golen, int completedMaps) {
-        // Golen get 5 perks by default
         for (int i = 0; i < GOLEN_PERK_COUNT; i++) {
             applyRandomEnemyPerk(golen, completedMaps);
         }
@@ -210,12 +206,12 @@ public class SpawnManager {
      * @return the replacement ratio (5 regular enemies per Golen)
      */
     public static int getGolenReplacementRatio() {
-        return 5;
+        return 10;
     }
 
     /**
      * Calculates how many Golen enemies can spawn for a given total enemy count.
-     * Each Golen replaces 5 regular enemies, so we need to ensure there are enough
+     * Each Golen replaces 10 regular enemies, so we need to ensure there are enough
      * enemies to replace without going below a minimum threshold.
      *
      * @param totalEnemyCount the total number of enemies on the map
@@ -239,39 +235,4 @@ public class SpawnManager {
         return rng.nextInt(maxGolenCount + 1); // 0 to maxGolenCount
     }
 
-    /**
-     * Gets spawning statistics for debugging or UI display.
-     *
-     * @param completedMaps the number of completed maps
-     * @return a string describing the current spawning configuration
-     */
-    public String getSpawningStats(int completedMaps) {
-        int base = 3 + rng.nextInt(6); // 3..8
-        double mult = Math.pow(1.4, completedMaps);
-        int totalCount = Math.max(1, (int) (base * mult));
-
-        StringBuilder stats = new StringBuilder();
-        stats.append("Map ").append(completedMaps + 1).append(": ");
-        stats.append(totalCount).append(" total enemies");
-
-        if (totalCount > getGolenSpawnThreshold()) {
-            int maxGolenCount = Math.min(getMaxGolenPerMap(),
-                totalCount / getGolenReplacementRatio());
-            // Ensure we don't go below minimum enemy count
-            int minEnemiesToKeep = 10;
-            int maxGolenForMinEnemies = (totalCount - minEnemiesToKeep) / getGolenReplacementRatio();
-            maxGolenCount = Math.min(maxGolenCount, Math.max(0, maxGolenForMinEnemies));
-
-            if (maxGolenCount > 0) {
-                stats.append(", up to ").append(maxGolenCount).append(" Golen possible");
-                stats.append(" (each replaces ").append(getGolenReplacementRatio()).append(" enemies)");
-            } else {
-                stats.append(", no Golen (not enough enemies to replace)");
-            }
-        } else {
-            stats.append(", no Golen (below ").append(getGolenSpawnThreshold()).append(" threshold)");
-        }
-
-        return stats.toString();
-    }
 }
