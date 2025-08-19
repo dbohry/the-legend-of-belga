@@ -101,7 +101,8 @@ public class BiomeEnemySpawner extends SpawnManager {
                 double y = pos[1] * tileSize + tileSize / 2.0;
                 
                 Entity golen = new Golen(x, y, getEnemyWeapon());
-                applyEnemyPerks(golen, completedMaps);
+                // Golen get 5 perks by default to make them elite enemies
+                applyGolenPerks(golen, completedMaps);
                 out.add(golen);
             }
         }
