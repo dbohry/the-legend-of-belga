@@ -3,6 +3,8 @@ package com.lhamacorp.games.tlob.client.managers;
 import com.lhamacorp.games.tlob.client.entities.*;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
+import com.lhamacorp.games.tlob.client.weapons.Bow;
+import com.lhamacorp.games.tlob.client.weapons.Sword;
 
 import java.util.List;
 import java.util.Random;
@@ -96,9 +98,11 @@ public class SpawnManager {
                 Entity enemy;
                 // 20% chance to spawn an Archer, 80% chance for Soldier
                 if (rng.nextDouble() < 0.20) {
-                    enemy = new Archer(x, y, enemyWeapon);
+                    Weapon archerBow = new Bow(1, 120, 5, 8, 90);
+                    enemy = new Archer(x, y, archerBow);
                 } else {
-                    enemy = new Soldier(x, y, enemyWeapon);
+                    Weapon soldierSword = new Sword(2, 15, 5, 6, 60);
+                    enemy = new Soldier(x, y, soldierSword);
                 }
 
                 // Apply high perks (6-10 perks) to make them elite
@@ -119,9 +123,11 @@ public class SpawnManager {
                 Entity enemy;
                 // 20% chance to spawn an Archer, 80% chance for Soldier
                 if (rng.nextDouble() < 0.20) {
-                    enemy = new Archer(x, y, enemyWeapon);
+                    Weapon archerBow = new Bow(1, 120, 5, 8, 90);
+                    enemy = new Archer(x, y, archerBow);
                 } else {
-                    enemy = new Soldier(x, y, enemyWeapon);
+                    Weapon soldierSword = new Sword(2, 15, 5, 6, 60);
+                    enemy = new Soldier(x, y, soldierSword);
                 }
 
                 // Apply regular perks (0-5 perks)

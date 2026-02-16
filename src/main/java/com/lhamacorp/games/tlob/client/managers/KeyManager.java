@@ -24,6 +24,8 @@ public class KeyManager implements KeyListener, MouseListener {
     private static final int KEY_ALT = KeyEvent.VK_ALT;
     private static final int KEY_M = KeyEvent.VK_M;
     private static final int KEY_I = KeyEvent.VK_I;
+    private static final int KEY_1 = KeyEvent.VK_1;
+    private static final int KEY_2 = KeyEvent.VK_2;
 
     public volatile boolean up;
     public volatile boolean down;
@@ -37,6 +39,8 @@ public class KeyManager implements KeyListener, MouseListener {
     public volatile boolean dash;
     public volatile boolean mute = false;
     public volatile boolean i;
+    public volatile boolean weaponSwitch1;
+    public volatile boolean weaponSwitch2;
 
     private volatile boolean attackKey;
     private volatile boolean attackMouse;
@@ -110,6 +114,12 @@ public class KeyManager implements KeyListener, MouseListener {
             case KEY_I:
                 i = true;
                 break;
+            case KEY_1:
+                weaponSwitch1 = true;
+                break;
+            case KEY_2:
+                weaponSwitch2 = true;
+                break;
             default:
         }
     }
@@ -159,6 +169,12 @@ public class KeyManager implements KeyListener, MouseListener {
                 break;
             case KEY_I:
                 i = false;
+                break;
+            case KEY_1:
+                weaponSwitch1 = false;
+                break;
+            case KEY_2:
+                weaponSwitch2 = false;
                 break;
             default:
         }

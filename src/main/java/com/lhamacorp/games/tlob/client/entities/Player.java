@@ -1,10 +1,12 @@
 package com.lhamacorp.games.tlob.client.entities;
 
+import com.lhamacorp.games.tlob.client.inventory.Inventory;
 import com.lhamacorp.games.tlob.client.managers.AudioManager;
 import com.lhamacorp.games.tlob.client.managers.BaseGameManager;
 import com.lhamacorp.games.tlob.client.managers.KeyManager;
 import com.lhamacorp.games.tlob.client.managers.TextureManager;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
+import com.lhamacorp.games.tlob.client.weapons.Bow;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
 import com.lhamacorp.games.tlob.client.world.InputState;
 import com.lhamacorp.games.tlob.client.world.PlayerInputView;
@@ -60,6 +62,9 @@ public class Player extends Entity {
     // Level up listener for perk selection
     private LevelUpListener levelUpListener;
 
+    // Inventory system
+    private Inventory inventory;
+
     private boolean wasDashPressed = false;
     private boolean dashTriggered = false;
     private int dashCooldownTimer = 0;
@@ -102,7 +107,16 @@ public class Player extends Entity {
     private int screenShakeTimer = 0;
     private static final int AIM_INDICATOR_FADE_TIME = 60;
     private static final int ATTACK_SWING_DURATION = 10;
-    private static final int SCREEN_SHAKE_DURATION = 12;  // Increased from 8 to 12 frames
+    private static final int SCREEN_SHAKE_DURATION = 12;
+
+    // Arrow projectile state (for bow attacks)
+    private int arrowTimer = 0;
+    private int arrowTravelTicks = 30;  // Actual travel time for current arrow
+    private double arrowX = 0;
+    private double arrowY = 0;
+    private double arrowTargetX = 0;
+    private double arrowTargetY = 0;
+    private static final double ARROW_COLLISION_RADIUS = 25.0;  // Hit detection radius
 
     private static final double SWING_ARC_RADIANS = Math.PI / 2.0;
     private static final double SWING_TRAIL_SPACING = 0.1;
@@ -110,13 +124,17 @@ public class Player extends Entity {
     private static final int CROSSHAIR_SIZE = 8;
     private static final int ENEMY_HIGHLIGHT_SIZE = 12;
     private static final double ENEMY_HIGHLIGHT_RANGE_MULTIPLIER = 1.5;
-    private static final double SCREEN_SHAKE_INTENSITY = 6.0;  // Increased from 2.0 to 6.0 pixels
+    private static final double SCREEN_SHAKE_INTENSITY = 6.0;
 
     /**
      * Creates a player at the specified position with the given weapon.
      */
     public Player(double x, double y, Weapon weapon) {
         super(x, y, PLAYER_SIZE, PLAYER_SIZE, PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_MAX_STAMINA, PLAYER_MAX_MANA, PLAYER_MAX_SHIELD, 0, weapon, "Player", Alignment.NEUTRAL);
+
+        this.inventory = new Inventory(weapon);
+        this.inventory.addWeapon(new Bow(1, 200, 5, 8, 50));
+
         calculateXPToNextLevel();
     }
 
@@ -757,6 +775,31 @@ public class Player extends Entity {
             }
         }
 
+        // Update arrow projectile (if in flight)
+        if (arrowTimer > 0) {
+            arrowTimer--;
+
+            // Calculate current arrow position (linear interpolation)
+            double progress = 1.0 - (double) arrowTimer / arrowTravelTicks;
+            double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
+            double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
+
+            // Check collision with enemies
+            double dmg = getEffectiveAttackDamage();
+            for (Entity e : enemies) {
+                if (e.isAlive()) {
+                    double dist = Math.hypot(currentArrowX - e.getX(), currentArrowY - e.getY());
+                    if (dist <= ARROW_COLLISION_RADIUS) {
+                        e.damage(dmg);
+                        e.applyKnockback(arrowX, arrowY); // Knockback from arrow origin
+                        arrowTimer = 0; // Arrow consumed on hit
+                        AudioManager.playSound("slash-hit.wav", -15.0f);
+                        break; // Arrow stops after first hit
+                    }
+                }
+            }
+        }
+
         // Handle dash movement
         if (dashMovementTimer > 0) {
             dashMovementTimer--;
@@ -787,33 +830,87 @@ public class Player extends Entity {
 
         if (input.attack() && attackCooldown == 0 && attackTimer == 0 && stamina > 0 && !isBlocking) {
             stamina -= 0.5;
-            attackTimer = scaleFrom60(weapon.getDuration());
-            attackCooldown = scaleFrom60(weapon.getCooldown());
+            Weapon currentWeapon = getWeapon();
+            attackTimer = scaleFrom60(currentWeapon.getDuration());
+            attackCooldown = scaleFrom60(currentWeapon.getCooldown());
 
-            // Initialize attack swing animation
-            attackSwingPhase = ATTACK_SWING_DURATION;
-            attackSwingAngle = facingAngle;
-            // Don't trigger screen shake yet - only when we actually hit something
-
-            Shape swing = getSwordSwingShape();
-            boolean hitSomething = false;
-
-            double dmg = getEffectiveAttackDamage();
-            for (Entity e : enemies) {
-                if (e.isAlive() && swing.intersects(e.getBounds())) {
-                    e.damage(dmg);
-                    e.applyKnockback(x, y);
-                    hitSomething = true;
-                }
+            // Branch based on weapon type
+            if (currentWeapon.getType() == Weapon.WeaponType.BOW) {
+                // BOW ATTACK: Fire arrow projectile
+                performBowAttack(aimPoint, enemies);
+            } else {
+                // SWORD ATTACK: Immediate melee collision (existing code)
+                performSwordAttack(map, enemies);
             }
-            if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
-
-            if (hitSomething) AudioManager.playSound("slash-hit.wav", -15.0f);
-            else AudioManager.playSound("slash-clean.wav");
         }
 
         // --- Advance local animation clock (60 Hz sim) ---
         animTimeMs += TICK_MS;
+    }
+
+    private void performSwordAttack(TileMap map, List<Entity> enemies) {
+        // Initialize attack swing animation
+        attackSwingPhase = ATTACK_SWING_DURATION;
+        attackSwingAngle = facingAngle;
+
+        // Get swing shape and check collisions
+        Shape swing = getSwordSwingShape();
+        boolean hitSomething = false;
+
+        double dmg = getEffectiveAttackDamage();
+
+        // Damage enemies
+        for (Entity e : enemies) {
+            if (e.isAlive() && swing.intersects(e.getBounds())) {
+                e.damage(dmg);
+                e.applyKnockback(x, y);
+                hitSomething = true;
+            }
+        }
+
+        // Damage breakable walls
+        if (damageWallsInShape(swing, map, dmg)) hitSomething = true;
+
+        // Play sound effects
+        if (hitSomething) AudioManager.playSound("slash-hit.wav", -15.0f);
+        else AudioManager.playSound("slash-clean.wav");
+    }
+
+    private void performBowAttack(Point aimPoint, List<Entity> enemies) {
+        // Arrow starts at player position
+        arrowX = x;
+        arrowY = y;
+
+        int range = getWeapon().getReach();
+
+        // Determine target position
+        if (aimPoint != null) {
+            // Use mouse aim if available, but clamp to weapon range
+            double dx = aimPoint.x - x;
+            double dy = aimPoint.y - y;
+            double distance = Math.hypot(dx, dy);
+
+            if (distance > range) {
+                // Clamp to max range in the aim direction
+                double angle = Math.atan2(dy, dx);
+                arrowTargetX = x + Math.cos(angle) * range;
+                arrowTargetY = y + Math.sin(angle) * range;
+            } else {
+                arrowTargetX = aimPoint.x;
+                arrowTargetY = aimPoint.y;
+            }
+        } else {
+            // Use facing direction with max range
+            arrowTargetX = x + Math.cos(facingAngle) * range;
+            arrowTargetY = y + Math.sin(facingAngle) * range;
+        }
+
+        // Start arrow flight with duration-based travel time
+        arrowTravelTicks = scaleFrom60(getWeapon().getDuration());
+        arrowTimer = arrowTravelTicks;
+
+        // Optional: Play bow sound effect
+        AudioManager.playSound("slash-clean.wav"); // TODO: Add bow sound
     }
 
     private static int scaleFrom60(int ticksAt60) {
@@ -847,8 +944,9 @@ public class Player extends Entity {
     }
 
     private Shape getSwordSwingShape() {
-        int r = weapon.getReach();
-        int w = weapon.getWidth();
+        Weapon currentWeapon = getWeapon();
+        int r = currentWeapon.getReach();
+        int w = currentWeapon.getWidth();
 
         double theta = facingAngle;
         double cos = Math.cos(theta), sin = Math.sin(theta);
@@ -909,10 +1007,28 @@ public class Player extends Entity {
             g2.drawOval(px - width / 2 - 2, py - height / 2 - 2, width + 4, height + 4);
         }
 
-        if (attackTimer > 0) {
-            // Enhanced sword attack animation with swing phase
-            int r = weapon.getReach();
-            int w = weapon.getWidth();
+        // Draw arrow projectile if in flight
+        if (arrowTimer > 0) {
+            double progress = 1.0 - (double) arrowTimer / arrowTravelTicks;
+            double currentArrowX = arrowX + (arrowTargetX - arrowX) * progress;
+            double currentArrowY = arrowY + (arrowTargetY - arrowY) * progress;
+
+            int arrowScreenX = (int) Math.round(currentArrowX) - camX;
+            int arrowScreenY = (int) Math.round(currentArrowY) - camY;
+
+            // Draw arrow as crosshair (yellow)
+            g2.setColor(Color.YELLOW);
+            g2.setStroke(new BasicStroke(2f));
+            int arrowSize = 5;
+            g2.drawLine(arrowScreenX - arrowSize, arrowScreenY, arrowScreenX + arrowSize, arrowScreenY);
+            g2.drawLine(arrowScreenX, arrowScreenY - arrowSize, arrowScreenX, arrowScreenY + arrowSize);
+        }
+
+        if (attackTimer > 0 && getWeapon().getType() != Weapon.WeaponType.BOW) {
+            // Enhanced sword attack animation with swing phase (only for non-bow weapons)
+            Weapon currentWeapon = getWeapon();
+            int r = currentWeapon.getReach();
+            int w = currentWeapon.getWidth();
 
             // Calculate swing animation based on phase
             double swingProgress = 1.0 - (double) attackSwingPhase / ATTACK_SWING_DURATION;
@@ -1025,7 +1141,8 @@ public class Player extends Entity {
             g2.drawOval(px - aimRadius, py - aimRadius, aimRadius * 2, aimRadius * 2);
 
             // Draw weapon range indicator
-            int weaponRange = weapon.getReach();
+            Weapon currentWeapon = getWeapon();
+            int weaponRange = currentWeapon.getReach();
             g2.setColor(new Color(255, 255, 0, (int) (30 * alpha)));
             g2.setStroke(new BasicStroke(1f));
             g2.drawOval(px - weaponRange, py - weaponRange, weaponRange * 2, weaponRange * 2);
@@ -1044,7 +1161,7 @@ public class Player extends Entity {
                 for (Entity enemy : enemies) {
                     if (enemy.isAlive()) {
                         double distance = Math.hypot(enemy.getX() - x, enemy.getY() - y);
-                        if (distance < weapon.getReach() * ENEMY_HIGHLIGHT_RANGE_MULTIPLIER) {
+                        if (distance < currentWeapon.getReach() * ENEMY_HIGHLIGHT_RANGE_MULTIPLIER) {
                             int enemyScreenX = (int) Math.round(enemy.getX()) - camX;
                             int enemyScreenY = (int) Math.round(enemy.getY()) - camY;
 
@@ -1055,7 +1172,7 @@ public class Player extends Entity {
                                 ENEMY_HIGHLIGHT_SIZE * 2, ENEMY_HIGHLIGHT_SIZE * 2);
 
                             // Draw line to enemy if it's the closest one
-                            if (distance < weapon.getReach()) {
+                            if (distance < currentWeapon.getReach()) {
                                 g2.setColor(new Color(255, 100, 100, (int) (100 * alpha)));
                                 g2.setStroke(new BasicStroke(1f));
                                 g2.drawLine(px, py, enemyScreenX, enemyScreenY);
@@ -1080,8 +1197,9 @@ public class Player extends Entity {
     }
 
     public void triggerLocalAttackFx() {
-        this.attackTimer = scaleFrom60(weapon.getDuration());
-        this.attackCooldown = scaleFrom60(weapon.getCooldown());
+        Weapon currentWeapon = getWeapon();
+        this.attackTimer = scaleFrom60(currentWeapon.getDuration());
+        this.attackCooldown = scaleFrom60(currentWeapon.getCooldown());
     }
 
     public void tickClientAnimations(boolean moving) {
@@ -1201,5 +1319,28 @@ public class Player extends Entity {
             case LEFT -> TextureManager.Direction.LEFT;
             default -> TextureManager.Direction.RIGHT;
         };
+    }
+
+    /**
+     * Gets the player's inventory.
+     */
+    public Inventory getInventory() {
+        return inventory;
+    }
+
+    /**
+     * Gets the currently equipped weapon from inventory.
+     * Overrides Entity.getWeapon() to use inventory system.
+     */
+    @Override
+    public Weapon getWeapon() {
+        if (inventory != null) {
+            Weapon invWeapon = inventory.getCurrentWeapon();
+            if (invWeapon != null) {
+                return invWeapon;
+            }
+        }
+        // Fallback to parent's weapon field if inventory not initialized
+        return weapon;
     }
 }

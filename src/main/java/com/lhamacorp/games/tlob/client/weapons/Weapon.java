@@ -1,6 +1,6 @@
 package com.lhamacorp.games.tlob.client.weapons;
 
-public class Weapon {
+public abstract class Weapon {
 
     public static final int MAX_WEAPON_RANGE = 60;
     public static final int MAX_WEAPON_WIDTH = 10;

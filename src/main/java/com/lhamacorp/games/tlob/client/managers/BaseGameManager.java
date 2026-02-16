@@ -4,6 +4,7 @@ import com.lhamacorp.games.tlob.client.entities.Entity;
 import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.managers.renderers.GameOverRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.HudRenderer;
+import com.lhamacorp.games.tlob.client.managers.renderers.InventoryRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.PauseMenuRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.StatsRenderer;
 import com.lhamacorp.games.tlob.client.managers.renderers.VictoryScreenRenderer;
@@ -62,6 +63,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable, Player
     protected final VictoryScreenRenderer victoryRenderer = new VictoryScreenRenderer();
     protected final GameOverRenderer gameOverRenderer = new GameOverRenderer(new Font("Arial", Font.BOLD, 48));
     protected final StatsRenderer statsRenderer = new StatsRenderer();
+    protected final InventoryRenderer inventoryRenderer = new InventoryRenderer();
 
     protected long worldSeed = 0L;
     private Random rootRng;
@@ -81,7 +83,7 @@ public abstract class BaseGameManager extends JPanel implements Runnable, Player
 
     protected boolean musicMuted = false;
     protected float musicVolumeDb = -12.0f;
-    protected boolean statsPageOpen = false;
+    protected boolean inventoryPageOpen = false;
 
     public BaseGameManager() {
         setPreferredSize(new Dimension(SCREEN_WIDTH, SCREEN_HEIGHT));
@@ -181,15 +183,23 @@ public abstract class BaseGameManager extends JPanel implements Runnable, Player
             input.defense = keyManager.defense;
             input.dash = keyManager.dash;
 
-            // Handle I key for stats page
-            if (keyManager.i && !statsPageOpen) {
-                statsPageOpen = true;
+            // Handle I key for inventory page
+            if (keyManager.i && !inventoryPageOpen) {
+                inventoryPageOpen = true;
             }
-            if (!keyManager.i && statsPageOpen) {
-                statsPageOpen = false;
+            if (!keyManager.i && inventoryPageOpen) {
+                inventoryPageOpen = false;
             }
-            
 
+            // Handle weapon switching (1 for Sword, 2 for Bow)
+            if (keyManager.weaponSwitch1 && player != null && player.getInventory() != null) {
+                player.getInventory().switchWeapon(0);
+                keyManager.weaponSwitch1 = false;
+            }
+            if (keyManager.weaponSwitch2 && player != null && player.getInventory() != null) {
+                player.getInventory().switchWeapon(1);
+                keyManager.weaponSwitch2 = false;
+            }
 
             Point aimWorld = null;
             if (mouseInside) {
@@ -445,12 +455,12 @@ public abstract class BaseGameManager extends JPanel implements Runnable, Player
 
     private void drawOverlays(Graphics2D g2) {
         drawSeedOverlay(g2);
-        
-        // Draw stats page if open
-        if (statsPageOpen && player != null) {
-            statsRenderer.draw(g2, player);
+
+        // Draw inventory page if open
+        if (inventoryPageOpen && player != null) {
+            inventoryRenderer.draw(g2, player);
         }
-        
+
         switch (state) {
             case PAUSED -> {
                 GameConfig config = GameConfig.getInstance();
