@@ -7,217 +7,174 @@ import com.lhamacorp.games.tlob.client.entities.Player;
 import com.lhamacorp.games.tlob.client.entities.Soldier;
 import com.lhamacorp.games.tlob.client.maps.Biome;
 import com.lhamacorp.games.tlob.client.maps.TileMap;
+import com.lhamacorp.games.tlob.client.weapons.Bow;
+import com.lhamacorp.games.tlob.client.weapons.Sword;
 import com.lhamacorp.games.tlob.client.weapons.Weapon;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 /**
- * Handles spawning biome-specific enemies with different characteristics
- * and spawn patterns based on the current biome.
+ * Handles spawning biome-specific enemies with different characteristics and spawn patterns
+ * based on the current biome.
+ * <p>
+ * Which mobs exist, what they cost to spawn, and how likely they are per biome is entirely
+ * data-driven via {@link #registry}. To add a new mob type, register it once (see
+ * {@link #registerDefaultMobs()} for examples) - no other code in this class needs to change.
  */
 public class BiomeEnemySpawner extends SpawnManager {
-    
+
     /**
-     * Enemy type enumeration for consistent weight management
+     * Biome-specific enemy count multipliers. These affect the total number of enemies
+     * spawned in each biome.
      */
-    public enum EnemyType {
-        SOLDIER,
-        ARCHER,
-        GOLEN
-    }
-    
-    /**
-     * Biome-specific enemy spawn weights matrix.
-     * Each biome has weights for each enemy type.
-     * Weights are relative probabilities (higher = more likely).
-     * 
-     * Format: [BIOME][ENEMY_TYPE] = weight
-     */
-    private static final double[][] BIOME_ENEMY_WEIGHTS = {
-        // MEADOWS biome weights
-        {8.0, 2.0, 0.0},  // Soldier: 8, Archer: 2, Golen: 0 (disabled in meadows)
-        
-        // FOREST biome weights  
-        {4.0, 6.0, 0.0},  // Soldier: 4, Archer: 6, Golen: 0 (disabled in forest)
-        
-        // CAVE biome weights
-        {6.0, 4.0, 0.0},  // Soldier: 6, Archer: 4, Golen: 0 (disabled in cave)
-        
-        // DESERT biome weights
-        {5.0, 5.0, 0.0},  // Soldier: 5, Archer: 5, Golen: 0 (disabled in desert)
-        
-        // VULCAN biome weights
-        {7.0, 3.0, 0.0}   // Soldier: 7, Archer: 3, Golen: 0 (disabled in vulcan)
-    };
-    
-    /**
-     * Biome-specific enemy count multipliers.
-     * These affect the total number of enemies spawned in each biome.
-     */
-    private static final double[] BIOME_ENEMY_MULTIPLIERS = {
+    private static final double[] DEFAULT_BIOME_ENEMY_MULTIPLIERS = {
         1.0,   // MEADOWS: standard count
         1.2,   // FOREST: more enemies
-        0.8,   // CAVE: fewer enemies  
+        0.8,   // CAVE: fewer enemies
         1.1,   // DESERT: slightly more
         1.3    // VULCAN: more enemies (challenging)
     };
-    
-    // Golen spawning configuration - using parent class constants
-    
+
+    private final MobRegistry registry = new MobRegistry();
+
     public BiomeEnemySpawner(Weapon enemyWeapon) {
         super(enemyWeapon);
+        registerDefaultMobs();
     }
-    
+
     public BiomeEnemySpawner(Weapon enemyWeapon, Random rng) {
         super(enemyWeapon, rng);
+        registerDefaultMobs();
     }
-    
+
+    /** The registry backing this spawner. Register additional mobs on it to extend the roster. */
+    public MobRegistry getRegistry() {
+        return registry;
+    }
+
     @Override
     public void spawn(TileMap map, Player player, List<Entity> out, int completedMaps, int tileSize) {
         Biome biome = map.getBiome();
-        
-        // Calculate base enemy count (same as SpawnManager)
+
         int base = 3 + rng.nextInt(6); // 3..8
         double mult = Math.pow(1.4, completedMaps);
         int totalCount = Math.max(1, (int) (base * mult));
-        
-        // Apply biome-specific adjustments
         totalCount = applyBiomeAdjustments(totalCount, biome);
-        
+
         out.clear();
-        
-        // Determine Golen spawning logic
-        int golenCount = calculateGolenSpawnCount(totalCount);
-        // Each Golen replaces 10 regular enemies
-        int regularEnemyCount = totalCount - (golenCount * getGolenReplacementRatio());
-        
-        // Spawn Golen enemies first (if any)
-        for (int i = 0; i < golenCount; i++) {
-            int[] pos = map.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * tileSize);
-            if (pos == null) pos = map.getRandomFloorTile();
-            if (pos != null && !map.isWall(pos[0], pos[1])) {
-                double x = pos[0] * tileSize + tileSize / 2.0;
-                double y = pos[1] * tileSize + tileSize / 2.0;
-                
-                Entity golen = new Golen(x, y, getEnemyWeapon());
-                // Golen get 5 perks by default to make them elite enemies
-                applyGolenPerks(golen, completedMaps);
-                out.add(golen);
+
+        List<MobRegistry.MobEntry> elitePool = new ArrayList<>();
+        List<MobRegistry.MobEntry> regularPool = new ArrayList<>();
+        for (MobRegistry.MobEntry entry : registry.poolFor(biome)) {
+            (entry.isElite() ? elitePool : regularPool).add(entry);
+        }
+
+        int remainingSlots = totalCount;
+
+        // Elite mobs (slotCost > 1, e.g. Golen) spawn first and each one eats several regular slots.
+        if (!elitePool.isEmpty()) {
+            int representativeSlotCost = elitePool.stream().mapToInt(e -> e.slotCost).max().orElse(1);
+            int eliteBudget = calculateEliteSpawnCount(totalCount, representativeSlotCost);
+
+            for (int i = 0; i < eliteBudget && remainingSlots > 0; i++) {
+                MobRegistry.MobEntry chosen = registry.pickWeighted(biome, rng, elitePool);
+                if (chosen == null) break;
+                if (spawnOne(chosen, map, player, out, tileSize, completedMaps)) {
+                    remainingSlots -= chosen.slotCost;
+                }
             }
         }
-        
-        // Spawn regular enemies (Soldiers and Archers)
-        for (int i = 0; i < regularEnemyCount; i++) {
-            int[] pos = map.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * tileSize);
-            if (pos == null) pos = map.getRandomFloorTile();
-            if (pos != null && !map.isWall(pos[0], pos[1])) {
-                double x = pos[0] * tileSize + tileSize / 2.0;
-                double y = pos[1] * tileSize + tileSize / 2.0;
-                
-                Entity enemy = spawnBiomeEnemy(biome, x, y);
-                
-                // Apply perks based on map completion
-                applyEnemyPerks(enemy, completedMaps);
-                
-                out.add(enemy);
-            }
+
+        // Fill remaining slots with regular mobs.
+        for (int i = 0; i < remainingSlots; i++) {
+            MobRegistry.MobEntry chosen = registry.pickWeighted(biome, rng, regularPool);
+            if (chosen == null) break;
+            spawnOne(chosen, map, player, out, tileSize, completedMaps);
         }
     }
-    
+
+    /**
+     * Finds a spawn tile, instantiates the mob, applies perks, and adds it to {@code out}.
+     * Returns false (without adding anything) if no valid tile could be found.
+     */
+    private boolean spawnOne(MobRegistry.MobEntry entry, TileMap map, Player player, List<Entity> out,
+                              int tileSize, int completedMaps) {
+        int[] pos = map.randomFloorTileFarFrom(player.getX(), player.getY(), 12 * tileSize);
+        if (pos == null) pos = map.getRandomFloorTile();
+        if (pos == null || map.isWall(pos[0], pos[1])) return false;
+
+        double x = pos[0] * tileSize + tileSize / 2.0;
+        double y = pos[1] * tileSize + tileSize / 2.0;
+
+        Entity enemy = entry.factory.create(x, y);
+        if (entry.perkApplier != null) {
+            entry.perkApplier.accept(enemy, completedMaps);
+        } else {
+            applyEnemyPerks(enemy, completedMaps);
+        }
+        out.add(enemy);
+        return true;
+    }
+
     /**
      * Applies biome-specific adjustments to enemy count.
      */
     private int applyBiomeAdjustments(int baseCount, Biome biome) {
-        double multiplier = BIOME_ENEMY_MULTIPLIERS[biome.ordinal()];
+        double multiplier = registry.getBiomeMultiplier(biome);
         return Math.max(1, (int) (baseCount * multiplier));
     }
-    
-    /**
-     * Spawns a single enemy appropriate for the given biome.
-     */
-    private Entity spawnBiomeEnemy(Biome biome, double x, double y) {
-        // Choose enemy type based on biome weights
-        double rand = rng.nextDouble();
-        double soldierWeight = getEnemyTypeWeightInternal(biome, EnemyType.SOLDIER);
-        double archerWeight = getEnemyTypeWeightInternal(biome, EnemyType.ARCHER);
-        
-        // Normalize weights to probabilities
-        double totalWeight = soldierWeight + archerWeight;
-        double soldierProb = soldierWeight / totalWeight;
-        
-        if (rand < soldierProb) {
-            return new Soldier(x, y, getEnemyWeapon());
-        } else {
-            return new Archer(x, y, getEnemyWeapon());
-        }
-    }
-    
-    /**
-     * Gets the weight for a specific enemy type in a specific biome.
-     */
-    private double getEnemyTypeWeightInternal(Biome biome, EnemyType enemyType) {
-        return BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()];
-    }
-    
 
-    
     /**
-     * Gets the enemy weapon for spawning.
+     * Generalized version of the original "Golen replaces 10 regular enemies" rule: works for
+     * any elite mob (slotCost > 1), sized by that mob's own slot cost. Reuses the same
+     * thresholds Golen always used ({@link #getGolenSpawnThreshold()}, {@link #getMaxGolenPerMap()}),
+     * so Golen spawn rates are unchanged by this generalization.
      */
-    private Weapon getEnemyWeapon() {
-        // This is a workaround since we can't access the private field
-        // In a real implementation, we'd need to make this field protected in SpawnManager
-        return new com.lhamacorp.games.tlob.client.weapons.Sword(2, 28, 12, 10, 16);
+    private int calculateEliteSpawnCount(int totalEnemyCount, int slotCost) {
+        if (totalEnemyCount <= getGolenSpawnThreshold()) return 0;
+
+        int maxByCount = Math.min(getMaxGolenPerMap(), totalEnemyCount / slotCost);
+
+        int minEnemiesToKeep = 10;
+        int maxForMinEnemies = (totalEnemyCount - minEnemiesToKeep) / slotCost;
+        int maxCount = Math.min(maxByCount, Math.max(0, maxForMinEnemies));
+
+        return rng.nextInt(maxCount + 1); // 0..maxCount
     }
-    
-    // ===== Configuration methods for easy tweaking =====
-    
+
     /**
-     * Updates the weight for a specific enemy type in a specific biome.
-     * Useful for runtime configuration or difficulty adjustments.
+     * Registers the game's built-in mobs and their default per-biome weights. This is the
+     * template to copy when adding a new mob: pick an id, a slot cost (1 for a normal enemy,
+     * >1 for an elite that should replace several regular spawns), a factory that builds the
+     * entity (with its own weapon), and per-biome weights.
      */
-    public static void setEnemyTypeWeight(Biome biome, EnemyType enemyType, double weight) {
-        BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()] = Math.max(0.0, weight);
-    }
-    
-    /**
-     * Updates the enemy count multiplier for a specific biome.
-     */
-    public static void setBiomeEnemyMultiplier(Biome biome, double multiplier) {
-        BIOME_ENEMY_MULTIPLIERS[biome.ordinal()] = Math.max(0.1, multiplier);
-    }
-    
-    /**
-     * Gets the current weight for a specific enemy type in a specific biome.
-     */
-    public static double getEnemyTypeWeight(Biome biome, EnemyType enemyType) {
-        return BIOME_ENEMY_WEIGHTS[biome.ordinal()][enemyType.ordinal()];
-    }
-    
-    /**
-     * Gets the current enemy count multiplier for a specific biome.
-     */
-    public static double getBiomeEnemyMultiplier(Biome biome) {
-        return BIOME_ENEMY_MULTIPLIERS[biome.ordinal()];
-    }
-    
-    /**
-     * Resets all weights to their default values.
-     */
-    public static void resetToDefaults() {
-        // Reset biome enemy weights
-        BIOME_ENEMY_WEIGHTS[0] = new double[]{8.0, 2.0, 0.0}; // MEADOWS
-        BIOME_ENEMY_WEIGHTS[1] = new double[]{4.0, 6.0, 0.0}; // FOREST
-        BIOME_ENEMY_WEIGHTS[2] = new double[]{6.0, 4.0, 0.0}; // CAVE
-        BIOME_ENEMY_WEIGHTS[3] = new double[]{5.0, 5.0, 0.0}; // DESERT
-        BIOME_ENEMY_WEIGHTS[4] = new double[]{7.0, 3.0, 0.0}; // VULCAN
-        
-        // Reset biome multipliers
-        BIOME_ENEMY_MULTIPLIERS[0] = 1.0;  // MEADOWS
-        BIOME_ENEMY_MULTIPLIERS[1] = 1.2;  // FOREST
-        BIOME_ENEMY_MULTIPLIERS[2] = 0.8;  // CAVE
-        BIOME_ENEMY_MULTIPLIERS[3] = 1.1;  // DESERT
-        BIOME_ENEMY_MULTIPLIERS[4] = 1.3;  // VULCAN
+    private void registerDefaultMobs() {
+        registry.register("soldier", (x, y) -> new Soldier(x, y, new Sword(2, 28, 12, 10, 16)))
+            .setWeight(Biome.MEADOWS, 8.0)
+            .setWeight(Biome.FOREST, 4.0)
+            .setWeight(Biome.CAVE, 6.0)
+            .setWeight(Biome.DESERT, 5.0)
+            .setWeight(Biome.VULCAN, 7.0);
+
+        registry.register("archer", (x, y) -> new Archer(x, y, new Bow(1, 120, 5, 8, 90)))
+            .setWeight(Biome.MEADOWS, 2.0)
+            .setWeight(Biome.FOREST, 6.0)
+            .setWeight(Biome.CAVE, 4.0)
+            .setWeight(Biome.DESERT, 5.0)
+            .setWeight(Biome.VULCAN, 3.0);
+
+        // Golen is an elite: it replaces 10 regular spawn slots and always gets full perks,
+        // regardless of map completion, so it applies its own perk routine instead of the
+        // default scaling one.
+        registry.register("golen", getGolenReplacementRatio(), this::applyGolenPerks,
+                (x, y) -> new Golen(x, y, new Sword(2, 28, 12, 10, 16)));
+        // Disabled by default in every biome (weight 0.0), matching the original behavior;
+        // enable it per biome with registry.get("golen").setWeight(biome, weight).
+
+        for (Biome biome : Biome.values()) {
+            registry.setBiomeMultiplier(biome, DEFAULT_BIOME_ENEMY_MULTIPLIERS[biome.ordinal()]);
+        }
     }
 }
